@@ -73,7 +73,7 @@ class Volta:
 
 
 @dataclass
-class LinhaClassificacao:
+class LinhaClassificação:
     posicao: int
     piloto_id: int
     nome: str

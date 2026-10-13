@@ -13,7 +13,7 @@ from decimal import Decimal
 from typing import Callable, Dict, List, Optional
 
 from drivers.base import Passing
-from .modelos import (EstadoSessao, LinhaClassificacao, TipoSessao, Volta,
+from .modelos import (EstadoSessao, LinhaClassificação, TipoSessao, Volta,
                       formatar_tempo)
 
 log = logging.getLogger("kchrono.motor")
@@ -210,11 +210,11 @@ class MotorCorrida:
         return volta
 
     # ----- classificação -----
-    def classificacao(self) -> List[LinhaClassificacao]:
+    def classificacao(self) -> List[LinhaClassificação]:
         itens = list(self._pilotos.values())
         itens.sort(key=lambda e: (-len(e.voltas), e.melhor_volta_us or 0,
                                   e.tempo_total_us))
-        linhas: List[LinhaClassificacao] = []
+        linhas: List[LinhaClassificação] = []
         lider = itens[0] if itens else None
         for pos, estado in enumerate(itens, start=1):
             gap = ""
@@ -229,7 +229,7 @@ class MotorCorrida:
             desvio = ((sum((t - media) ** 2 for t in tempos) / len(tempos)) ** 0.5
                       if tempos else None)
             consistencia = max(0.0, 100 * (1 - desvio / media)) if media else None
-            linhas.append(LinhaClassificacao(
+            linhas.append(LinhaClassificação(
                 posicao=pos, piloto_id=estado.piloto_id, nome=estado.nome,
                 voltas=len(estado.voltas),
                 tempo_total_us=estado.tempo_total_us,

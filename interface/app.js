@@ -1671,6 +1671,18 @@ function mudarTransparencia(v) {
   const txt = document.getElementById("cfg-transparencia-txt");
   if (txt) txt.textContent = `${t}%`;
 }
+
+function mudarIdioma(lang) {
+  localStorage.setItem("kchrono_idioma", lang);
+  location.reload();
+}
+
+function carregarIdioma() {
+  const lang = localStorage.getItem("kchrono_idioma") || "pt_BR";
+  const sel = document.getElementById("cfg-idioma");
+  if (sel) sel.value = lang;
+  return lang;
+}
 async function carregarEstadoPista() {
   try {
     const r = await api("pista/estado", "GET");
@@ -2045,6 +2057,7 @@ function previewNome() {
 // init — abre direto no painel completo do operador, com o menu sempre visível
 previewNome();
 aplicarAparencia();
+carregarIdioma();
 conectarWS();
 carregarNotificacoes();
 mostrar("operador");

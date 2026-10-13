@@ -1,0 +1,2231 @@
+# KChrono — tradução en_US
+# Gerado automaticamente a partir do kchrono.pot
+
+msgid ""
+msgstr ""
+"Project-Id-Version: KChrono 1.0.0\n"
+PO-Revision-Date: 2026-10-13 12:00+0000
+"Last-Translator: Auto-generated\n"
+"Language-Team: KChrono Team\n"
+"Language: en_US\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+msgid "%pista/bandeira?cor=&motivo=bandeira:"
+msgstr "%pista/bandeira?cor=&motivo=bandeira:"
+
+msgid "'dbus_fast.errors'"
+msgstr "'dbus_fast.errors'"
+
+msgid "'IPython.core'"
+msgstr "'IPython.core'"
+
+msgid "'multipart.exceptions'"
+msgstr "'multipart.exceptions'"
+
+msgid "'multipart.multipart'"
+msgstr "'multipart.multipart'"
+
+msgid "'mypy.errorcodes'"
+msgstr "'mypy.errorcodes'"
+
+msgid "'python_multipart.exceptions'"
+msgstr "'python_multipart.exceptions'"
+
+msgid "'python_multipart.multipart'"
+msgstr "'python_multipart.multipart'"
+
+msgid "'winrt.windows.applicationmodel'"
+msgstr "'winrt.windows.applicationmodel'"
+
+msgid "'winrt.windows.devices.bluetooth.rfcomm'"
+msgstr "'winrt.windows.devices.bluetooth.rfcomm'"
+
+msgid "'winrt.windows.networking'"
+msgstr "'winrt.windows.networking'"
+
+msgid "'winrt.windows.security'"
+msgstr "'winrt.windows.security'"
+
+msgid "'winrt.windows.system'"
+msgstr "'winrt.windows.system'"
+
+msgid "'winrt.windows.ui'"
+msgstr "'winrt.windows.ui'"
+
+msgid "(atual )não foi possível verificar:  ·  · já é a versão mais recenteversao/baixar?chave=baixado:"
+msgstr "(atual )não foi possível verificar:  ·  · já é a versão mais recenteversao/baixar?chave=baixado:"
+
+msgid "(feminina), a voz"
+msgstr "(feminina), a voz"
+
+msgid ", só com QR Code."
+msgstr ", só com QR Code."
+
+msgid ". A cada abertura do aplicativo um novo"
+msgstr ". A cada abertura do aplicativo um novo"
+
+msgid "/api/relatorios/.csv"
+msgstr "/api/relatorios/.csv"
+
+msgid "/api/som/audio?chave=&nome=áudio definido para \"\" ()Não foi possível enviar o áudio: Falha no envio do áudio: som/audio?chave=áudio removido de \"\"frase-🔊"
+msgstr "/api/som/audio?chave=&nome=áudio definido para \"\" ()Não foi possível enviar o áudio: Falha no envio do áudio: som/audio?chave=áudio removido de \"\"frase-🔊"
+
+msgid "0 voltas"
+msgstr "0 laps"
+
+msgid "0% = cartões sólidos · 80% = máximo de transparência."
+msgstr "0% = solid cards · 80% = max transparency."
+
+msgid "5 · 4 · 3 · 2 · 1 · VAI!"
+msgstr "5 · 4 · 3 · 2 · 1 · GO!"
+
+msgid "_csv"
+msgstr "_csv"
+
+msgid "_manylinux"
+msgstr "_manylinux"
+
+msgid "_multiprocessing"
+msgstr "_multiprocessing"
+
+msgid "_pyrepl.console"
+msgstr "_pyrepl.console"
+
+msgid "_pyrepl.simple_interact"
+msgstr "_pyrepl.simple_interact"
+
+msgid "_pyrepl.unix_console"
+msgstr "_pyrepl.unix_console"
+
+msgid "_pyrepl.windows_console"
+msgstr "_pyrepl.windows_console"
+
+msgid "_pyrepl.windows_eventqueue"
+msgstr "_pyrepl.windows_eventqueue"
+
+msgid "_tokenize"
+msgstr "_tokenize"
+
+msgid "a atualizar"
+msgstr "a atualizar"
+
+msgid "A bandeira ativa aparece imediatamente no telão."
+msgstr "Active flag appears immediately on TV screen."
+
+msgid "a cada N voltas do líder"
+msgstr "every N leader laps"
+
+msgid "Acesso da direção de prova —"
+msgstr "Race control access —"
+
+msgid "acesso total"
+msgstr "full access"
+
+msgid "Acúmulo na fila de upload"
+msgstr "Upload queue buildup"
+
+msgid "admin"
+msgstr "admin"
+
+msgid "Admin"
+msgstr "Admin"
+
+msgid "Admin → Gerente de Pista"
+msgstr "Admin → Track Manager"
+
+msgid "Admin → 🏎️ Pilotos"
+msgstr "Admin → 🏎️ Drivers"
+
+msgid "adota a chave primária"
+msgstr "adopts primary key"
+
+msgid "adotou a chave primária"
+msgstr "adopted primary key"
+
+msgid "aguardando"
+msgstr "waiting"
+
+msgid "aguardando largada…"
+msgstr "waiting largada…"
+
+msgid "aguardando verificação…"
+msgstr "waiting verificação…"
+
+msgid "aiohttp._cookie_helpers"
+msgstr "aiohttp._cookie_helpers"
+
+msgid "aiohttp.cookiejar"
+msgstr "aiohttp.cookiejar"
+
+msgid "aiohttp.multipart"
+msgstr "aiohttp.multipart"
+
+msgid "aiohttp.web_urldispatcher"
+msgstr "aiohttp.web_urldispatcher"
+
+msgid "Amarela"
+msgstr "Yellow"
+
+msgid "Anunciar quando bate o recorde da pista"
+msgstr "Anunciar quando bate o recorde da pista"
+
+msgid "Anunciar quando o piloto bate o próprio recorde"
+msgstr "Anunciar quando o piloto bate o próprio recorde"
+
+msgid "Anúncio por voz"
+msgstr "Announcement por voz"
+
+msgid "Anúncios automáticos"
+msgstr "Anúncios automáticos"
+
+msgid "Aparência"
+msgstr "Appearance"
+
+msgid "Apelido"
+msgstr "Nickname"
+
+msgid "Aponte a câmera do celular para entrar no painel do gerente"
+msgstr "Aponte a câmera do celular para entrar no painel do gerente"
+
+msgid "Após salvar"
+msgstr "Após salvar"
+
+msgid "asyncio.windows_events"
+msgstr "asyncio.windows_events"
+
+msgid "asyncio.windows_utils"
+msgstr "asyncio.windows_utils"
+
+msgid "Atenção pilotos"
+msgstr "Atenção pilotos"
+
+msgid "Atenção pilotos, preparem-se para a largada!"
+msgstr "Atenção pilotos, preparem-se para a largada!"
+
+msgid "ativar/desativar este som"
+msgstr "ativar/desativar este som"
+
+msgid "Aviso de saída (s)"
+msgstr "Aviso de saída (s)"
+
+msgid "Ação"
+msgstr "Action"
+
+msgid "backports.tarfile"
+msgstr "backports.tarfile"
+
+msgid "Bandeira"
+msgstr "Flag"
+
+msgid "Bandeira / estado da pista"
+msgstr "Bandeira / estado da pista"
+
+msgid "Bandeira amarela"
+msgstr "Flag amarela"
+
+msgid "bat-#tabela-pilotos tr[data-piloto=\"\"]"
+msgstr "bat-#tabela-pilotos tr[data-piloto=\"\"]"
+
+msgid "Baterias &amp; espectro RF"
+msgstr "Baterias &amp; espectro RF"
+
+msgid "baterias/{chave}"
+msgstr "baterias/{chave}"
+
+msgid "Bipe a cada luz acesa"
+msgstr "Bipe a cada luz acesa"
+
+msgid "Bipe longo no \"VAI!\""
+msgstr "Bipe longo no \"VAI!\""
+
+msgid "Bipe na contagem regressiva"
+msgstr "Bipe na contagem regressiva"
+
+msgid "Bipes do semáforo"
+msgstr "Bipes do semáforo"
+
+msgid "BLE · descoberta + captura p/ decodificar o protocolo"
+msgstr "BLE · descoberta + captura p/ decodificar o protocolo"
+
+msgid "bleak"
+msgstr "bleak"
+
+msgid "bleak._compat"
+msgstr "bleak._compat"
+
+msgid "bleak.args"
+msgstr "bleak.args"
+
+msgid "bleak.args.bluez"
+msgstr "bleak.args.bluez"
+
+msgid "bleak.args.corebluetooth"
+msgstr "bleak.args.corebluetooth"
+
+msgid "bleak.args.winrt"
+msgstr "bleak.args.winrt"
+
+msgid "bleak.assigned_numbers"
+msgstr "bleak.assigned_numbers"
+
+msgid "bleak.backends"
+msgstr "bleak.backends"
+
+msgid "bleak.backends._utils"
+msgstr "bleak.backends._utils"
+
+msgid "bleak.backends.bluezdbus"
+msgstr "bleak.backends.bluezdbus"
+
+msgid "bleak.backends.bluezdbus.advertisement_monitor"
+msgstr "bleak.backends.bluezdbus.advertisement_monitor"
+
+msgid "bleak.backends.bluezdbus.client"
+msgstr "bleak.backends.bluezdbus.client"
+
+msgid "bleak.backends.bluezdbus.defs"
+msgstr "bleak.backends.bluezdbus.defs"
+
+msgid "bleak.backends.bluezdbus.manager"
+msgstr "bleak.backends.bluezdbus.manager"
+
+msgid "bleak.backends.bluezdbus.scanner"
+msgstr "bleak.backends.bluezdbus.scanner"
+
+msgid "bleak.backends.bluezdbus.signals"
+msgstr "bleak.backends.bluezdbus.signals"
+
+msgid "bleak.backends.bluezdbus.utils"
+msgstr "bleak.backends.bluezdbus.utils"
+
+msgid "bleak.backends.bluezdbus.version"
+msgstr "bleak.backends.bluezdbus.version"
+
+msgid "bleak.backends.characteristic"
+msgstr "bleak.backends.characteristic"
+
+msgid "bleak.backends.client"
+msgstr "bleak.backends.client"
+
+msgid "bleak.backends.corebluetooth"
+msgstr "bleak.backends.corebluetooth"
+
+msgid "bleak.backends.corebluetooth.CentralManagerDelegate"
+msgstr "bleak.backends.corebluetooth.CentralManagerDelegate"
+
+msgid "bleak.backends.corebluetooth.client"
+msgstr "bleak.backends.corebluetooth.client"
+
+msgid "bleak.backends.corebluetooth.PeripheralDelegate"
+msgstr "bleak.backends.corebluetooth.PeripheralDelegate"
+
+msgid "bleak.backends.corebluetooth.scanner"
+msgstr "bleak.backends.corebluetooth.scanner"
+
+msgid "bleak.backends.corebluetooth.utils"
+msgstr "bleak.backends.corebluetooth.utils"
+
+msgid "bleak.backends.descriptor"
+msgstr "bleak.backends.descriptor"
+
+msgid "bleak.backends.device"
+msgstr "bleak.backends.device"
+
+msgid "bleak.backends.p4android"
+msgstr "bleak.backends.p4android"
+
+msgid "bleak.backends.p4android.client"
+msgstr "bleak.backends.p4android.client"
+
+msgid "bleak.backends.p4android.defs"
+msgstr "bleak.backends.p4android.defs"
+
+msgid "bleak.backends.p4android.scanner"
+msgstr "bleak.backends.p4android.scanner"
+
+msgid "bleak.backends.p4android.utils"
+msgstr "bleak.backends.p4android.utils"
+
+msgid "bleak.backends.scanner"
+msgstr "bleak.backends.scanner"
+
+msgid "bleak.backends.service"
+msgstr "bleak.backends.service"
+
+msgid "bleak.backends.winrt"
+msgstr "bleak.backends.winrt"
+
+msgid "bleak.backends.winrt.client"
+msgstr "bleak.backends.winrt.client"
+
+msgid "bleak.backends.winrt.scanner"
+msgstr "bleak.backends.winrt.scanner"
+
+msgid "bleak.backends.winrt.util"
+msgstr "bleak.backends.winrt.util"
+
+msgid "bleak.exc"
+msgstr "bleak.exc"
+
+msgid "bleak.uuids"
+msgstr "bleak.uuids"
+
+msgid "bleak_pythonista"
+msgstr "bleak_pythonista"
+
+msgid "Buscar por nome/transponder…"
+msgstr "Search por nome/transponder…"
+
+msgid "Buscar sessão, piloto, campeonato, configuração…"
+msgstr "Buscar sessão, piloto, campeonato, configuração…"
+
+msgid "Bônus melhor volta"
+msgstr "Bonus melhor volta"
+
+msgid "Bônus pole"
+msgstr "Bonus pole"
+
+msgid "C:\\Users\\luisr\\AppData\\Local\\Python\\pythoncore-3.14-64\\DLLs\\_multiprocessing.pyd"
+msgstr "C:\\Users\\luisr\\AppData\\Local\\Python\\pythoncore-3.14-64\\DLLs\\_multiprocessing.pyd"
+
+msgid "C:\\Users\\luisr\\AppData\\Local\\Python\\pythoncore-3.14-64\\Lib\\site-packages\\aiohttp\\_http_parser.cp314-win_amd64.pyd"
+msgstr "C:\\Users\\luisr\\AppData\\Local\\Python\\pythoncore-3.14-64\\Lib\\site-packages\\aiohttp\\_http_parser.cp314-win_amd64.pyd"
+
+msgid "C:\\Users\\luisr\\AppData\\Local\\Python\\pythoncore-3.14-64\\Lib\\site-packages\\aiohttp\\_http_writer.cp314-win_amd64.pyd"
+msgstr "C:\\Users\\luisr\\AppData\\Local\\Python\\pythoncore-3.14-64\\Lib\\site-packages\\aiohttp\\_http_writer.cp314-win_amd64.pyd"
+
+msgid "C:\\Users\\luisr\\AppData\\Local\\Python\\pythoncore-3.14-64\\Lib\\site-packages\\aiohttp\\_websocket\\mask.cp314-win_amd64.pyd"
+msgstr "C:\\Users\\luisr\\AppData\\Local\\Python\\pythoncore-3.14-64\\Lib\\site-packages\\aiohttp\\_websocket\\mask.cp314-win_amd64.pyd"
+
+msgid "C:\\Users\\luisr\\AppData\\Local\\Python\\pythoncore-3.14-64\\Lib\\site-packages\\aiohttp\\_websocket\\reader_c.cp314-win_amd64.pyd"
+msgstr "C:\\Users\\luisr\\AppData\\Local\\Python\\pythoncore-3.14-64\\Lib\\site-packages\\aiohttp\\_websocket\\reader_c.cp314-win_amd64.pyd"
+
+msgid "C:\\Users\\luisr\\AppData\\Local\\Python\\pythoncore-3.14-64\\Lib\\site-packages\\charset_normalizer\\cd.cp314-win_amd64.pyd"
+msgstr "C:\\Users\\luisr\\AppData\\Local\\Python\\pythoncore-3.14-64\\Lib\\site-packages\\charset_normalizer\\cd.cp314-win_amd64.pyd"
+
+msgid "C:\\Users\\luisr\\AppData\\Local\\Python\\pythoncore-3.14-64\\Lib\\site-packages\\charset_normalizer\\md.cp314-win_amd64.pyd"
+msgstr "C:\\Users\\luisr\\AppData\\Local\\Python\\pythoncore-3.14-64\\Lib\\site-packages\\charset_normalizer\\md.cp314-win_amd64.pyd"
+
+msgid "C:\\Users\\luisr\\AppData\\Local\\Python\\pythoncore-3.14-64\\Lib\\site-packages\\frozenlist\\_frozenlist.cp314-win_amd64.pyd"
+msgstr "C:\\Users\\luisr\\AppData\\Local\\Python\\pythoncore-3.14-64\\Lib\\site-packages\\frozenlist\\_frozenlist.cp314-win_amd64.pyd"
+
+msgid "C:\\Users\\luisr\\AppData\\Local\\Python\\pythoncore-3.14-64\\Lib\\site-packages\\httptools\\parser\\parser.cp314-win_amd64.pyd"
+msgstr "C:\\Users\\luisr\\AppData\\Local\\Python\\pythoncore-3.14-64\\Lib\\site-packages\\httptools\\parser\\parser.cp314-win_amd64.pyd"
+
+msgid "C:\\Users\\luisr\\AppData\\Local\\Python\\pythoncore-3.14-64\\Lib\\site-packages\\httptools\\parser\\url_parser.cp314-win_amd64.pyd"
+msgstr "C:\\Users\\luisr\\AppData\\Local\\Python\\pythoncore-3.14-64\\Lib\\site-packages\\httptools\\parser\\url_parser.cp314-win_amd64.pyd"
+
+msgid "C:\\Users\\luisr\\AppData\\Local\\Python\\pythoncore-3.14-64\\Lib\\site-packages\\markupsafe\\_speedups.cp314-win_amd64.pyd"
+msgstr "C:\\Users\\luisr\\AppData\\Local\\Python\\pythoncore-3.14-64\\Lib\\site-packages\\markupsafe\\_speedups.cp314-win_amd64.pyd"
+
+msgid "C:\\Users\\luisr\\AppData\\Local\\Python\\pythoncore-3.14-64\\Lib\\site-packages\\multidict\\_multidict.cp314-win_amd64.pyd"
+msgstr "C:\\Users\\luisr\\AppData\\Local\\Python\\pythoncore-3.14-64\\Lib\\site-packages\\multidict\\_multidict.cp314-win_amd64.pyd"
+
+msgid "C:\\Users\\luisr\\AppData\\Local\\Python\\pythoncore-3.14-64\\Lib\\site-packages\\propcache\\_helpers_c.cp314-win_amd64.pyd"
+msgstr "C:\\Users\\luisr\\AppData\\Local\\Python\\pythoncore-3.14-64\\Lib\\site-packages\\propcache\\_helpers_c.cp314-win_amd64.pyd"
+
+msgid "C:\\Users\\luisr\\AppData\\Local\\Python\\pythoncore-3.14-64\\Lib\\site-packages\\pydantic_core\\_pydantic_core.cp314-win_amd64.pyd"
+msgstr "C:\\Users\\luisr\\AppData\\Local\\Python\\pythoncore-3.14-64\\Lib\\site-packages\\pydantic_core\\_pydantic_core.cp314-win_amd64.pyd"
+
+msgid "C:\\Users\\luisr\\AppData\\Local\\Python\\pythoncore-3.14-64\\Lib\\site-packages\\websockets\\speedups.cp314-win_amd64.pyd"
+msgstr "C:\\Users\\luisr\\AppData\\Local\\Python\\pythoncore-3.14-64\\Lib\\site-packages\\websockets\\speedups.cp314-win_amd64.pyd"
+
+msgid "C:\\Users\\luisr\\AppData\\Local\\Python\\pythoncore-3.14-64\\Lib\\site-packages\\winrt\\_winrt.cp314-win_amd64.pyd"
+msgstr "C:\\Users\\luisr\\AppData\\Local\\Python\\pythoncore-3.14-64\\Lib\\site-packages\\winrt\\_winrt.cp314-win_amd64.pyd"
+
+msgid "C:\\Users\\luisr\\AppData\\Local\\Python\\pythoncore-3.14-64\\Lib\\site-packages\\winrt\\_winrt_windows_devices_bluetooth.cp314-win_amd64.pyd"
+msgstr "C:\\Users\\luisr\\AppData\\Local\\Python\\pythoncore-3.14-64\\Lib\\site-packages\\winrt\\_winrt_windows_devices_bluetooth.cp314-win_amd64.pyd"
+
+msgid "C:\\Users\\luisr\\AppData\\Local\\Python\\pythoncore-3.14-64\\Lib\\site-packages\\winrt\\_winrt_windows_devices_bluetooth_advertisement.cp314-win_amd64.pyd"
+msgstr "C:\\Users\\luisr\\AppData\\Local\\Python\\pythoncore-3.14-64\\Lib\\site-packages\\winrt\\_winrt_windows_devices_bluetooth_advertisement.cp314-win_amd64.pyd"
+
+msgid "C:\\Users\\luisr\\AppData\\Local\\Python\\pythoncore-3.14-64\\Lib\\site-packages\\winrt\\_winrt_windows_devices_bluetooth_genericattributeprofile.cp314-win_amd64.pyd"
+msgstr "C:\\Users\\luisr\\AppData\\Local\\Python\\pythoncore-3.14-64\\Lib\\site-packages\\winrt\\_winrt_windows_devices_bluetooth_genericattributeprofile.cp314-win_amd64.pyd"
+
+msgid "C:\\Users\\luisr\\AppData\\Local\\Python\\pythoncore-3.14-64\\Lib\\site-packages\\winrt\\_winrt_windows_devices_enumeration.cp314-win_amd64.pyd"
+msgstr "C:\\Users\\luisr\\AppData\\Local\\Python\\pythoncore-3.14-64\\Lib\\site-packages\\winrt\\_winrt_windows_devices_enumeration.cp314-win_amd64.pyd"
+
+msgid "C:\\Users\\luisr\\AppData\\Local\\Python\\pythoncore-3.14-64\\Lib\\site-packages\\winrt\\_winrt_windows_devices_radios.cp314-win_amd64.pyd"
+msgstr "C:\\Users\\luisr\\AppData\\Local\\Python\\pythoncore-3.14-64\\Lib\\site-packages\\winrt\\_winrt_windows_devices_radios.cp314-win_amd64.pyd"
+
+msgid "C:\\Users\\luisr\\AppData\\Local\\Python\\pythoncore-3.14-64\\Lib\\site-packages\\winrt\\_winrt_windows_foundation.cp314-win_amd64.pyd"
+msgstr "C:\\Users\\luisr\\AppData\\Local\\Python\\pythoncore-3.14-64\\Lib\\site-packages\\winrt\\_winrt_windows_foundation.cp314-win_amd64.pyd"
+
+msgid "C:\\Users\\luisr\\AppData\\Local\\Python\\pythoncore-3.14-64\\Lib\\site-packages\\winrt\\_winrt_windows_foundation_collections.cp314-win_amd64.pyd"
+msgstr "C:\\Users\\luisr\\AppData\\Local\\Python\\pythoncore-3.14-64\\Lib\\site-packages\\winrt\\_winrt_windows_foundation_collections.cp314-win_amd64.pyd"
+
+msgid "C:\\Users\\luisr\\AppData\\Local\\Python\\pythoncore-3.14-64\\Lib\\site-packages\\winrt\\_winrt_windows_storage_streams.cp314-win_amd64.pyd"
+msgstr "C:\\Users\\luisr\\AppData\\Local\\Python\\pythoncore-3.14-64\\Lib\\site-packages\\winrt\\_winrt_windows_storage_streams.cp314-win_amd64.pyd"
+
+msgid "C:\\Users\\luisr\\AppData\\Local\\Python\\pythoncore-3.14-64\\Lib\\site-packages\\yaml\\_yaml.cp314-win_amd64.pyd"
+msgstr "C:\\Users\\luisr\\AppData\\Local\\Python\\pythoncore-3.14-64\\Lib\\site-packages\\yaml\\_yaml.cp314-win_amd64.pyd"
+
+msgid "C:\\Users\\luisr\\AppData\\Local\\Python\\pythoncore-3.14-64\\Lib\\site-packages\\yarl\\_quoting_c.cp314-win_amd64.pyd"
+msgstr "C:\\Users\\luisr\\AppData\\Local\\Python\\pythoncore-3.14-64\\Lib\\site-packages\\yarl\\_quoting_c.cp314-win_amd64.pyd"
+
+msgid "Campeonato"
+msgstr "Championship"
+
+msgid "campeonato"
+msgstr "campeonato"
+
+msgid "Campeonato do site"
+msgstr "Championship do site"
+
+msgid "Campeonato no KChrono"
+msgstr "Championship no KChrono"
+
+msgid "campeonato/ctad:"
+msgstr "campeonato/ctad:"
+
+msgid "campeonato: avançou para"
+msgstr "campeonato: avançou para"
+
+msgid "Campeonatos"
+msgstr "Campeonatos"
+
+msgid "Campeonatos etapas ranking"
+msgstr "Campeonatos etapas ranking"
+
+msgid "campeonatos/{chave}"
+msgstr "campeonatos/{chave}"
+
+msgid "Central de Voltas"
+msgstr "Central de Laps"
+
+msgid "Chave A, B, C…"
+msgstr "Chave A, B, C…"
+
+msgid "Chave do campeonato no site"
+msgstr "Chave do campeonato no site"
+
+msgid "Chave no CTAD"
+msgstr "Key no CTAD"
+
+msgid "Check-in de pilotos"
+msgstr "Check-in de pilotos"
+
+msgid "Check-in dos pilotos ("
+msgstr "Check-in dos pilotos ("
+
+msgid "checkin?piloto_id=&presente=anúncio: sessao/adicionar-volta?piloto_id=&tempo_s=volta manual adicionada (s)relatorios/sessoes"
+msgstr "checkin?piloto_id=&presente=anúncio: sessao/adicionar-volta?piloto_id=&tempo_s=volta manual adicionada (s)relatorios/sessoes"
+
+msgid "Classificação"
+msgstr "Qualifying"
+
+msgid "Classificação ao vivo"
+msgstr "Qualifying ao vivo"
+
+msgid "click._winconsole"
+msgstr "click._winconsole"
+
+msgid "clique em \"Gerar\" acima"
+msgstr "clique em \"Gerar\" acima"
+
+msgid "clique em “Gerar QR”"
+msgstr "clique em “Gerar QR”"
+
+msgid "Comprimir arquivo antes do envio"
+msgstr "Comprimir arquivo antes do envio"
+
+msgid "comtypes._post_coinit._cominterface_meta_patcher"
+msgstr "comtypes._post_coinit._cominterface_meta_patcher"
+
+msgid "comtypes.errorinfo"
+msgstr "comtypes.errorinfo"
+
+msgid "Conexão com o decoder"
+msgstr "Conexão com o decoder"
+
+msgid "Configuração da sessão"
+msgstr "Configuration da sessão"
+
+msgid "Configuração já estava igual à do site."
+msgstr "Configuração já estava igual à do site."
+
+msgid "Configurações aparência wallpaper transparência"
+msgstr "Configurações aparência wallpaper transparência"
+
+msgid "Consistência"
+msgstr "Consistency"
+
+msgid "Console de eventos"
+msgstr "Console de eventos"
+
+msgid "Conta do CTAD"
+msgstr "CTAD Account"
+
+msgid "Contagem regressiva"
+msgstr "Countdown regressiva"
+
+msgid "Controla o quanto o wallpaper aparece através dos cartões e tabelas."
+msgstr "Controla o quanto o wallpaper aparece através dos cartões e tabelas."
+
+msgid "Controle da sessão"
+msgstr "Controle da sessão"
+
+msgid "Controle fino da fila, reprocessamento e log por upload — Fase 3."
+msgstr "Controle fino da fila, reprocessamento e log por upload — Fase 3."
+
+msgid "CoreBluetooth"
+msgstr "CoreBluetooth"
+
+msgid "Corrida"
+msgstr "Race"
+
+msgid "corrida"
+msgstr "corrida"
+
+msgid "Créditos"
+msgstr "Credits"
+
+msgid "csv"
+msgstr "csv"
+
+msgid "Decoder"
+msgstr "Decoder"
+
+msgid "Decoder offline / perda de conexão"
+msgstr "Decoder offline / perda de conexão"
+
+msgid "decoder —"
+msgstr "decoder —"
+
+msgid "Decoder: —"
+msgstr "Decoder: —"
+
+msgid "Desvio"
+msgstr "Std Dev"
+
+msgid "Desvio padrão"
+msgstr "Std Dev padrão"
+
+msgid "do CTAD a configuração do"
+msgstr "do CTAD a configuração do"
+
+msgid "dotenv.ipython"
+msgstr "dotenv.ipython"
+
+msgid "dotenv.variables"
+msgstr "dotenv.variables"
+
+msgid "drivers.easylap"
+msgstr "drivers.easylap"
+
+msgid "drivers.lapwiz"
+msgstr "drivers.lapwiz"
+
+msgid "drivers.mylaps_p3"
+msgstr "drivers.mylaps_p3"
+
+msgid "Drop rounds (descartar piores)"
+msgstr "Drop rounds (descartar piores)"
+
+msgid "Duração (min)"
+msgstr "Duração (min)"
+
+msgid "Duração (min/voltas)"
+msgstr "Duração (min/voltas)"
+
+msgid "Duração exata do campeonato:"
+msgstr "Duração exata do campeonato:"
+
+msgid "E-mail (conta do site)"
+msgstr "E-mail (conta do site)"
+
+msgid "easylap"
+msgstr "easylap"
+
+msgid "EASYLAP-USB"
+msgstr "EASYLAP-USB"
+
+msgid "EASYLAP-USB (serial Robitronic)"
+msgstr "EASYLAP-USB (serial Robitronic)"
+
+msgid "edge_tts"
+msgstr "edge_tts"
+
+msgid "edge_tts.communicate"
+msgstr "edge_tts.communicate"
+
+msgid "edge_tts.constants"
+msgstr "edge_tts.constants"
+
+msgid "edge_tts.data_classes"
+msgstr "edge_tts.data_classes"
+
+msgid "edge_tts.drm"
+msgstr "edge_tts.drm"
+
+msgid "edge_tts.exceptions"
+msgstr "edge_tts.exceptions"
+
+msgid "edge_tts.srt_composer"
+msgstr "edge_tts.srt_composer"
+
+msgid "edge_tts.submaker"
+msgstr "edge_tts.submaker"
+
+msgid "edge_tts.typing"
+msgstr "edge_tts.typing"
+
+msgid "edge_tts.version"
+msgstr "edge_tts.version"
+
+msgid "edge_tts.voices"
+msgstr "edge_tts.voices"
+
+msgid "Editar piloto — nome=&apelido=&fonia=&telefone=&funcoes=&transponders=pilotos/editar?piloto_id=&ativo=&pilotos/criar?piloto salvo: Não foi possível salvar:"
+msgstr "Editar piloto — nome=&apelido=&fonia=&telefone=&funcoes=&transponders=pilotos/editar?piloto_id=&ativo=&pilotos/criar?piloto salvo: Não foi possível salvar:"
+
+msgid "Em pista"
+msgstr "Em pista"
+
+msgid "email.errors"
+msgstr "email.errors"
+
+msgid "Enviar ao CTAD automaticamente (Fase 3)"
+msgstr "Enviar ao CTAD automaticamente (Fase 3)"
+
+msgid "Enviar automaticamente após salvar a sessão"
+msgstr "Enviar automaticamente após salvar a sessão"
+
+msgid "Est. de tempo"
+msgstr "Est. de tempo"
+
+msgid "Est. de voltas"
+msgstr "Est. de voltas"
+
+msgid "Estado da pista (bandeiras)"
+msgstr "Estado da pista (bandeiras)"
+
+msgid "Eventos"
+msgstr "Events"
+
+msgid "ex.: acidente na curva 3"
+msgstr "ex.: acidente na curva 3"
+
+msgid "ex.: Bateria 3 na pista em 2 minutos"
+msgstr "ex.: Bateria 3 na pista em 2 minutos"
+
+msgid "ex.: Joan Silva — pronúncia no TTS"
+msgstr "ex.: Joan Silva — pronúncia no TTS"
+
+msgid "Exibição do telão"
+msgstr "Exibição do telão"
+
+msgid "Falar cada volta (nome + tempo)"
+msgstr "Falar cada volta (nome + tempo)"
+
+msgid "falhas aguardando retry"
+msgstr "falhas waiting retry"
+
+msgid "fastapi.security.open_id_connect_url"
+msgstr "fastapi.security.open_id_connect_url"
+
+msgid "Fechada"
+msgstr "Closed"
+
+msgid "Filtrar pilotos…"
+msgstr "Filter pilotos…"
+
+msgid "Filtrar por tipo/data…"
+msgstr "Filter por tipo/data…"
+
+msgid "Fonia"
+msgstr "Phonetic"
+
+msgid "fonia"
+msgstr "fonia"
+
+msgid "Fonia (como falar)"
+msgstr "Phonetic (como falar)"
+
+msgid "Formato do nome de salvamento"
+msgstr "Formato do nome de salvamento"
+
+msgid "Frase antes da largada"
+msgstr "Frase antes da largada"
+
+msgid "Frases faladas — edite, ouça (▶) ou troque por um áudio (📁)"
+msgstr "Frases faladas — edite, ouça (▶) ou troque por um áudio (📁)"
+
+msgid "Frequência"
+msgstr "Frequency"
+
+msgid "Gap"
+msgstr "Gap"
+
+msgid "Gerar QR"
+msgstr "Generate QR"
+
+msgid "Gerar relatórios"
+msgstr "Generate relatórios"
+
+msgid "Gerente de Pista"
+msgstr "Gerente de Track"
+
+msgid "Gerente de Pista bandeira check-in"
+msgstr "Gerente de Pista bandeira check-in"
+
+msgid "gestor"
+msgstr "gestor"
+
+msgid "Gestor de pista"
+msgstr "Manager de pista"
+
+msgid "Ghost lap descartado"
+msgstr "Ghost lap descartado"
+
+msgid "Grids &amp; chaves (diretiva CTAD)"
+msgstr "Grids &amp; chaves (diretiva CTAD)"
+
+msgid "Gráfico Posições"
+msgstr "Position Chart"
+
+msgid "gzip"
+msgstr "gzip"
+
+msgid "Hardware Decoders drivers"
+msgstr "Hardware Decoders drivers"
+
+msgid "historico/histórico:  ·  voltas ·  piloto(s)Enviar esta sessão ao CTAD?\\n\\n\\n\\nEla ficará visível no site do CTAD (pode ser apagada por lá depois).sync/enviar?sessao_id=CTAD:  → enviados , duplicados , falhas Enviado ao CTAD!\\n\\nenviados: \\nduplicados: \\nfalhas: \\n\\nchave: Falha no envio: Voltas volta a volta —  piloto(s),  voltas"
+msgstr "historico/histórico:  ·  voltas ·  piloto(s)Enviar esta sessão ao CTAD?\\n\\n\\n\\nEla ficará visível no site do CTAD (pode ser apagada por lá depois).sync/enviar?sessao_id=CTAD:  → enviados , duplicados , falhas Enviado ao CTAD!\\n\\nenviados: \\nduplicados: \\nfalhas: \\n\\nchave: Falha no envio: Voltas volta a volta —  piloto(s),  voltas"
+
+msgid "Histórico completo ·"
+msgstr "History completo ·"
+
+msgid "hmin mincampeonato/ctad?chave="
+msgstr "hmin mincampeonato/ctad?chave="
+
+msgid "http.cookiejar"
+msgstr "http.cookiejar"
+
+msgid "http.cookies"
+msgstr "http.cookies"
+
+msgid "httptools.parser.errors"
+msgstr "httptools.parser.errors"
+
+msgid "httptools.parser.url_parser"
+msgstr "httptools.parser.url_parser"
+
+msgid "ID da pista"
+msgstr "Track ID"
+
+msgid "Imagem de fundo da área de conteúdo. Fica salva neste navegador."
+msgstr "Imagem de fundo da área de conteúdo. Fica salva neste navegador."
+
+msgid "Inscrever piloto"
+msgstr "Inscrever piloto"
+
+msgid "inscritos"
+msgstr "inscritos"
+
+msgid "Inscritos ("
+msgstr "Entries ("
+
+msgid "Interrupções marcam a sessão como \"interrompida\" e prevalecem sobre o automático."
+msgstr "Interrupções marcam a sessão como \"interrompida\" e prevalecem sobre o automático."
+
+msgid "Intervalo"
+msgstr "Interval"
+
+msgid "Inverter bateria seguinte"
+msgstr "Inverter bateria seguinte"
+
+msgid "inverterSegundaBateria"
+msgstr "inverterSegundaBateria"
+
+msgid "IP do decoder"
+msgstr "IP do decoder"
+
+msgid "ipaddress"
+msgstr "ipaddress"
+
+msgid "IPython"
+msgstr "IPython"
+
+msgid "itens aguardando envio"
+msgstr "itens waiting envio"
+
+msgid "itsdangerous.serializer"
+msgstr "itsdangerous.serializer"
+
+msgid "itsdangerous.url_safe"
+msgstr "itsdangerous.url_safe"
+
+msgid "json.decoder"
+msgstr "json.decoder"
+
+msgid "KChrono · Gerente de Pista"
+msgstr "KChrono · Gerente de Pista"
+
+msgid "KChrono — Gerente de Pista"
+msgstr "KChrono — Gerente de Pista"
+
+msgid "KChrono — Telão"
+msgstr "KChrono — TV Screen"
+
+msgid "lapwiz"
+msgstr "lapwiz"
+
+msgid "Ler posições a cada N voltas do líder — 0 desliga"
+msgstr "Ler posições a cada N voltas do líder — 0 desliga"
+
+msgid "limite de pilotos por chave (divisão da grade em A/B/C…)"
+msgstr "limite de pilotos por chave (divisão da grade em A/B/C…)"
+
+msgid "Limpar"
+msgstr "Clear"
+
+msgid "Locutor (TTS)"
+msgstr "Announcer (TTS)"
+
+msgid "Locução / anúncios"
+msgstr "Locução / anúncios"
+
+msgid "Luzes e contagem usam o mesmo relógio — sincronizados por construção."
+msgstr "Luzes e contagem usam o mesmo relógio — sincronizados por construção."
+
+msgid "Manter cópia local do arquivo"
+msgstr "Manter cópia local do arquivo"
+
+msgid "Marcar todos"
+msgstr "Marcar todos"
+
+msgid "melhor da sessão"
+msgstr "melhor da sessão"
+
+msgid "Melhor tempo"
+msgstr "Melhor tempo"
+
+msgid "Melhor volta"
+msgstr "Best lap"
+
+msgid "Melhores"
+msgstr "Bests"
+
+msgid "Modo offline: acumular na fila e enviar quando voltar a conexão"
+msgstr "Modo offline: acumular na fila e enviar quando voltar a conexão"
+
+msgid "modulegraph cross reference for kchrono_launcher.py, pyi_rth_inspect.py, pyi_rth_multiprocessing.py, pyi_rth_pkgutil.py, pyi_rth_pythoncom.py, pyi_rth_pywintypes.py, pyi_rth_setuptools.py"
+msgstr "modulegraph cross reference for kchrono_launcher.py, pyi_rth_inspect.py, pyi_rth_multiprocessing.py, pyi_rth_pkgutil.py, pyi_rth_pythoncom.py, pyi_rth_pywintypes.py, pyi_rth_setuptools.py"
+
+msgid "Motivo"
+msgstr "Reason"
+
+msgid "motivo (ex.: carro na brita)"
+msgstr "motivo (ex.: carro na brita)"
+
+msgid "multipart"
+msgstr "multipart"
+
+msgid "multiprocessing"
+msgstr "multiprocessing"
+
+msgid "multiprocessing.AuthenticationError"
+msgstr "multiprocessing.AuthenticationError"
+
+msgid "multiprocessing.BufferTooShort"
+msgstr "multiprocessing.BufferTooShort"
+
+msgid "multiprocessing.connection"
+msgstr "multiprocessing.connection"
+
+msgid "multiprocessing.context"
+msgstr "multiprocessing.context"
+
+msgid "multiprocessing.dummy"
+msgstr "multiprocessing.dummy"
+
+msgid "multiprocessing.dummy.connection"
+msgstr "multiprocessing.dummy.connection"
+
+msgid "multiprocessing.forkserver"
+msgstr "multiprocessing.forkserver"
+
+msgid "multiprocessing.get_context"
+msgstr "multiprocessing.get_context"
+
+msgid "multiprocessing.get_start_method"
+msgstr "multiprocessing.get_start_method"
+
+msgid "multiprocessing.heap"
+msgstr "multiprocessing.heap"
+
+msgid "multiprocessing.managers"
+msgstr "multiprocessing.managers"
+
+msgid "multiprocessing.Pipe"
+msgstr "multiprocessing.Pipe"
+
+msgid "multiprocessing.pool"
+msgstr "multiprocessing.pool"
+
+msgid "multiprocessing.popen_fork"
+msgstr "multiprocessing.popen_fork"
+
+msgid "multiprocessing.popen_forkserver"
+msgstr "multiprocessing.popen_forkserver"
+
+msgid "multiprocessing.popen_spawn_posix"
+msgstr "multiprocessing.popen_spawn_posix"
+
+msgid "multiprocessing.popen_spawn_win32"
+msgstr "multiprocessing.popen_spawn_win32"
+
+msgid "multiprocessing.process"
+msgstr "multiprocessing.process"
+
+msgid "multiprocessing.queues"
+msgstr "multiprocessing.queues"
+
+msgid "multiprocessing.reduction"
+msgstr "multiprocessing.reduction"
+
+msgid "multiprocessing.resource_sharer"
+msgstr "multiprocessing.resource_sharer"
+
+msgid "multiprocessing.resource_tracker"
+msgstr "multiprocessing.resource_tracker"
+
+msgid "multiprocessing.set_start_method"
+msgstr "multiprocessing.set_start_method"
+
+msgid "multiprocessing.shared_memory"
+msgstr "multiprocessing.shared_memory"
+
+msgid "multiprocessing.sharedctypes"
+msgstr "multiprocessing.sharedctypes"
+
+msgid "multiprocessing.spawn"
+msgstr "multiprocessing.spawn"
+
+msgid "multiprocessing.synchronize"
+msgstr "multiprocessing.synchronize"
+
+msgid "multiprocessing.TimeoutError"
+msgstr "multiprocessing.TimeoutError"
+
+msgid "multiprocessing.util"
+msgstr "multiprocessing.util"
+
+msgid "multiprocessing.Value"
+msgstr "multiprocessing.Value"
+
+msgid "MyLaps / AMB P3"
+msgstr "MyLaps / AMB P3"
+
+msgid "MyLaps / AMB P3 (TCP)"
+msgstr "MyLaps / AMB P3 (TCP)"
+
+msgid "Média"
+msgstr "Average"
+
+msgid "nenhum campeonato em andamento"
+msgstr "nenhum campeonato em andamento"
+
+msgid "nenhum inscrito"
+msgstr "nenhum inscrito"
+
+msgid "nenhuma bateria — clique em \"Gerar heats &amp; finais\""
+msgstr "nenhuma bateria — clique em \"Gerar heats &amp; finais\""
+
+msgid "nenhuma volta registrada"
+msgstr "nenhuma volta registrada"
+
+msgid "no histórico"
+msgstr "no histórico"
+
+msgid "Nome"
+msgstr "Name"
+
+msgid "Nome *"
+msgstr "Name *"
+
+msgid "Notificações alertas"
+msgstr "Notificações alertas"
+
+msgid "Notificações do navegador (web)"
+msgstr "Notificações do navegador (web)"
+
+msgid "Novo campeonato"
+msgstr "New campeonato"
+
+msgid "Novo piloto"
+msgstr "New piloto"
+
+msgid "Novo recorde de volta"
+msgstr "Novo recorde de volta"
+
+msgid "novos"
+msgstr "novos"
+
+msgid "nucleo.campeonatos"
+msgstr "nucleo.campeonatos"
+
+msgid "nucleo.motor_corrida"
+msgstr "nucleo.motor_corrida"
+
+msgid "nucleo.voz"
+msgstr "nucleo.voz"
+
+msgid "nunca é sobrescrito por outro número"
+msgstr "nunca é sobrescrito por outro número"
+
+msgid "nº de finais"
+msgstr "nº de finais"
+
+msgid "Nº máximo por chave"
+msgstr "Nº máximo por chave"
+
+msgid "não"
+msgstr "não"
+
+msgid "não configurado"
+msgstr "não configurado"
+
+msgid "Não foi possível ouvir: 🔊 Teste de voz —"
+msgstr "Não foi possível ouvir: 🔊 Teste de voz —"
+
+msgid "Não foi possível salvar: posições anunciadas ()''busca?q="
+msgstr "Não foi possível salvar: posições anunciadas ()''busca?q="
+
+msgid "Número"
+msgstr "Number"
+
+msgid "O que deve gerar notificação"
+msgstr "O que deve gerar notificação"
+
+msgid "opentelemetry.environment_variables"
+msgstr "opentelemetry.environment_variables"
+
+msgid "Operador painel"
+msgstr "Operator painel"
+
+msgid "Os bipes tocam no próprio telão (WebAudio) — funcionam em qualquer dispositivo."
+msgstr "Os bipes tocam no próprio telão (WebAudio) — funcionam em qualquer dispositivo."
+
+msgid "p3"
+msgstr "p3"
+
+msgid "P3 · EASYLAP · LapWiz"
+msgstr "P3 · EASYLAP · LapWiz"
+
+msgid "packaging._manylinux"
+msgstr "packaging._manylinux"
+
+msgid "packaging._musllinux"
+msgstr "packaging._musllinux"
+
+msgid "packaging._tokenizer"
+msgstr "packaging._tokenizer"
+
+msgid "Painel do Operador"
+msgstr "Dashboard do Operator"
+
+msgid "para voltar à voz."
+msgstr "para voltar à voz."
+
+msgid "Piloto"
+msgstr "Driver"
+
+msgid "Pilotos"
+msgstr "Pilotos"
+
+msgid "pilotos"
+msgstr "pilotos"
+
+msgid "pilotos cadastrados"
+msgstr "pilotos cadastrados"
+
+msgid "Pilotos cadastrados ("
+msgstr "Pilotos cadastrados ("
+
+msgid "Pilotos com histórico de voltas não são apagados"
+msgstr "Pilotos com histórico de voltas não são apagados"
+
+msgid "Pilotos do site"
+msgstr "Pilotos do site"
+
+msgid "Pilotos fonia telefone funções transponder"
+msgstr "Pilotos fonia telefone funções transponder"
+
+msgid "pilotos por chave (Chave A/B/C)"
+msgstr "pilotos por chave (Chave A/B/C)"
+
+msgid "Pilotos por prova"
+msgstr "Pilotos por prova"
+
+msgid "pilotosMetadados"
+msgstr "pilotosMetadados"
+
+msgid "pilotosPorChave"
+msgstr "pilotosPorChave"
+
+msgid "pista aberta (verde)"
+msgstr "pista aberta (verde)"
+
+msgid "pista livre"
+msgstr "pista livre"
+
+msgid "Pista livre"
+msgstr "Track livre"
+
+msgid "Porta TCP"
+msgstr "TCP Port"
+
+msgid "Posição"
+msgstr "Position"
+
+msgid "presentes)"
+msgstr "presentes)"
+
+msgid "pronto"
+msgstr "pronto"
+
+msgid "Pronto — o painel abre direto, sem digitar nada."
+msgstr "Pronto — o painel abre direto, sem digitar nada."
+
+msgid "Pré-visualização:"
+msgstr "Pré-visualização:"
+
+msgid "prévia:  novo(s)sync/pilotos: prévia do site —  pilotosimportado:  novo(s)sync/pilotos:  criados,  atualizados do CTADCriar \"\" no cadastro do CTAD?\\n\\nsync/pilotos/exportar?piloto_id=sync/pilotos: criado: sync/pilotos:"
+msgstr "prévia:  novo(s)sync/pilotos: prévia do site —  pilotosimportado:  novo(s)sync/pilotos:  criados,  atualizados do CTADCriar \"\" no cadastro do CTAD?\\n\\nsync/pilotos/exportar?piloto_id=sync/pilotos: criado: sync/pilotos:"
+
+msgid "pydantic._internal._serializers"
+msgstr "pydantic._internal._serializers"
+
+msgid "pydantic.error_wrappers"
+msgstr "pydantic.error_wrappers"
+
+msgid "pydantic.errors"
+msgstr "pydantic.errors"
+
+msgid "pydantic.experimental.pipeline"
+msgstr "pydantic.experimental.pipeline"
+
+msgid "pydantic.functional_serializers"
+msgstr "pydantic.functional_serializers"
+
+msgid "pydantic.PydanticSchemaGenerationError"
+msgstr "pydantic.PydanticSchemaGenerationError"
+
+msgid "pydantic.PydanticUserError"
+msgstr "pydantic.PydanticUserError"
+
+msgid "pydantic.v1.error_wrappers"
+msgstr "pydantic.v1.error_wrappers"
+
+msgid "pydantic.v1.errors"
+msgstr "pydantic.v1.errors"
+
+msgid "pyi_rth_multiprocessing.py"
+msgstr "pyi_rth_multiprocessing.py"
+
+msgid "python cli.py easylap --porta COM3"
+msgstr "python cli.py easylap --porta COM3"
+
+msgid "python cli.py lapwiz"
+msgstr "python cli.py lapwiz"
+
+msgid "python_multipart"
+msgstr "python_multipart"
+
+msgid "pyttsx3"
+msgstr "pyttsx3"
+
+msgid "pyttsx3.driver"
+msgstr "pyttsx3.driver"
+
+msgid "pyttsx3.drivers"
+msgstr "pyttsx3.drivers"
+
+msgid "pyttsx3.drivers.dummy"
+msgstr "pyttsx3.drivers.dummy"
+
+msgid "pyttsx3.drivers.sapi5"
+msgstr "pyttsx3.drivers.sapi5"
+
+msgid "pyttsx3.engine"
+msgstr "pyttsx3.engine"
+
+msgid "pyttsx3.voice"
+msgstr "pyttsx3.voice"
+
+msgid "Pódio top 3 durante a corrida"
+msgstr "Pódio top 3 durante a corrida"
+
+msgid "QR ativo · vale por  dia(s) ·  anterior(es) revogado(s)admin/qrcode?dias=QR Code de acesso gerado (vale  dia(s)) QR Code(s) ativo(s). · validade restante ~h.QR Code revogado ()url(\"\")%"
+msgstr "QR ativo · vale por  dia(s) ·  anterior(es) revogado(s)admin/qrcode?dias=QR Code de acesso gerado (vale  dia(s)) QR Code(s) ativo(s). · validade restante ~h.QR Code revogado ()url(\"\")%"
+
+msgid "QR Code de acesso (sem senha)"
+msgstr "QR Code de acesso (sem senha)"
+
+msgid "QR de Gestão Remota"
+msgstr "QR de Gestão Remota"
+
+msgid "quando a corrida corre do início ao fim sem interrupções"
+msgstr "quando a corrida corre do início ao fim sem interrupções"
+
+msgid "quando houver interrupção (pausa, reinício, volta editada) — sugerindo o nome no formato acima"
+msgstr "quando houver interrupção (pausa, reinício, volta editada) — sugerindo o nome no formato acima"
+
+msgid "Quando salvar"
+msgstr "Quando salvar"
+
+msgid "Quantos pilotos ler"
+msgstr "Quantos pilotos ler"
+
+msgid "Ranking"
+msgstr "Ranking"
+
+msgid "Ranking geral (drop rounds + bônus)"
+msgstr "Ranking geral (drop rounds + bônus)"
+
+msgid "Record da sessão"
+msgstr "Record da sessão"
+
+msgid "Record Pista"
+msgstr "Record Track"
+
+msgid "Registrar na trilha de auditoria (ação, usuário, hora)"
+msgstr "Registrar na trilha de auditoria (ação, usuário, hora)"
+
+msgid "Regras de upload"
+msgstr "Regras de upload"
+
+msgid "Relatórios CSV exportar"
+msgstr "Relatórios CSV exportar"
+
+msgid "remover áudio"
+msgstr "remover áudio"
+
+msgid "requests.cookies"
+msgstr "requests.cookies"
+
+msgid "requests.hooks"
+msgstr "requests.hooks"
+
+msgid "roadmap — serial/USB"
+msgstr "roadmap — serial/USB"
+
+msgid "Rotação automática de perfis (30s)"
+msgstr "Rotação automática de perfis (30s)"
+
+msgid "SAPI do Windows"
+msgstr "SAPI do Windows"
+
+msgid "Script"
+msgstr "Script"
+
+msgid "Selecionar"
+msgstr "Select"
+
+msgid "Selecione uma sessão"
+msgstr "Selecione uma sessão"
+
+msgid "sem digitar senha"
+msgstr "sem digitar senha"
+
+msgid "sem inscritos — inscreva pilotos para montar as chaves"
+msgstr "sem inscritos — inscreva pilotos para montar as chaves"
+
+msgid "sem ligação"
+msgstr "sem ligação"
+
+msgid "Sem ligação"
+msgstr "Sem ligação"
+
+msgid "sem pista"
+msgstr "sem pista"
+
+msgid "sem senha"
+msgstr "sem senha"
+
+msgid "sem sessão"
+msgstr "sem sessão"
+
+msgid "sem sessão ativa"
+msgstr "sem sessão ativa"
+
+msgid "sem voltas na sessão"
+msgstr "sem voltas na sessão"
+
+msgid "sem wallpaper — fundo padrão"
+msgstr "sem wallpaper — fundo padrão"
+
+msgid "Semáforo da largada"
+msgstr "Semáforo da largada"
+
+msgid "Senha"
+msgstr "Password"
+
+msgid "senha do CTAD"
+msgstr "senha do CTAD"
+
+msgid "Sequência do campeonato"
+msgstr "Sequência do campeonato"
+
+msgid "serial"
+msgstr "serial"
+
+msgid "serial 38400 8N1 · protocolo Robitronic — conecte p/ testar"
+msgstr "serial 38400 8N1 · protocolo Robitronic — conecte p/ testar"
+
+msgid "serial.serialcli"
+msgstr "serial.serialcli"
+
+msgid "serial.serialjava"
+msgstr "serial.serialjava"
+
+msgid "serial.serialposix"
+msgstr "serial.serialposix"
+
+msgid "serial.serialutil"
+msgstr "serial.serialutil"
+
+msgid "serial.serialwin32"
+msgstr "serial.serialwin32"
+
+msgid "serial.tools"
+msgstr "serial.tools"
+
+msgid "serial.tools.list_ports"
+msgstr "serial.tools.list_ports"
+
+msgid "serial.tools.list_ports_common"
+msgstr "serial.tools.list_ports_common"
+
+msgid "serial.tools.list_ports_linux"
+msgstr "serial.tools.list_ports_linux"
+
+msgid "serial.tools.list_ports_osx"
+msgstr "serial.tools.list_ports_osx"
+
+msgid "serial.tools.list_ports_posix"
+msgstr "serial.tools.list_ports_posix"
+
+msgid "serial.tools.list_ports_windows"
+msgstr "serial.tools.list_ports_windows"
+
+msgid "serial.win32"
+msgstr "serial.win32"
+
+msgid "servidor.som"
+msgstr "servidor.som"
+
+msgid "SESSÃO"
+msgstr "SESSÃO"
+
+msgid "sessão"
+msgstr "sessão"
+
+msgid "sessões com voltas."
+msgstr "sessões com voltas."
+
+msgid "setuptools._distutils.compilers.C.errors"
+msgstr "setuptools._distutils.compilers.C.errors"
+
+msgid "setuptools._distutils.compilers.errors"
+msgstr "setuptools._distutils.compilers.errors"
+
+msgid "setuptools._distutils.errors"
+msgstr "setuptools._distutils.errors"
+
+msgid "setuptools._vendor.backports.tarfile"
+msgstr "setuptools._vendor.backports.tarfile"
+
+msgid "setuptools._vendor.backports.tarfile.compat"
+msgstr "setuptools._vendor.backports.tarfile.compat"
+
+msgid "setuptools._vendor.backports.tarfile.compat.py38"
+msgstr "setuptools._vendor.backports.tarfile.compat.py38"
+
+msgid "setuptools._vendor.more_itertools.recipes"
+msgstr "setuptools._vendor.more_itertools.recipes"
+
+msgid "setuptools._vendor.packaging._manylinux"
+msgstr "setuptools._vendor.packaging._manylinux"
+
+msgid "setuptools._vendor.packaging._musllinux"
+msgstr "setuptools._vendor.packaging._musllinux"
+
+msgid "setuptools._vendor.packaging._tokenizer"
+msgstr "setuptools._vendor.packaging._tokenizer"
+
+msgid "setuptools._vendor.zipp"
+msgstr "setuptools._vendor.zipp"
+
+msgid "setuptools._vendor.zipp._functools"
+msgstr "setuptools._vendor.zipp._functools"
+
+msgid "setuptools._vendor.zipp.compat"
+msgstr "setuptools._vendor.zipp.compat"
+
+msgid "setuptools._vendor.zipp.compat.overlay"
+msgstr "setuptools._vendor.zipp.compat.overlay"
+
+msgid "setuptools._vendor.zipp.compat.py310"
+msgstr "setuptools._vendor.zipp.compat.py310"
+
+msgid "setuptools._vendor.zipp.compat.py313"
+msgstr "setuptools._vendor.zipp.compat.py313"
+
+msgid "setuptools._vendor.zipp.glob"
+msgstr "setuptools._vendor.zipp.glob"
+
+msgid "setuptools.config._validate_pyproject.error_reporting"
+msgstr "setuptools.config._validate_pyproject.error_reporting"
+
+msgid "setuptools.errors"
+msgstr "setuptools.errors"
+
+msgid "setuptools.windows_support"
+msgstr "setuptools.windows_support"
+
+msgid "SHA-256 — mesmo arquivo não duplica"
+msgstr "SHA-256 — mesmo arquivo não duplica"
+
+msgid "simplejson"
+msgstr "simplejson"
+
+msgid "sincronizados com o CTAD"
+msgstr "sincronizados com o CTAD"
+
+msgid "Sincronização CTAD: aguardando"
+msgstr "Sync CTAD: waiting"
+
+msgid "sistema de chaves"
+msgstr "sistema de chaves"
+
+msgid "Situação dos drivers"
+msgstr "Situação dos drivers"
+
+msgid "SKYRC LapWiz (Bluetooth BLE)"
+msgstr "SKYRC LapWiz (Bluetooth BLE)"
+
+msgid "SKYRC LapWiz (RT004)"
+msgstr "SKYRC LapWiz (RT004)"
+
+msgid "Sobre créditos versão"
+msgstr "About créditos versão"
+
+msgid "Somente manual"
+msgstr "Somente manual"
+
+msgid "starlette.middleware.errors"
+msgstr "starlette.middleware.errors"
+
+msgid "superuser"
+msgstr "superuser"
+
+msgid "Superuser"
+msgstr "Superuser"
+
+msgid "SUPERUSER"
+msgstr "SUPERUSER"
+
+msgid "sync.sincronizador"
+msgstr "sync.sincronizador"
+
+msgid "são locais e nunca são sobrescritos."
+msgstr "são locais e nunca são sobrescritos."
+
+msgid "tarfile"
+msgstr "tarfile"
+
+msgid "TCP · serial · Bluetooth"
+msgstr "TCP · serial · Bluetooth"
+
+msgid "Telefone"
+msgstr "Phone"
+
+msgid "Telefone (chave do piloto)"
+msgstr "Telefone (chave do piloto)"
+
+msgid "Telefone (chave primária)"
+msgstr "Phone (chave primária)"
+
+msgid "telefone é a chave primária"
+msgstr "telefone é a chave primária"
+
+msgid "telefone — chave primária"
+msgstr "telefone — chave primária"
+
+msgid "Telão Semáforo colunas"
+msgstr "TV Screen Semáforo colunas"
+
+msgid "Tempo"
+msgstr "Time"
+
+msgid "Tempo da volta (s)"
+msgstr "Tempo da volta (s)"
+
+msgid "Tempo entre carros (s)"
+msgstr "Tempo entre carros (s)"
+
+msgid "Tempo entre luzes"
+msgstr "Time entre luzes"
+
+msgid "Tempo médio"
+msgstr "Time médio"
+
+msgid "Tempo mínimo de volta (s)"
+msgstr "Tempo mínimo de volta (s)"
+
+msgid "tempo mínimo de volta (s)"
+msgstr "tempo mínimo de volta (s)"
+
+msgid "Tempo para terminar (s)"
+msgstr "Tempo para terminar (s)"
+
+msgid "Tempo total"
+msgstr "Time total"
+
+msgid "Tempos"
+msgstr "Times"
+
+msgid "Texto do anúncio"
+msgstr "Texto do anúncio"
+
+msgid "texto do anúncio…"
+msgstr "texto do anúncio…"
+
+msgid "Tipo"
+msgstr "Tipo"
+
+msgid "Tipo de decoder"
+msgstr "Tipo de decoder"
+
+msgid "tipo de sessão"
+msgstr "tipo de sessão"
+
+msgid "Tocar som de alerta"
+msgstr "Tocar som de alerta"
+
+msgid "todos"
+msgstr "todos"
+
+msgid "token"
+msgstr "token"
+
+msgid "tokenize"
+msgstr "tokenize"
+
+msgid "toque em “Gerar” abaixo"
+msgstr "toque em “Gerar” abaixo"
+
+msgid "Track View"
+msgstr "Track View"
+
+msgid "Transparência"
+msgstr "Transparency"
+
+msgid "Transparência dos cartões"
+msgstr "Transparency dos cartões"
+
+msgid "Transponder"
+msgstr "Transponder"
+
+msgid "Transponder e frequência de cada inscrito alimentam a"
+msgstr "Transponder e frequência de cada inscrito alimentam a"
+
+msgid "Transponder(s)"
+msgstr "Transponder(s)"
+
+msgid "transponders"
+msgstr "transponders"
+
+msgid "Treino"
+msgstr "Practice"
+
+msgid "treino"
+msgstr "treino"
+
+msgid "Uploads Sync CTAD"
+msgstr "Uploads Sync CTAD"
+
+msgid "URL da imagem"
+msgstr "URL da imagem"
+
+msgid "urllib"
+msgstr "urllib"
+
+msgid "urllib.error"
+msgstr "urllib.error"
+
+msgid "urllib.parse"
+msgstr "urllib.parse"
+
+msgid "urllib.request"
+msgstr "urllib.request"
+
+msgid "urllib.response"
+msgstr "urllib.response"
+
+msgid "urllib3"
+msgstr "urllib3"
+
+msgid "urllib3._base_connection"
+msgstr "urllib3._base_connection"
+
+msgid "urllib3._collections"
+msgstr "urllib3._collections"
+
+msgid "urllib3._request_methods"
+msgstr "urllib3._request_methods"
+
+msgid "urllib3._version"
+msgstr "urllib3._version"
+
+msgid "urllib3.connection"
+msgstr "urllib3.connection"
+
+msgid "urllib3.connectionpool"
+msgstr "urllib3.connectionpool"
+
+msgid "urllib3.contrib"
+msgstr "urllib3.contrib"
+
+msgid "urllib3.contrib.emscripten"
+msgstr "urllib3.contrib.emscripten"
+
+msgid "urllib3.contrib.emscripten.connection"
+msgstr "urllib3.contrib.emscripten.connection"
+
+msgid "urllib3.contrib.emscripten.fetch"
+msgstr "urllib3.contrib.emscripten.fetch"
+
+msgid "urllib3.contrib.emscripten.request"
+msgstr "urllib3.contrib.emscripten.request"
+
+msgid "urllib3.contrib.emscripten.response"
+msgstr "urllib3.contrib.emscripten.response"
+
+msgid "urllib3.contrib.pyopenssl"
+msgstr "urllib3.contrib.pyopenssl"
+
+msgid "urllib3.contrib.socks"
+msgstr "urllib3.contrib.socks"
+
+msgid "urllib3.exceptions"
+msgstr "urllib3.exceptions"
+
+msgid "urllib3.fields"
+msgstr "urllib3.fields"
+
+msgid "urllib3.filepost"
+msgstr "urllib3.filepost"
+
+msgid "urllib3.http2"
+msgstr "urllib3.http2"
+
+msgid "urllib3.http2.connection"
+msgstr "urllib3.http2.connection"
+
+msgid "urllib3.http2.probe"
+msgstr "urllib3.http2.probe"
+
+msgid "urllib3.poolmanager"
+msgstr "urllib3.poolmanager"
+
+msgid "urllib3.response"
+msgstr "urllib3.response"
+
+msgid "urllib3.util"
+msgstr "urllib3.util"
+
+msgid "urllib3.util.connection"
+msgstr "urllib3.util.connection"
+
+msgid "urllib3.util.proxy"
+msgstr "urllib3.util.proxy"
+
+msgid "urllib3.util.request"
+msgstr "urllib3.util.request"
+
+msgid "urllib3.util.response"
+msgstr "urllib3.util.response"
+
+msgid "urllib3.util.retry"
+msgstr "urllib3.util.retry"
+
+msgid "urllib3.util.ssl_"
+msgstr "urllib3.util.ssl_"
+
+msgid "urllib3.util.ssl_match_hostname"
+msgstr "urllib3.util.ssl_match_hostname"
+
+msgid "urllib3.util.ssltransport"
+msgstr "urllib3.util.ssltransport"
+
+msgid "urllib3.util.timeout"
+msgstr "urllib3.util.timeout"
+
+msgid "urllib3.util.url"
+msgstr "urllib3.util.url"
+
+msgid "urllib3.util.util"
+msgstr "urllib3.util.util"
+
+msgid "urllib3.util.wait"
+msgstr "urllib3.util.wait"
+
+msgid "usar um áudio no lugar desta frase"
+msgstr "usar um áudio no lugar desta frase"
+
+msgid "uvicorn.supervisors.multiprocess"
+msgstr "uvicorn.supervisors.multiprocess"
+
+msgid "v disponível"
+msgstr "v disponível"
+
+msgid "Variáveis: {campeonato} {etapa} {tipo} {pista} {categoria} {data} {hora}"
+msgstr "Variáveis: {campeonato} {etapa} {tipo} {pista} {categoria} {data} {hora}"
+
+msgid "varredura de espectro"
+msgstr "varredura de espectro"
+
+msgid "Velocidade"
+msgstr "Speed"
+
+msgid "Verde"
+msgstr "Green"
+
+msgid "Vermelha"
+msgstr "Red"
+
+msgid "Versão"
+msgstr "Version"
+
+msgid "Volta manual (correção)"
+msgstr "Lap manual (correção)"
+
+msgid "Volta rápida"
+msgstr "Fast lap"
+
+msgid "Voltas"
+msgstr "Laps"
+
+msgid "voltas"
+msgstr "voltas"
+
+msgid "Voltas do líder"
+msgstr "Laps do líder"
+
+msgid "Voltas histórico sessões central"
+msgstr "Voltas histórico sessões central"
+
+msgid "Voltas Rápidas"
+msgstr "Fast Laps"
+
+msgid "voltas ·  piloto(s) · melhor s"
+msgstr "voltas ·  piloto(s) · melhor s"
+
+msgid "Voltas, sessões disputadas e melhor volta de cada piloto."
+msgstr "Voltas, sessões disputadas e melhor volta de cada piloto."
+
+msgid "Volume"
+msgstr "Volume"
+
+msgid "Voz instalada"
+msgstr "Voice instalada"
+
+msgid "voz na contagem"
+msgstr "voz na contagem"
+
+msgid "Voz Som TTS frases áudio"
+msgstr "Voz Som TTS frases áudio"
+
+msgid "Wallpaper da área principal"
+msgstr "Wallpaper da área principal"
+
+msgid "werkzeug.debug.console"
+msgstr "werkzeug.debug.console"
+
+msgid "werkzeug.sansio.multipart"
+msgstr "werkzeug.sansio.multipart"
+
+msgid "werkzeug.urls"
+msgstr "werkzeug.urls"
+
+msgid "winerror"
+msgstr "winerror"
+
+msgid "winrt._winrt_windows_devices_bluetooth"
+msgstr "winrt._winrt_windows_devices_bluetooth"
+
+msgid "winrt._winrt_windows_devices_bluetooth_advertisement"
+msgstr "winrt._winrt_windows_devices_bluetooth_advertisement"
+
+msgid "winrt._winrt_windows_devices_bluetooth_genericattributeprofile"
+msgstr "winrt._winrt_windows_devices_bluetooth_genericattributeprofile"
+
+msgid "winrt._winrt_windows_devices_enumeration"
+msgstr "winrt._winrt_windows_devices_enumeration"
+
+msgid "winrt._winrt_windows_devices_radios"
+msgstr "winrt._winrt_windows_devices_radios"
+
+msgid "winrt._winrt_windows_foundation"
+msgstr "winrt._winrt_windows_foundation"
+
+msgid "winrt._winrt_windows_foundation_collections"
+msgstr "winrt._winrt_windows_foundation_collections"
+
+msgid "winrt._winrt_windows_storage_streams"
+msgstr "winrt._winrt_windows_storage_streams"
+
+msgid "winrt.windows"
+msgstr "winrt.windows"
+
+msgid "winrt.windows.devices"
+msgstr "winrt.windows.devices"
+
+msgid "winrt.windows.devices.bluetooth"
+msgstr "winrt.windows.devices.bluetooth"
+
+msgid "winrt.windows.devices.bluetooth.advertisement"
+msgstr "winrt.windows.devices.bluetooth.advertisement"
+
+msgid "winrt.windows.devices.bluetooth.genericattributeprofile"
+msgstr "winrt.windows.devices.bluetooth.genericattributeprofile"
+
+msgid "winrt.windows.devices.enumeration"
+msgstr "winrt.windows.devices.enumeration"
+
+msgid "winrt.windows.devices.radios"
+msgstr "winrt.windows.devices.radios"
+
+msgid "winrt.windows.foundation"
+msgstr "winrt.windows.foundation"
+
+msgid "winrt.windows.foundation.collections"
+msgstr "winrt.windows.foundation.collections"
+
+msgid "winrt.windows.storage"
+msgstr "winrt.windows.storage"
+
+msgid "winrt.windows.storage.streams"
+msgstr "winrt.windows.storage.streams"
+
+msgid "yaml.error"
+msgstr "yaml.error"
+
+msgid "yaml.representer"
+msgstr "yaml.representer"
+
+msgid "yaml.serializer"
+msgstr "yaml.serializer"
+
+msgid "yaml.tokens"
+msgstr "yaml.tokens"
+
+msgid "yarl._url"
+msgstr "yarl._url"
+
+msgid "zipfile"
+msgstr "zipfile"
+
+msgid "zipfile._path"
+msgstr "zipfile._path"
+
+msgid "zipfile._path.glob"
+msgstr "zipfile._path.glob"
+
+msgid "zipimport"
+msgstr "zipimport"
+
+msgid "zipp"
+msgstr "zipp"
+
+msgid "{campeonato}_{etapa}_{tipo}_{data}_{hora}"
+msgstr "{campeonato}_{etapa}_{tipo}_{data}_{hora}"
+
+msgid "· nível:"
+msgstr "· nível:"
+
+msgid "· ruído"
+msgstr "· ruído"
+
+msgid "· tensão"
+msgstr "· tensão"
+
+msgid "Áudio em vez de frase"
+msgstr "Áudio em vez de frase"
+
+msgid "áudio:"
+msgstr "áudio:"
+
+msgid "Última volta"
+msgstr "Última volta"
+
+msgid "— campeonato do CTAD"
+msgstr "— campeonato do CTAD"
+
+msgid "— clique numa linha para selecionar o piloto (marcar gato / apagar volta)"
+msgstr "— clique numa linha para selecionar o piloto (marcar gato / apagar volta)"
+
+msgid "— nenhum campeonato —"
+msgstr "— nenhum campeonato —"
+
+msgid "— nenhuma —"
+msgstr "— nenhuma —"
+
+msgid "— pilotos do CTAD"
+msgstr "— pilotos do CTAD"
+
+msgid "— soma das etapas (os intervalos contam apenas a duração)."
+msgstr "— soma das etapas (os intervalos contam apenas a duração)."
+
+msgid "“Gerar novo”"
+msgstr "“Gerar novo”"
+
+msgid "“Gerar QR”"
+msgstr "“Gerar QR”"
+
+msgid "“Novo recorde da pista! Ana, 8,95 segundos!”"
+msgstr "“Novo recorde da pista! Ana, 8,95 segundos!”"
+
+msgid "ℹ️ Sobre o KChrono"
+msgstr "ℹ️ Sobre o KChrono"
+
+msgid "⊕ Adicionar sessão"
+msgstr "⊕ Add sessão"
+
+msgid "⏏ Desconectar"
+msgstr "⏏ Disconnect"
+
+msgid "⏸ Pausar"
+msgstr "⏸ Pause"
+
+msgid "⏹ Encerrar campeonato"
+msgstr "⏹ Encerrar campeonato"
+
+msgid "⏹ Finalizar"
+msgstr "⏹ Finish"
+
+msgid "▶ Iniciar"
+msgstr "▶ Start"
+
+msgid "▶ Iniciar sessão"
+msgstr "▶ Start sessão"
+
+msgid "▶ Largada"
+msgstr "▶ Start Lights"
+
+msgid "♻️ Desmarcar"
+msgstr "♻️ Unmark"
+
+msgid "⛔ Pista fechada"
+msgstr "⛔ Track fechada"
+
+msgid "⛔ Revogar todos os QR"
+msgstr "⛔ Revogar todos os QR"
+
+msgid "✏️ Editar"
+msgstr "✏️ Edit"
+
+msgid "✔ Todos presentes"
+msgstr "✔ All presentes"
+
+msgid "✖ Limpar"
+msgstr "✖ Clear"
+
+msgid "✖ Limpar formulário"
+msgstr "✖ Clear formulário"
+
+msgid "➕ Adicionar volta"
+msgstr "➕ Add volta"
+
+msgid "➕ Criar campeonato"
+msgstr "➕ Create campeonato"
+
+msgid "⬆ Enviar piloto ao site"
+msgstr "⬆ Enviar piloto ao site"
+
+msgid "⬇ Baixar"
+msgstr "⬇ Download"
+
+msgid "⬇ CSV pilotos"
+msgstr "⬇ CSV pilotos"
+
+msgid "⬇ CSV sessões"
+msgstr "⬇ CSV sessões"
+
+msgid "⬇ Importar"
+msgstr "⬇ Import"
+
+msgid "⬇ Importar do site"
+msgstr "⬇ Importar do site"
+
+msgid "🎮 Painel do Operador"
+msgstr "🎮 Painel do Operador"
+
+msgid "🏁 Classificação"
+msgstr "🏁 Qualifying"
+
+msgid "🏁 Gerar heats &amp; finais"
+msgstr "🏁 Gerar heats &amp; finais"
+
+msgid "🏁 Largada"
+msgstr "🏁 Start Lights"
+
+msgid "🏁 Ver grids"
+msgstr "🏁 Ver grids"
+
+msgid "🏁 Voltas"
+msgstr "🏁 Laps"
+
+msgid "🏆 Campeonato em andamento"
+msgstr "🏆 Campeonato em andamento"
+
+msgid "🏆 Campeonatos"
+msgstr "🏆 Campeonatos"
+
+msgid "🏆 Iniciar campeonato"
+msgstr "🏆 Start campeonato"
+
+msgid "🏆 Melhores resultados da pista (recorde por categoria) — chega com os campeonatos (Fase 5)"
+msgstr "🏆 Melhores resultados da pista (recorde por categoria) — chega com os campeonatos (Fase 5)"
+
+msgid "🏆 Ver ranking"
+msgstr "🏆 Ver ranking"
+
+msgid "🏎️ Pilotos"
+msgstr "🏎️ Pilotos"
+
+msgid "🏟️ Track View"
+msgstr "🏟️ Track View"
+
+msgid "💾 Salvar"
+msgstr "💾 Save"
+
+msgid "💾 Salvar piloto"
+msgstr "💾 Save piloto"
+
+msgid "💾 Salvar plano"
+msgstr "💾 Save plano"
+
+msgid "💾 Salvar preferências"
+msgstr "💾 Save preferências"
+
+msgid "📁 Enviar arquivo"
+msgstr "📁 Send arquivo"
+
+msgid "📁 Áudio"
+msgstr "📁 Audio"
+
+msgid "📊 Gerar"
+msgstr "📊 Generate"
+
+msgid "📊 Relatórios"
+msgstr "📊 Relatórios"
+
+msgid "📋 Copiar endereço"
+msgstr "📋 Copy endereço"
+
+msgid "📤 Enviar ao CTAD"
+msgstr "📤 Enviar ao CTAD"
+
+msgid "📤 Enviar sessão atual"
+msgstr "📤 Enviar sessão atual"
+
+msgid "📤 Lançar resultado da sessão atual"
+msgstr "📤 Lançar resultado da sessão atual"
+
+msgid "📤 Uploads &amp; Sync"
+msgstr "📤 Uploads &amp; Sync"
+
+msgid "📱 Acesso por QR Code"
+msgstr "📱 Acesso por QR Code"
+
+msgid "📱 Gestão Remota"
+msgstr "📱 Gestão Remota"
+
+msgid "📱 QR Code de acesso"
+msgstr "📱 QR Code de acesso"
+
+msgid "📺 Abrir telão"
+msgstr "📺 Abrir telão"
+
+msgid "📺 Telão &amp; Semáforo"
+msgstr "📺 Telão &amp; Semáforo"
+
+msgid "🔄 Atualizar"
+msgstr "🔄 Update"
+
+msgid "🔄 Gerar novo"
+msgstr "🔄 Generate novo"
+
+msgid "🔄 Gerar QR"
+msgstr "🔄 Generate QR"
+
+msgid "🔄 inversão da bateria seguinte:"
+msgstr "🔄 inversão da bateria seguinte:"
+
+msgid "🔄 Processar fila"
+msgstr "🔄 Processar fila"
+
+msgid "🔄 Verificar"
+msgstr "🔄 Check"
+
+msgid "🔊 Testar voz"
+msgstr "🔊 Testar voz"
+
+msgid "🔊 Voz &amp; Som"
+msgstr "🔊 Voz &amp; Som"
+
+msgid "🔌 (Re)conectar"
+msgstr "🔌 (Re)conectar"
+
+msgid "🔍 Buscar no CTAD"
+msgstr "🔍 Buscar no CTAD"
+
+msgid "🔍 Detectar portas"
+msgstr "🔍 Detect portas"
+
+msgid "🔍 Prévia (não grava)"
+msgstr "🔍 Prévia (não grava)"
+
+msgid "🔐 Conectar e testar"
+msgstr "🔐 Conectar e testar"
+
+msgid "🔔 Permitir no navegador"
+msgstr "🔔 Permitir no navegador"
+
+msgid "🔧 Hardware &amp; Decoders"
+msgstr "🔧 Hardware &amp; Decoders"
+
+msgid "🔴 Vermelha"
+msgstr "🔴 Red"
+
+msgid "🖼 Aplicar URL"
+msgstr "🖼 Aplicar URL"
+
+msgid "🗑 Apagar volta"
+msgstr "🗑 Delete volta"
+
+msgid "🗑 Excluir"
+msgstr "🗑 Remove"
+
+msgid "🗑 Limpar fila local"
+msgstr "🗑 Limpar fila local"
+
+msgid "🗑 Remover"
+msgstr "🗑 Remove"
+
+msgid "🚦 Gerente de Pista"
+msgstr "🚦 Gerente de Pista"
+
+msgid "🟡 Amarela"
+msgstr "🟡 Yellow"
+
+msgid "🟢 Verde"
+msgstr "🟢 Green"
