@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KChrono — Mockup de Design (Fase 2)</title>
+<style>
+  :root{
+    --bg-body:#0d111a; --bg-card:#151c28; --bg-header:#1c2638; --bg-input:#1c263b;
+    --border-card:#222d42; --text-title:#ffffff; --text-main:#d0d7e3; --text-muted:#8492a6;
+    --accent-red:#e63946; --accent-green:#2ec4b6; --accent-gold:#ffb703;
+    --accent-blue:#3a86ff; --accent-gap:#ff006e;
+  }
+  *{box-sizing:border-box; margin:0; padding:0}
+  body{background:var(--bg-body); color:var(--text-main); font-family:"Segoe UI",system-ui,sans-serif}
+  button{font-family:inherit}
+
+  /* ---------- navegação do mockup ---------- */
+  .mock-nav{position:sticky; top:0; z-index:50; display:flex; gap:4px; align-items:center;
+    padding:8px 16px; background:var(--bg-header); border-bottom:1px solid var(--border-card)}
+  .mock-nav .brand{font-weight:700; color:var(--text-title); margin-right:16px}
+  .mock-nav .brand span{color:var(--accent-blue)}
+  .mock-nav button{background:transparent; border:1px solid var(--border-card); color:var(--text-muted);
+    padding:6px 14px; border-radius:6px; cursor:pointer; font-size:13px}
+  .mock-nav button:hover{color:var(--text-title); border-color:var(--accent-blue)}
+  .mock-nav button.active{background:var(--accent-blue); border-color:var(--accent-blue); color:#fff}
+  .tela{display:none; min-height:calc(100vh - 49px)}
+  .tela.visivel{display:block}
+
+  /* ---------- login estilo Steam ---------- */
+  .login-wrap{display:flex; height:calc(100vh - 49px)}
+  .login-banner{flex:1.2; position:relative; overflow:hidden;
+    background:linear-gradient(135deg,#0d111a 0%,#132043 55%,#3a86ff 130%);
+    display:flex; flex-direction:column; justify-content:flex-end; padding:48px}
+  .login-banner::before{content:""; position:absolute; inset:0;
+    background:radial-gradient(circle at 78% 22%, rgba(255,183,3,.25), transparent 45%);}
+  .login-banner .kicker{color:var(--accent-gold); letter-spacing:3px; font-size:12px; text-transform:uppercase}
+  .login-banner h1{color:#fff; font-size:56px; line-height:1.05; margin:12px 0}
+  .login-banner h1 em{color:var(--accent-blue); font-style:normal}
+  .login-banner p{max-width:460px; color:#aeb9cc}
+  .login-form{flex:1; display:flex; flex-direction:column; justify-content:center;
+    padding:48px 56px; background:var(--bg-body); border-left:1px solid var(--border-card)}
+  .login-form h2{color:var(--text-title); margin-bottom:24px; font-weight:600}
+  .login-form label{display:block; font-size:12px; color:var(--text-muted); margin:14px 0 6px}
+  .login-form input{width:100%; padding:11px 12px; border-radius:6px;
+    border:1px solid var(--border-card); background:var(--bg-input); color:var(--text-title)}
+  .login-form .btn{margin-top:24px; width:100%; padding:12px; border:none; border-radius:6px;
+    background:linear-gradient(180deg,#3a86ff,#2b6de0); color:#fff; font-weight:600; cursor:pointer}
+  .login-form .btn:hover{filter:brightness(1.1)}
+  .login-form .nivel{display:flex; gap:8px; margin-top:18px; flex-wrap:wrap}
+  .login-form .nivel span{font-size:11px; color:var(--text-muted); border:1px solid var(--border-card);
+    padding:4px 10px; border-radius:20px}
+
+  /* ---------- shell (dashboard/operador/admin) ---------- */
+  .shell{display:flex; min-height:calc(100vh - 49px)}
+  .side{width:210px; background:var(--bg-card); border-right:1px solid var(--border-card); padding:18px 12px}
+  .side .logo{color:var(--text-title); font-weight:700; font-size:18px; padding:4px 10px 18px}
+  .side .logo span{color:var(--accent-blue)}
+  .side a{display:flex; align-items:center; gap:10px; padding:10px 12px; border-radius:6px;
+    color:var(--text-muted); text-decoration:none; font-size:14px; margin-bottom:2px}
+  .side a:hover{background:var(--bg-header); color:var(--text-title)}
+  .side a.on{background:var(--bg-header); color:var(--text-title); border-left:3px solid var(--accent-blue)}
+  .side .sep{height:1px; background:var(--border-card); margin:12px 6px}
+  .main{flex:1; padding:24px 28px; overflow:auto}
+  .main header{display:flex; justify-content:space-between; align-items:center; margin-bottom:22px}
+  .main h1{color:var(--text-title); font-size:24px; font-weight:600}
+  .perfil{display:flex; align-items:center; gap:10px; font-size:13px; color:var(--text-muted)}
+  .perfil .tag{background:var(--accent-blue); color:#fff; font-size:11px; padding:2px 8px; border-radius:12px}
+
+  .grid{display:grid; gap:16px}
+  .g4{grid-template-columns:repeat(auto-fit,minmax(220px,1fr))}
+  .g2{grid-template-columns:repeat(auto-fit,minmax(340px,1fr))}
+  .card{background:var(--bg-card); border:1px solid var(--border-card); border-radius:10px; padding:16px 18px}
+  .card h3{font-size:12px; text-transform:uppercase; letter-spacing:1px; color:var(--text-muted);
+    font-weight:600; margin-bottom:10px}
+  .card .big{font-size:28px; color:var(--text-title); font-weight:700}
+  .card .sub{font-size:12px; color:var(--text-muted); margin-top:4px}
+  .pill{display:inline-block; font-size:11px; padding:2px 10px; border-radius:12px; margin-right:6px}
+  .pill.ok{background:rgba(46,196,182,.15); color:var(--accent-green)}
+  .pill.warn{background:rgba(255,183,3,.15); color:var(--accent-gold)}
+  .pill.err{background:rgba(230,57,70,.15); color:var(--accent-red)}
+
+  table{width:100%; border-collapse:collapse; font-size:13px}
+  th{color:var(--text-muted); text-align:left; font-weight:600; font-size:11px;
+    text-transform:uppercase; letter-spacing:.5px; padding:8px 10px; border-bottom:1px solid var(--border-card)}
+  td{padding:9px 10px; border-bottom:1px solid var(--border-card); color:var(--text-main)}
+  tr:hover td{background:rgba(58,134,255,.06)}
+  .pos1 td:first-child{color:var(--accent-gold); font-weight:700}
+  .gato{color:var(--accent-gap); font-size:11px; border:1px solid var(--accent-gap);
+    border-radius:10px; padding:1px 8px; margin-left:6px}
+
+  .acoes{display:flex; gap:10px; flex-wrap:wrap; margin:16px 0}
+  .acoes button{padding:10px 18px; border-radius:8px; border:1px solid var(--border-card);
+    background:var(--bg-header); color:var(--text-main); cursor:pointer; font-size:14px}
+  .acoes button:hover{border-color:var(--accent-blue); color:#fff}
+  .acoes button.destaque{background:linear-gradient(180deg,#3a86ff,#2b6de0); border:none; color:#fff; font-weight:600}
+  .acoes button.perigo:hover{border-color:var(--accent-red); color:var(--accent-red)}
+  .log{background:var(--bg-input); border:1px solid var(--border-card); border-radius:8px;
+    padding:12px; font-family:Consolas,monospace; font-size:12px; max-height:220px; overflow:auto; color:var(--text-muted)}
+  .log b{color:var(--accent-green)}
+
+  /* ---------- telão ---------- */
+  .telao{background:#000; min-height:calc(100vh - 49px); display:flex; flex-direction:column; align-items:center; justify-content:center; padding:32px}
+  .semaforo{display:flex; gap:18px; margin-bottom:36px}
+  .luz{width:74px; height:74px; border-radius:50%; background:#161616;
+    border:3px solid #2a2a2a; transition:all .15s}
+  .luz.on{box-shadow:0 0 34px 6px currentColor}
+  .count{color:#fff; font-size:64px; font-weight:800; font-variant-numeric:tabular-nums; margin-bottom:28px}
+  .tv{width:min(92vw,1500px); background:#0a0a0a; border:2px solid #222; border-radius:12px; overflow:hidden}
+  .tv-head{display:flex; justify-content:space-between; padding:14px 22px; background:linear-gradient(90deg,#101b33,#0a0a0a);
+    color:#fff; font-size:22px; font-weight:700}
+  .tv-head .cat{color:var(--accent-gold); font-size:15px; align-self:center}
+  .tv table{font-size:20px}
+  .tv th{font-size:12px; padding:10px 14px}
+  .tv td{padding:12px 14px; border-bottom:1px solid #181818; color:#e8e8e8}
+  .tv .num{background:var(--accent-blue); color:#fff; border-radius:6px; padding:1px 10px; font-size:16px}
+  .tv .pos1 td{color:var(--accent-gold); font-weight:700}
+  .tv-rodape{display:flex; gap:12px; padding:12px 22px; font-size:13px; color:#666}
+
+  .switch{display:flex; align-items:center; gap:10px; margin:10px 0; font-size:14px}
+  .switch .ck{width:20px; height:20px; border-radius:5px; border:2px solid var(--border-card);
+    background:var(--bg-input); display:inline-flex; align-items:center; justify-content:center; font-size:13px}
+  .switch .ck.on{background:var(--accent-blue); border-color:var(--accent-blue); color:#fff}
+  .code{font-family:Consolas,monospace; background:var(--bg-input); border:1px solid var(--border-card);
+    border-radius:8px; padding:12px 14px; font-size:14px; color:var(--accent-gold)}
+  .hint{font-size:12px; color:var(--text-muted); margin-top:8px}
+</style>
+</head>
+<body>
+
+<nav class="mock-nav">
+  <div class="brand">K<span>Chrono</span> · mockup</div>
+  <button data-tela="login" class="active" onclick="mostrar('login',this)">Entrar</button>
+  <button data-tela="dashboard" onclick="mostrar('dashboard',this)">Dashboard</button>
+  <button data-tela="operador" onclick="mostrar('operador',this)">Operador</button>
+  <button data-tela="telao" onclick="mostrar('telao',this)">Telão 4K</button>
+  <button data-tela="admin" onclick="mostrar('admin',this)">Admin</button>
+</nav>
+
+<!-- ============ LOGIN ============ -->
+<section id="login" class="tela visivel">
+  <div class="login-wrap">
+    <div class="login-banner">
+      <div class="kicker">KChrono · cronometragem e telemetria</div>
+      <h1>Bem-vindo de volta,<br><em>Krathus</em>.</h1>
+      <p>Cronometragem profissional para sua pista: treino, classificação, corrida, telão e
+         telemetria sincronizada com o CTAD — tudo em PT-BR.</p>
+    </div>
+    <div class="login-form">
+      <h2>Entrar</h2>
+      <label>Usuário</label>
+      <input type="text" value="raphael" placeholder="seu usuário">
+      <label>Senha</label>
+      <input type="password" value="123456" placeholder="sua senha">
+      <button class="btn">Entrar</button>
+      <div class="nivel">
+        <span>superuser</span><span>admin</span><span>gestor de pista</span>
+      </div>
+      <p class="hint">O login usa as credenciais do CTAD. O nível da conta define as
+         permissões (controle remoto, apagar/marcar voltas, configurações).</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ DASHBOARD ============ -->
+<section id="dashboard" class="tela">
+  <div class="shell">
+    <aside class="side">
+      <div class="logo">K<span>Chrono</span></div>
+      <a href="#" class="on">🏠 Dashboard</a>
+      <a href="#">🏁 Painel do Operador</a>
+      <a href="#">📺 Telão</a>
+      <a href="#">🏆 Campeonatos</a>
+      <a href="#">👤 Pilotos & Transponders</a>
+      <a href="#">🏟️ Pistas</a>
+      <a href="#">📤 Fila de Uploads</a>
+      <div class="sep"></div>
+      <a href="#">⚙️ Configurações</a>
+    </aside>
+    <div class="main">
+      <header>
+        <h1>Dashboard</h1>
+        <div class="perfil"><span class="tag">SUPERUSER</span> Raphael · Sábado, 11/10/2026</div>
+      </header>
+      <div class="grid g4">
+        <div class="card"><h3>Decoder MyLaps P3</h3>
+          <div class="big" style="color:var(--accent-green)">Conectado</div>
+          <div class="sub">192.168.0.50:5403 · 37 °C · 12,1 V · ruído 45</div></div>
+        <div class="card"><h3>Próxima sessão</h3>
+          <div class="big">Treino Livre</div>
+          <div class="sub">Krathus Arena · hoje 14:00 · 29 pilotos</div></div>
+        <div class="card"><h3>Campeonato ativo</h3>
+          <div class="big">KR 2026 · 3ª etapa</div>
+          <div class="sub">Classificação definida no CTAD</div></div>
+        <div class="card"><h3>Fila de uploads</h3>
+          <div class="big">2 pendentes</div>
+          <div class="sub">última sync há 4 min</div></div>
+      </div>
+      <div class="grid g2" style="margin-top:16px">
+        <div class="card">
+          <h3>Últimas sessões</h3>
+          <table>
+            <tr><th>Sessão</th><th>Data</th><th>Status</th><th>Upload</th></tr>
+            <tr><td>Corrida 17-07-26</td><td>17/07 15:00</td><td><span class="pill ok">completa</span></td><td><span class="pill ok">enviado</span></td></tr>
+            <tr><td>Treino 10-10-26</td><td>10/10 20:12</td><td><span class="pill warn">interrompida</span></td><td><span class="pill ok">enviado</span></td></tr>
+            <tr><td>Classificação 10-10-26</td><td>10/10 20:30</td><td><span class="pill ok">completa</span></td><td><span class="pill warn">pendente</span></td></tr>
+          </table>
+        </div>
+        <div class="card">
+          <h3>Regras & cadastros</h3>
+          <p style="font-size:14px; line-height:1.6">Campeonatos, etapas, pontuação, grid e
+            categorias são definidos no <b style="color:var(--accent-blue)">CTAD</b> e sincronizados
+            para o app. Alterações no site chegam na próxima sincronização.</p>
+          <p class="hint">Sessões "interrompidas" (com pausa/edição) perguntam antes de salvar —
+            sessões completas salvam automaticamente.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ OPERADOR ============ -->
+<section id="operador" class="tela">
+  <div class="shell">
+    <aside class="side">
+      <div class="logo">K<span>Chrono</span></div>
+      <a href="#">🏠 Dashboard</a>
+      <a href="#" class="on">🏁 Painel do Operador</a>
+      <a href="#">📺 Telão</a>
+      <div class="sep"></div>
+      <a href="#">👤 Pilotos & Transponders</a>
+    </aside>
+    <div class="main">
+      <header>
+        <h1>Operador — Corrida em andamento</h1>
+        <div class="perfil"><span class="tag">SUPERUSER</span> KR 2026 · 3ª etapa · Bateria 1</div>
+      </header>
+
+      <div class="acoes">
+        <button class="destaque">▶ Iniciar</button>
+        <button>⏸ Pausar</button>
+        <button>⏹ Parar</button>
+        <button>🔄 Reiniciar</button>
+        <button class="perigo" style="margin-left:auto">🚫 Marcar "gato"</button>
+        <button class="perigo">🗑 Apagar volta</button>
+      </div>
+
+      <div class="grid g2">
+        <div class="card">
+          <h3>Classificação ao vivo</h3>
+          <table>
+            <tr><th>#</th><th>Piloto</th><th>Voltas</th><th>Melhor</th><th>Gap</th><th>Ações</th></tr>
+            <tr class="pos1"><td>1</td><td>Bruno <span class="num" style="color:var(--accent-blue)">#7</span></td><td>12</td><td>0:11.502</td><td>—</td><td>···</td></tr>
+            <tr><td>2</td><td>Ana #12</td><td>12</td><td>0:12.001</td><td>+0:02.500</td><td>···</td></tr>
+            <tr><td>3</td><td>Carla #3</td><td>12</td><td>0:11.980</td><td>+0:03.100</td><td>···</td></tr>
+            <tr><td>4</td><td>Diego #21</td><td>11</td><td>0:12.310</td><td>+1 volta</td><td>···</td></tr>
+            <tr><td>5</td><td>Elisa #9 <span class="gato">gato</span></td><td>11</td><td>0:11.700</td><td>+1 volta</td><td>···</td></tr>
+          </table>
+          <p class="hint">Voltas marcadas como "gato" ficam sinalizadas em rosa e constam na
+             trilha de auditoria da sessão (ação, usuário, hora).</p>
+        </div>
+        <div class="card">
+          <h3>Eventos da sessão</h3>
+          <div class="log">
+            <b>14:32:05</b> largada! modo: semáforo 5 luzes (aleatório)<br>
+            <b>14:32:31</b> melhor volta: Bruno 0:11.502<br>
+            <b>14:33:12</b> Carla assume 2º lugar<br>
+            14:34:40 admin: volta 9 de Elisa marcada como suspeita (raphael)<br>
+            <b>14:35:02</b> Diego para nos boxes (transponder 7096340 fora do loop)<br>
+            14:35:44 admin: sessão pausada (raphael)<br>
+          </div>
+          <div class="acoes">
+            <button>🔊 Voz: ligada</button>
+            <button>💾 Salvar agora</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ TELÃO ============ -->
+<section id="telao" class="tela">
+  <div class="telao">
+    <div class="semaforo" id="semaforo">
+      <div class="luz" style="color:#e63946"></div>
+      <div class="luz" style="color:#e63946"></div>
+      <div class="luz" style="color:#e63946"></div>
+      <div class="luz" style="color:#e63946"></div>
+      <div class="luz" style="color:#2ec4b6"></div>
+    </div>
+    <div class="count" id="countdown">5</div>
+
+    <div class="tv">
+      <div class="tv-head">
+        <div>KRATHUS ARENA · Classificação</div>
+        <div class="cat">KR 2026 · 3ª etapa · Bateria 1 · Faltam 2 voltas</div>
+      </div>
+      <table>
+        <tr><th>Pos</th><th>Nº</th><th>Piloto</th><th>Voltas</th><th>Última</th><th>Melhor</th><th>Gap</th><th>Total</th><th>Consist.</th></tr>
+        <tr class="pos1"><td>1</td><td><span class="num">#7</span></td><td>BRUNO</td><td>12</td><td>0:11.601</td><td>0:11.502</td><td>—</td><td>2:21.400</td><td>98,4%</td></tr>
+        <tr><td>2</td><td><span class="num">#12</span></td><td>ANA</td><td>12</td><td>0:12.010</td><td>0:12.001</td><td>+0:02.500</td><td>2:23.900</td><td>97,1%</td></tr>
+        <tr><td>3</td><td><span class="num">#3</span></td><td>CARLA</td><td>12</td><td>0:12.050</td><td>0:11.980</td><td>+0:03.100</td><td>2:24.500</td><td>96,8%</td></tr>
+        <tr><td>4</td><td><span class="num">#21</span></td><td>DIEGO</td><td>11</td><td>0:12.400</td><td>0:12.310</td><td>+1 volta</td><td>2:21.100</td><td>95,2%</td></tr>
+        <tr><td>5</td><td><span class="num" style="background:var(--accent-gap)">#9</span></td><td>ELISA ⚑</td><td>11</td><td>0:11.750</td><td>0:11.700</td><td>+1 volta</td><td>2:20.800</td><td>94,9%</td></tr>
+      </table>
+      <div class="tv-rodape">
+        <span>Perfil: TV — Classificação (troca automática 30s)</span>
+        <span>Colunas: Pos · Nº · Piloto · Voltas · Última · Melhor · Gap · Total · Consistência — selecionáveis</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ ADMIN ============ -->
+<section id="admin" class="tela">
+  <div class="shell">
+    <aside class="side">
+      <div class="logo">K<span>Chrono</span></div>
+      <a href="#">🏠 Dashboard</a>
+      <div class="sep"></div>
+      <a href="#" class="on">⚙️ Configurações</a>
+    </aside>
+    <div class="main">
+      <header>
+        <h1>Configurações (superuser)</h1>
+        <div class="perfil"><span class="tag">SUPERUSER</span></div>
+      </header>
+      <div class="grid g2">
+        <div class="card">
+          <h3>Formato de salvamento</h3>
+          <div class="code" id="tpl">{campeonato}_{etapa}_{tipo}_{AAAA-MM-DD}_{hh-mm}</div>
+          <div class="switch" style="margin-top:12px"><span class="ck on">✓</span> Pré-visualização: <b style="color:var(--accent-green)">KR2026_etapa3_corrida_2026-10-11_14-35.json</b></div>
+          <p class="hint">Variáveis: {campeonato} {etapa} {tipo} {pista} {categoria} {data} {hora}</p>
+          <div class="switch"><span class="ck on">✓</span> Salvar automaticamente quando a corrida for completa (sem interrupções)</div>
+          <div class="switch"><span class="ck on">✓</span> Perguntar quando houver interrupção (pausa, reinício, volta editada)</div>
+          <div class="switch"><span class="ck">·</span> Enviar ao CTAD automaticamente após salvar</div>
+        </div>
+        <div class="card">
+          <h3>Telão — colunas de feedback</h3>
+          <div style="columns:2; font-size:13px">
+            <div class="switch"><span class="ck on">✓</span> Posição</div>
+            <div class="switch"><span class="ck on">✓</span> Número</div>
+            <div class="switch"><span class="ck on">✓</span> Cor</div>
+            <div class="switch"><span class="ck on">✓</span> Abreviado</div>
+            <div class="switch"><span class="ck on">✓</span> Piloto</div>
+            <div class="switch"><span class="ck">·</span> Fotografia</div>
+            <div class="switch"><span class="ck">·</span> Bandeira</div>
+            <div class="switch"><span class="ck on">✓</span> Voltas</div>
+            <div class="switch"><span class="ck">·</span> Dif. para o seguinte</div>
+            <div class="switch"><span class="ck">·</span> Dif. para o 1º</div>
+            <div class="switch"><span class="ck on">✓</span> Tempo total</div>
+            <div class="switch"><span class="ck on">✓</span> Última volta</div>
+            <div class="switch"><span class="ck on">✓</span> Melhor volta</div>
+            <div class="switch"><span class="ck">·</span> Tempo médio</div>
+            <div class="switch"><span class="ck">·</span> Est. de voltas</div>
+            <div class="switch"><span class="ck">·</span> Est. de tempo</div>
+            <div class="switch"><span class="ck">·</span> Desvio padrão</div>
+            <div class="switch"><span class="ck on">✓</span> Consistência</div>
+          </div>
+          <h3 style="margin-top:16px">Semáforo de largada</h3>
+          <div class="switch"><span class="ck on">✓</span> 5 luzes · tempos aleatórios (0,3s–1,2s)</div>
+          <div class="switch"><span class="ck on">✓</span> Contagem regressiva com voz</div>
+          <h3 style="margin-top:16px">Voz</h3>
+          <div class="switch"><span class="ck on">✓</span> Locutor: Maria (PT-BR) · volume 80%</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<script>
+function mostrar(id, btn){
+  document.querySelectorAll('.tela').forEach(t=>t.classList.remove('visivel'));
+  document.getElementById(id).classList.add('visivel');
+  document.querySelectorAll('.mock-nav button').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  if(id==='telao') iniciarSemaforo();
+}
+/* semáforo fake: 5 luzes acendem e apagam, depois countdown 3-2-1-VAI */
+let semTimer=null;
+function iniciarSemaforo(){
+  clearInterval(semTimer);
+  const luzes=document.querySelectorAll('#semaforo .luz');
+  const count=document.getElementById('countdown');
+  let i=0; count.textContent='';
+  luzes.forEach(l=>l.classList.remove('on'));
+  semTimer=setInterval(()=>{
+    if(i<5){
+      luzes[i].style.background=luzes[i].style.color;
+      luzes[i].classList.add('on');
+      i++;
+      setTimeout(()=>{ if(i<=5){ luzes.forEach(l=>{l.classList.remove('on'); setTimeout(()=>l.style.background='#161616',150);}); } }, Math.random()*300+200);
+    } else {
+      clearInterval(semTimer);
+      let n=3; count.textContent=n;
+      const t2=setInterval(()=>{
+        n--;
+        if(n>0){count.textContent=n;}
+        else{count.textContent='VAI!'; count.style.color='#2ec4b6'; clearInterval(t2);
+          setTimeout(()=>{count.style.color='#fff';},2000);}
+      },1000);
+    }
+  },700);
+}
+</script>
+</body>
+</html>

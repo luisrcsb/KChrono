@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KChrono — Telão</title>
+<link rel="stylesheet" href="/static/telao.css">
+<link rel="icon" href="/imagens/KCHRONO-LOGO.png">
+<script src="/static/chart.umd.min.js"></script>
+</head>
+<body>
+
+<!-- TELA DE LARGADA (semáforo + locução) -->
+<div id="tela-largada" class="tela visivel">
+  <div class="titulo-largada">
+    🏁 <span id="titulo-sessao-largada">SESSÃO</span>
+    <small id="subtitulo-largada">preparar…</small>
+  </div>
+  <div class="semaforo">
+    <div class="luz" style="color:#e63946"></div>
+    <div class="luz" style="color:#e63946"></div>
+    <div class="luz" style="color:#e63946"></div>
+    <div class="luz" style="color:#e63946"></div>
+    <div class="luz" style="color:#2ec4b6"></div>
+  </div>
+  <div class="contagem" id="contagem"></div>
+</div>
+
+<!-- TELA DE CORRIDA -->
+<div id="tela-corrida" class="tela">
+  <div class="cabecalho">
+    <div class="tit"><img src="/imagens/KCHRONO-LOGO.png" alt="KChrono">
+      <span id="titulo-sessao">SESSÃO</span></div>
+    <div class="info">
+      <div>Exibindo telemetria ao vivo · <b id="total-pilotos">0</b> pilotos</div>
+      <div><span class="ws-st" id="ws-st">offline</span></div>
+    </div>
+  </div>
+
+  <div class="bandeira-banner" id="bandeira-banner" hidden></div>
+
+  <div class="displays">
+    <div class="display"><div class="rot">Race Time</div><div class="val" id="t-race">00:00:00</div></div>
+    <div class="display verde"><div class="rot">Voltas do líder</div><div class="val" id="t-laps">0</div></div>
+    <div class="display verde"><div class="rot">Record da sessão</div><div class="val" id="t-record">—</div></div>
+  </div>
+
+  <div class="podio" id="podio"></div>
+
+  <div class="abas-telao">
+    <button class="on" onclick="tabTelao(this,'tv-class')">🏁 Classificação</button>
+    <button onclick="tabTelao(this,'tv-ritmo')">📈 Ritmo</button>
+    <button onclick="tabTelao(this,'tv-posicoes')">📊 Posições</button>
+    <button onclick="tabTelao(this,'tv-track')">🏟️ Track View</button>
+    <button class="btn-fs" onclick="telaCheia()">⛶ Tela cheia</button>
+  </div>
+
+  <div class="painel on" id="tv-class">
+    <div class="tabela-wrap">
+      <table id="tabela-telao">
+        <thead>
+          <tr><th>Pos</th><th>Nº</th><th>Piloto</th><th>Voltas</th><th>Total</th>
+              <th>Intervalo</th><th>Gap</th><th>Última</th><th>Melhor</th>
+              <th>Ritmo</th><th>EST</th></tr>
+        </thead>
+        <tbody><tr><td colspan="11" style="color:var(--mut)">aguardando largada…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="painel" id="tv-ritmo"><canvas id="grafico-ritmo"></canvas></div>
+  <div class="painel" id="tv-posicoes"><canvas id="grafico-posicoes"></canvas></div>
+  <div class="painel" id="tv-track"><canvas id="canvas-track"></canvas></div>
+
+  <div class="rodape">
+    <span>Record Pista <b id="record-pista">—</b></span>
+    <span>KChrono · Precision Timing System · <b id="hora-atual"></b></span>
+  </div>
+</div>
+
+<script src="/static/telao.js"></script>
+</body>
+</html>

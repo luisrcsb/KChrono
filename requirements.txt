@@ -1,0 +1,10 @@
+# Dependências do KChrono
+fastapi>=0.110
+uvicorn[standard]>=0.29
+
+# QR Code da área do Gerente de Pista (puro Python, sem binários)
+segno>=1.5
+
+# Drivers de cronometragem alternativos (Fase 6)
+pyserial>=3.5          # EASYLAP-USB / protocolo serial Robitronic
+bleak>=0.21            # SKYRC LapWiz (Bluetooth BLE)

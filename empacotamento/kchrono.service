@@ -1,0 +1,14 @@
+[Unit]
+Description=KChrono - cronometragem RC
+After=network.target
+
+[Service]
+Type=simple
+# Ajuste o usuário e o caminho conforme a instalação:
+WorkingDirectory=__DEST__
+ExecStart=__DEST__/venv/bin/python cli.py servidor --host 0.0.0.0 --porta 8780
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

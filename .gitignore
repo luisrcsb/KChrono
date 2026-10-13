@@ -1,0 +1,18 @@
+# KChrono — arquivos locais que não entram no versionamento
+# logs e capturas
+*.log
+captura_*.txt
+# banco local, config com segredos e uploads do operador
+dados/
+config.json
+# python
+__pycache__/
+*.pyc
+.venv/
+# empacotamento
+dist/
+build/
+*.spec.tmp
+# sistema
+.DS_Store
+Thumbs.db

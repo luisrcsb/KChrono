@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>KChrono — Gerente de Pista</title>
+<link rel="stylesheet" href="/static/gerente.css?v=1.1">
+<link rel="icon" href="/imagens/KCHRONO-LOGO.png">
+</head>
+<body>
+
+<!-- ============================= ENTRADA (SEM SENHA, SÓ QR CODE) ============ -->
+<section id="g-login" class="g-tela visivel">
+  <div class="g-login-card">
+    <img class="g-logo" src="/imagens/KCHRONO-LOGO.png" alt="KChrono">
+    <h1 id="g-login-tit">Gerente de Pista</h1>
+    <p class="g-sub">Acesso da direção de prova — <b>sem senha</b>, só com QR Code.</p>
+
+    <div class="g-qr-instrucao">
+      <div class="g-qr-passo"><span>1</span>No PC, abra <b>Admin → Gerente de Pista</b> e toque em <b>Gerar QR</b>.</div>
+      <div class="g-qr-passo"><span>2</span>Aponte a câmera deste aparelho para o código.</div>
+      <div class="g-qr-passo"><span>3</span>Pronto — o painel abre direto, sem digitar nada.</div>
+    </div>
+
+    <div id="g-login-erro" class="g-erro"></div>
+  </div>
+</section>
+
+<!-- PAINEL -->
+<section id="g-app" class="g-tela">
+  <header class="g-top">
+    <img class="g-logo-mini" src="/imagens/KCHRONO-LOGO.png" alt="">
+    <div class="g-top-tit"><b>Gerente de Pista</b><span id="g-top-sub"></span></div>
+    <span class="g-ws" id="g-ws">offline</span>
+    <span class="g-user" id="g-user"></span>
+    <button class="g-btn mini" onclick="gAbrirQR()">📱 QR</button>
+    <button class="g-btn mini" onclick="gSair()">Sair</button>
+  </header>
+
+  <div class="g-faixa" id="g-faixa">pista livre</div>
+
+  <main class="g-main">
+    <div class="g-grid">
+
+      <!-- SESSÃO -->
+      <div class="g-card">
+        <h3>Controle da sessão</h3>
+        <div class="g-status">
+          <span class="g-led" id="g-led"></span>
+          <span id="g-decoder">decoder —</span>
+          <span class="g-dot">·</span>
+          <span id="g-estado">sem sessão</span>
+          <span class="g-dot">·</span>
+          <span id="g-voltas-tot">0 voltas</span>
+        </div>
+        <div class="g-crono" id="g-crono">0:00.000</div>
+        <div class="g-linha">
+          <select id="g-tipo" title="tipo de sessão">
+            <option value="treino">Treino</option>
+            <option value="classificacao">Classificação</option>
+            <option value="corrida">Corrida</option>
+          </select>
+          <input id="g-tempo-min" type="number" min="0" step="1" value="3"
+                 title="tempo mínimo de volta (s)">
+        </div>
+        <div class="g-botoes grande">
+          <button class="g-btn primario" onclick="gIniciar()">▶ Iniciar</button>
+          <button class="g-btn destaque" onclick="gLargada()">🏁 Largada</button>
+          <button class="g-btn" onclick="gPausar(true)">⏸ Pausar</button>
+          <button class="g-btn" onclick="gPausar(false)">⏵ Retomar</button>
+          <button class="g-btn perigo" onclick="gFinalizar()">⏹ Finalizar</button>
+        </div>
+      </div>
+
+      <!-- ESTADO DA PISTA -->
+      <div class="g-card">
+        <h3>Estado da pista (bandeiras)</h3>
+        <div class="g-bandeiras">
+          <button class="g-bandeira verde" onclick="gBandeira('verde')">
+            <span class="bola"></span>Verde<small>pista livre</small></button>
+          <button class="g-bandeira amarela" onclick="gBandeira('amarela')">
+            <span class="bola"></span>Amarela<small>atenção</small></button>
+          <button class="g-bandeira vermelha" onclick="gBandeira('vermelha')">
+            <span class="bola"></span>Vermelha<small>perigo</small></button>
+          <button class="g-bandeira fechada" onclick="gBandeira('fechada')">
+            <span class="bola"></span>Fechada<small>sem pista</small></button>
+        </div>
+        <div class="g-linha" style="margin-top:10px">
+          <input id="g-motivo" placeholder="motivo (ex.: carro na brita)">
+          <button class="g-btn" onclick="gBandeira(null)">Aplicar</button>
+        </div>
+        <p class="g-hint">A bandeira ativa aparece imediatamente no telão.</p>
+      </div>
+
+      <!-- LOCUÇÃO -->
+      <div class="g-card">
+        <h3>Locução / anúncios</h3>
+        <div class="g-botoes">
+          <button class="g-btn destaque" onclick="gAnunciarPosicoes()">📢 Anunciar posições</button>
+        </div>
+        <div class="g-linha" style="margin-top:10px">
+          <input id="g-anuncio" placeholder="texto do anúncio…"
+                 onkeydown="if(event.key==='Enter') gFalar()">
+          <button class="g-btn primario" onclick="gFalar()">🔊 Falar</button>
+        </div>
+        <div class="g-frases">
+          <button onclick="gFalarTexto('Atenção pilotos')">Atenção pilotos</button>
+          <button onclick="gFalarTexto('Bandeira amarela na pista')">Bandeira amarela</button>
+          <button onclick="gFalarTexto('Pista livre, podem acelerar')">Pista livre</button>
+          <button onclick="gFalarTexto('Última volta')">Última volta</button>
+        </div>
+      </div>
+
+      <!-- CHECK-IN -->
+      <div class="g-card">
+        <h3>Check-in de pilotos <span id="g-presentes-n" class="g-tag">0</span></h3>
+        <p class="g-hint">Marque quem está presente. Só os marcados entram na
+          próxima sessão (vazio = todos).</p>
+        <div class="g-linha">
+          <button class="g-btn mini" onclick="gCheckinTodos(true)">Marcar todos</button>
+          <button class="g-btn mini" onclick="gCheckinTodos(false)">Limpar</button>
+        </div>
+        <div class="g-checkin" id="g-checkin"></div>
+      </div>
+    </div>
+
+    <!-- CLASSIFICAÇÃO -->
+    <div class="g-card g-class">
+      <h3>Classificação ao vivo</h3>
+      <div class="g-tabela-wrap">
+        <table class="g-tabela" id="g-tabela">
+          <thead>
+            <tr><th>Pos</th><th>Piloto</th><th>Voltas</th><th>Melhor</th><th>Última</th>
+              <th>Total</th><th>Gap</th><th>Ações</th></tr>
+          </thead>
+          <tbody><tr><td colspan="8" class="g-vazio">sem sessão ativa</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="g-rodape">
+      <button class="g-btn mini" onclick="gAbrirQR()">📱 QR Code de acesso</button>
+      <span id="g-versao">KChrono · Gerente de Pista</span>
+    </div>
+  </main>
+</section>
+
+<!-- ============================= QR CODE DE ACESSO ============================ -->
+<section id="g-qr" class="g-tela">
+  <div class="g-login-card" style="max-width:420px">
+    <h1>📱 Acesso por QR Code</h1>
+    <p class="g-sub">Aponte a câmera do celular para entrar <b>sem digitar senha</b>.
+      O celular precisa estar na mesma rede do cronômetro.</p>
+
+    <div class="g-aviso">⚠️ O botão <b>“Gerar novo”</b> substitui o QR atual: o QR
+      anterior <b>deixa de funcionar na hora</b> — só o último vale. Abrir esta
+      tela <b>não</b> troca o QR, então pode mostrar o mesmo código para vários
+      celulares sem derrubar ninguém.</div>
+
+    <div class="g-qr-box" id="g-qr-box">
+      <img id="g-qr-img" alt="QR Code de acesso" hidden>
+      <div class="g-qr-vazio" id="g-qr-vazio">toque em “Gerar” abaixo</div>
+    </div>
+
+    <p class="g-hint">Endereço</p>
+    <div class="g-qr-url" id="g-qr-url">—</div>
+
+    <div class="g-acoes-linha">
+      <label class="g-qr-dias">Válido por
+        <input id="g-qr-dias" type="number" min="1" max="365" value="30"> dias</label>
+    </div>
+
+    <div class="g-acoes-linha">
+      <button class="g-btn primario" onclick="gGerarQR()">🔄 Gerar novo</button>
+      <button class="g-btn" onclick="gCopiarEndereco()">📋 Copiar endereço</button>
+    </div>
+    <div class="g-acoes-linha">
+      <button class="g-btn perigo" onclick="gRevogarQR()">⛔ Revogar todos os QR</button>
+      <button class="g-btn" onclick="gFecharQR()">Fechar</button>
+    </div>
+    <div id="g-qr-erro" class="g-erro"></div>
+    <p class="g-hint" id="g-qr-info">—</p>  </div>
+</section>
+
+<div id="g-toast" class="g-toast"></div>
+<script src="/static/gerente.js?v=1.5"></script>
+</body>
+</html>

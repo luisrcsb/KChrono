@@ -1,0 +1,184 @@
+/* KChrono — Gerente de Pista (módulo de controle externo, na LAN)
+   Tema escuro CTAD; pensado para toque (celular/tablet). */
+:root{
+  --bg-body:#0d111a; --bg-card:#151c28; --bg-header:#1c2638; --bg-input:#1c263b;
+  --border-card:#222d42; --text-title:#ffffff; --text-main:#d0d7e3; --text-muted:#8492a6;
+  --accent-red:#e63946; --accent-green:#2ec4b6; --accent-gold:#ffb703;
+  --accent-blue:#3a86ff; --accent-gap:#ff006e;
+}
+*{box-sizing:border-box; margin:0; padding:0}
+body{background:var(--bg-body); color:var(--text-main);
+  font-family:"Segoe UI",system-ui,sans-serif; min-height:100vh}
+button{font-family:inherit; cursor:pointer}
+input,select{font-family:inherit}
+
+.g-tela{display:none}
+.g-tela.visivel{display:block}
+
+/* ---------------------------------------------------------------- login */
+#g-login{min-height:100vh; display:flex; align-items:center; justify-content:center; padding:24px}
+.g-login-card{width:min(420px,100%); background:var(--bg-card); border:1px solid var(--border-card);
+  border-radius:14px; padding:28px 26px; box-shadow:0 20px 60px rgba(0,0,0,.45)}
+.g-login-card .g-logo{height:52px; display:block; margin:0 auto 14px}
+.g-login-card h1{color:var(--text-title); font-size:22px; text-align:center}
+.g-login-card .g-sub{color:var(--text-muted); font-size:13px; text-align:center; margin:6px 0 18px}
+.g-login-card label{display:block; font-size:12px; color:var(--text-muted); margin:12px 0 6px}
+.g-login-card input{width:100%; padding:12px; border-radius:8px; font-size:15px;
+  border:1px solid var(--border-card); background:var(--bg-input); color:var(--text-title)}
+.g-erro{color:var(--accent-red); font-size:13px; margin-top:12px; min-height:18px}
+.g-hint{color:var(--text-muted); font-size:12px; line-height:1.5; margin-top:12px}
+
+/* ---------------------------------------------------------------- topo */
+.g-top{position:sticky; top:0; z-index:20; display:flex; align-items:center; gap:10px;
+  padding:10px 14px; background:var(--bg-header); border-bottom:1px solid var(--border-card)}
+.g-logo-mini{height:30px}
+.g-top-tit{display:flex; flex-direction:column; line-height:1.1}
+.g-top-tit b{color:var(--text-title); font-size:15px}
+.g-top-tit span{color:var(--text-muted); font-size:12px}
+.g-ws,.g-user{margin-left:auto; font-size:12px; color:var(--text-muted)}
+.g-user{margin-left:0; color:var(--accent-gold); font-weight:600}
+.g-ws.on{color:var(--accent-green)}
+.g-ws.off{color:var(--accent-red)}
+
+/* faixa de bandeira */
+.g-faixa{padding:10px 16px; font-weight:700; font-size:14px; letter-spacing:.4px;
+  text-transform:uppercase; background:#173a2e; color:#7ef0d8; border-bottom:1px solid var(--border-card)}
+.g-faixa.amarela{background:#3d3410; color:#ffd76b}
+.g-faixa.vermelha{background:#3d1216; color:#ff97a0}
+.g-faixa.fechada{background:#2a2f3a; color:#b9c3d3}
+
+/* ---------------------------------------------------------------- layout */
+.g-main{max-width:1180px; margin:0 auto; padding:16px}
+.g-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:14px}
+.g-card{background:var(--bg-card); border:1px solid var(--border-card); border-radius:12px; padding:16px}
+.g-card h3{color:var(--text-title); font-size:13px; text-transform:uppercase; letter-spacing:.6px;
+  margin-bottom:12px; font-weight:600; display:flex; align-items:center; gap:8px}
+.g-class{margin-top:14px}
+.g-hint{color:var(--text-muted); font-size:12px; margin-top:10px; line-height:1.4}
+.g-tag{background:var(--accent-blue); color:#fff; border-radius:20px; padding:1px 9px;
+  font-size:11px; letter-spacing:0; text-transform:none}
+
+/* ---------------------------------------------------------------- controles */
+.g-botoes{display:flex; flex-wrap:wrap; gap:8px}
+.g-btn{padding:11px 14px; border-radius:9px; border:1px solid var(--border-card);
+  background:var(--bg-header); color:var(--text-main); font-size:14px; font-weight:600}
+.g-btn:hover{filter:brightness(1.12)}
+.g-btn.grande{padding:14px 16px; font-size:15px}
+.g-btn.mini{padding:7px 11px; font-size:12px}
+.g-btn.primario{background:linear-gradient(180deg,#3a86ff,#2b6de0); border-color:transparent; color:#fff}
+.g-btn.destaque{background:linear-gradient(180deg,#2ec4b6,#17756c); border-color:transparent; color:#04231f}
+.g-btn.perigo{background:#3a1620; border-color:#5b2331; color:#ff8a99}
+.g-btn.grande{min-width:0}
+.g-botoes.grande .g-btn{flex:1 1 46%; padding:14px 10px; font-size:15px}
+
+.g-linha{display:flex; gap:8px; align-items:center}
+.g-linha input,.g-linha select{flex:1; min-width:0; padding:11px 12px; border-radius:8px;
+  border:1px solid var(--border-card); background:var(--bg-input); color:var(--text-title); font-size:14px}
+.g-linha input[type=number]{max-width:110px}
+
+.g-status{display:flex; align-items:center; gap:8px; font-size:13px; color:var(--text-main); margin-bottom:6px; flex-wrap:wrap}
+.g-dot{color:var(--text-muted)}
+.g-led{width:10px;height:10px;border-radius:50%;background:var(--accent-red)}
+.g-led.on{background:var(--accent-green); box-shadow:0 0 8px var(--accent-green)}
+.g-crono{font-size:34px; font-weight:700; color:var(--text-title); font-variant-numeric:tabular-nums;
+  margin:6px 0 12px; letter-spacing:1px}
+
+/* bandeiras */
+.g-bandeiras{display:grid; grid-template-columns:1fr 1fr; gap:10px}
+.g-bandeira{display:flex; flex-direction:column; align-items:flex-start; gap:2px;
+  padding:12px; border-radius:10px; border:1px solid var(--border-card);
+  background:var(--bg-input); color:var(--text-main); font-weight:700; font-size:14px}
+.g-bandeira small{font-weight:400; color:var(--text-muted); font-size:11px}
+.g-bandeira .bola{width:16px;height:16px;border-radius:50%;display:inline-block;margin-bottom:4px}
+.g-bandeira.verde .bola{background:var(--accent-green)}
+.g-bandeira.amarela .bola{background:var(--accent-gold)}
+.g-bandeira.vermelha .bola{background:var(--accent-red)}
+.g-bandeira.fechada .bola{background:#5c6470}
+.g-bandeira.ativo{outline:2px solid var(--accent-blue); background:#1b2740}
+
+/* locução rápida */
+.g-frases{display:flex; flex-wrap:wrap; gap:8px; margin-top:10px}
+.g-frases button{background:var(--bg-header); border:1px solid var(--border-card);
+  color:var(--text-main); padding:7px 12px; border-radius:20px; font-size:12px}
+.g-frases button:hover{border-color:var(--accent-blue); color:var(--text-title)}
+
+/* check-in */
+.g-tag-n{display:inline-block; min-width:22px; text-align:center}
+.g-checkin{display:grid; grid-template-columns:1fr 1fr; gap:6px; margin-top:10px;
+  max-height:260px; overflow:auto}
+.g-checkin label{display:flex; align-items:center; gap:8px; padding:9px 10px; border-radius:8px;
+  background:var(--bg-input); border:1px solid var(--border-card); font-size:13px; cursor:pointer}
+.g-checkin label.on{border-color:var(--accent-green); background:#15281f}
+.g-checkin input{width:18px;height:18px; accent-color:var(--accent-green)}
+.g-checkin .nome{overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+
+/* tabela */
+.g-tabela-wrap{overflow-x:auto}
+.g-tabela{width:100%; border-collapse:collapse; font-size:13px}
+.g-tabela th{color:var(--text-muted); text-align:left; font-weight:600; font-size:11px;
+  text-transform:uppercase; letter-spacing:.4px; padding:8px 8px; border-bottom:1px solid var(--border-card); white-space:nowrap}
+.g-tabela td{padding:9px 8px; border-bottom:1px solid var(--border-card); white-space:nowrap}
+.g-tabela tr.lider td{background:rgba(255,183,3,.07)}
+.g-tabela .pos{font-weight:700; color:var(--text-title)}
+.g-tabela tr.lider td:first-child{color:var(--accent-gold)}
+.g-badge{font-size:10px; padding:2px 7px; border-radius:10px; margin-left:6px; vertical-align:middle}
+.g-badge.lider{background:rgba(255,183,3,.18); color:var(--accent-gold)}
+.g-badge.gato{background:rgba(230,57,70,.2); color:#ff8a99}
+.g-acoes{display:flex; gap:5px}
+.g-act{background:var(--bg-input); border:1px solid var(--border-card); color:var(--text-main);
+  border-radius:8px; padding:6px 9px; font-size:14px; line-height:1}
+.g-act:hover{border-color:var(--accent-blue)}
+.g-vazio{color:var(--text-muted); text-align:center; padding:22px}
+
+.g-tag{display:inline-block}
+.g-tag.g-pill{font-size:11px; color:var(--text-muted); border:1px solid var(--border-card);
+  padding:3px 9px; border-radius:20px}
+
+/* rodapé + toast */
+.g-rodape{display:flex; align-items:center; gap:12px; margin:18px 0 30px; color:var(--text-muted); font-size:12px}
+.g-rodape #g-versao{margin-left:auto}
+.g-toast{position:fixed; left:50%; bottom:22px; transform:translateX(-50%) translateY(20px);
+  background:var(--bg-header); color:var(--text-title); border:1px solid var(--border-card);
+  padding:11px 18px; border-radius:10px; font-size:13px; opacity:0; pointer-events:none;
+  transition:.25s; z-index:60; box-shadow:0 12px 40px rgba(0,0,0,.5); max-width:90vw}
+.g-toast.show{opacity:1; transform:translateX(-50%) translateY(0)}
+.g-toast.ok{border-color:var(--accent-green)}
+.g-toast.erro{border-color:var(--accent-red)}
+
+@media (max-width:520px){
+  .g-checkin{grid-template-columns:1fr}
+  .g-crono{font-size:28px}
+  .g-top-tit span{display:none}
+}
+
+/* ---------------------------------------------------------------- QR Code de acesso */
+.g-login-card .g-qr-box{
+  display:flex; align-items:center; justify-content:center;
+  min-height:210px; margin:16px 0; padding:12px;
+  background:#fff; border-radius:12px; border:1px solid var(--border-card);
+}
+.g-login-card .g-qr-box img{width:210px; height:210px; display:block}
+.g-qr-vazio{color:#5a6675; font-size:13px; text-align:center; padding:70px 10px}
+.g-qr-url{
+  font-family:Consolas,monospace; font-size:12px; word-break:break-all;
+  background:var(--bg-input); border:1px solid var(--border-card);
+  border-radius:8px; padding:10px; color:var(--accent-blue); margin-bottom:8px;
+}
+.g-acoes-linha{display:flex; gap:8px; margin-top:10px; flex-wrap:wrap}
+.g-acoes-linha .g-btn{flex:1; min-width:0}
+.g-qr-dias{display:flex; align-items:center; gap:8px; font-size:12px;
+  color:var(--text-muted); flex:1}
+.g-qr-dias input{width:64px; padding:9px; border-radius:8px; font-size:14px;
+  border:1px solid var(--border-card); background:var(--bg-input);
+  color:var(--text-title); text-align:center}
+.g-qr-instrucao{display:flex; flex-direction:column; gap:10px; margin:16px 0}
+.g-qr-passo{display:flex; gap:12px; align-items:flex-start; font-size:13.5px;
+  color:var(--text-main); line-height:1.5}
+.g-qr-passo span{flex:0 0 26px; height:26px; border-radius:50%;
+  background:var(--accent-blue); color:#fff; font-weight:700; font-size:13px;
+  display:flex; align-items:center; justify-content:center}
+.g-login-card .g-aviso{
+  background:rgba(255,183,3,.10); border:1px solid rgba(255,183,3,.35);
+  color:var(--accent-gold); border-radius:8px; padding:10px 12px;
+  font-size:12.5px; line-height:1.5; margin-bottom:14px;
+}

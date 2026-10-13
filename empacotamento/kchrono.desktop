@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=KChrono
+GenericName=Cronometragem RC
+Comment=Sistema de cronometragem para pistas de RC (MyLaps P3, EASYLAP, LapWiz)
+Exec=__EXEC__
+Icon=kchrono
+Terminal=true
+Categories=Utility;Sports;
+Keywords=cronometragem;RC;carrinho;timing;
