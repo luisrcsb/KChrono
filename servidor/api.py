@@ -185,7 +185,11 @@ async def api_apagar_volta(piloto_id: int = Query(...), volta: Optional[int] = Q
 
 @app.post("/api/sessao/adicionar-volta")
 async def api_adicionar_volta(piloto_id: int = Query(...), tempo_s: float = Query(...)):
-    return {"ok": estado.adicionar_volta(piloto_id, tempo_s)}
+    ok = estado.adicionar_volta(piloto_id, tempo_s)
+    if ok:
+        return {"ok": True}
+    return {"ok": False,
+            "erro": "piloto fora da sessão (confira o check-in) ou tempo inválido"}
 
 
 # ---------------------------------------------------------------- sync (Fase 3)

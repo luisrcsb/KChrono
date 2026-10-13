@@ -52,6 +52,12 @@ def configurar_log(nivel: int = logging.INFO) -> logging.Logger:
     raiz = logging.getLogger("kchrono")
     raiz.setLevel(nivel)
     if not raiz.handlers:
+        try:
+            # UTF-8 com replace: acentos/emoji nunca derrubam o log
+            # (stdout redirecionado no Windows é cp1252 por padrão)
+            sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
         handler = logging.StreamHandler(sys.stdout)
         handler.setFormatter(_Formatador(com_cor=habilitar_ansi_windows()))
         raiz.addHandler(handler)

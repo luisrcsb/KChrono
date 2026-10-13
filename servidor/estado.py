@@ -342,6 +342,8 @@ class EstadoApp:
             self.motor.registrar_transponder(codigo, piloto_id)
         for piloto_id in {pid for _, pid in vinculos}:
             self.motor.vincular_piloto(piloto_id, self._piloto_nome(piloto_id))
+        log.info("sessão %s (%s): %d vínculo(s) transponder->piloto, %d piloto(s) no motor",
+                 self.sessao_id[:8], tipo, len(vinculos), len(self.motor._pilotos))
         self.motor.iniciar(TipoSessao(tipo))
         self.som.iniciada(tipo)
         if tipo == "corrida":
@@ -565,6 +567,7 @@ class EstadoApp:
     # ----- volta manual (correção pelo gerente) -----
     def adicionar_volta(self, piloto_id: int, tempo_s: float) -> bool:
         if not self.motor:
+            log.warning("volta manual recusada: sem motor de sessão ativo")
             return False
         try:
             tempo_us = int(round(float(tempo_s) * 1_000_000))
