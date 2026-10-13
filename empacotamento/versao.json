@@ -2,7 +2,7 @@
   "versao": "1.0.0",
   "canal": "estavel",
   "url_base": "",
-  "notas": "Versão 1.0.0 — Fases 0 a 7: driver MyLaps P3, motor de corrida, interface web (login/dashboard/operador/telão/admin), Central de Voltas, sincronização CTAD, voz (TTS), gráficos, campeonatos e drivers EASYLAP-USB / SKYRC LapWiz.",
+  "notas": "Versão 1.0.0 — KChrono definitivo: driver MyLaps P3, motor de corrida, interface web (login/dashboard/operador/telão/admin), Central de Voltas, sincronização CTAD (Firebase kchrono), voz (TTS), gráficos, campeonatos, drivers EASYLAP-USB / SKYRC LapWiz, i18n pt-BR/en-US. Inclui CTAD-Upload-Auto v1.2.4 para PDF.",
   "arquivos": {
     "windows": "KChrono-Setup.exe",
     "linux": "kchrono-linux.tar.gz"
