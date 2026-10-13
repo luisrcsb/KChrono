@@ -14,41 +14,7 @@ button{font-family:inherit}
 .tela{display:none; min-height:calc(100vh - 34px)}
 .tela.visivel{display:block}
 
-/* login estilo Steam */
-.login-wrap{display:flex; height:calc(100vh - 34px)}
-.login-banner{flex:1.15; position:relative; overflow:hidden;
-  background:linear-gradient(135deg,#0d111a 0%,#132043 55%,#3a86ff 130%);
-  display:flex; flex-direction:column; justify-content:center; align-items:center; padding:48px}
-.login-banner::before{content:""; position:absolute; inset:0;
-  background:radial-gradient(circle at 78% 22%, rgba(255,183,3,.22), transparent 45%)}
-.login-banner img{max-width:min(60%,460px); position:relative}
-.login-banner .kicker{color:var(--accent-gold); letter-spacing:3px; font-size:12px;
-  text-transform:uppercase; margin-top:22px; position:relative}
-.login-form{flex:1; display:flex; flex-direction:column; justify-content:center;
-  padding:48px 56px; background:var(--bg-body); border-left:1px solid var(--border-card)}
-.login-form h2{color:var(--text-title); margin-bottom:22px; font-weight:600}
-.login-form label{display:block; font-size:12px; color:var(--text-muted); margin:14px 0 6px}
-.login-form input,.login-form select{width:100%; padding:11px 12px; border-radius:6px;
-  border:1px solid var(--border-card); background:var(--bg-input); color:var(--text-title)}
-.btn{margin-top:22px; width:100%; padding:12px; border:none; border-radius:6px;
-  background:linear-gradient(180deg,#3a86ff,#2b6de0); color:#fff; font-weight:600; cursor:pointer}
-.btn:hover{filter:brightness(1.1)}
-.niveis{display:flex; gap:8px; margin-top:16px; flex-wrap:wrap}
-.niveis span{font-size:11px; color:var(--text-muted); border:1px solid var(--border-card);
-  padding:4px 10px; border-radius:20px}
-
 /* shell */
-.shell{display:flex; min-height:calc(100vh - 34px)}
-.side{width:206px; background:var(--bg-card); border-right:1px solid var(--border-card); padding:16px 12px}
-.side .logo{height:40px; margin:2px 8px 16px}
-.side a{display:flex; align-items:center; gap:10px; padding:10px 12px; border-radius:6px;
-  color:var(--text-muted); text-decoration:none; font-size:14px; margin-bottom:2px; cursor:pointer}
-.side a:hover{background:var(--bg-header); color:var(--text-title)}
-.side a.on{background:var(--bg-header); color:var(--text-title); border-left:3px solid var(--accent-blue)}
-.side .sep{height:1px; background:var(--border-card); margin:12px 6px}
-.main{flex:1; padding:24px 28px; overflow:auto}
-.main header{display:flex; justify-content:space-between; align-items:center; margin-bottom:20px}
-.main h1{color:var(--text-title); font-size:24px; font-weight:600}
 .perfil{display:flex; align-items:center; gap:10px; font-size:13px; color:var(--text-muted)}
 .perfil .tag{background:var(--accent-blue); color:#fff; font-size:11px; padding:2px 8px; border-radius:12px}
 
@@ -88,22 +54,6 @@ tr:hover td{background:rgba(58,134,255,.06)}
 .log .l-sistema{color:var(--accent-blue)}
 .log .l-volta{color:var(--accent-green)}
 
-/* telão */
-.telao{background:#000; min-height:calc(100vh - 34px); display:flex; flex-direction:column;
-  align-items:center; justify-content:center; padding:30px}
-.semaforo{display:flex; gap:16px; margin-bottom:30px}
-.luz{width:70px; height:70px; border-radius:50%; background:#161616; border:3px solid #2a2a2a; transition:all .12s}
-.luz.on{box-shadow:0 0 32px 6px currentColor}
-.count{color:#fff; font-size:60px; font-weight:800; font-variant-numeric:tabular-nums; margin-bottom:24px}
-.tv{width:min(92vw,1500px); background:#0a0a0a; border:2px solid #222; border-radius:12px; overflow:hidden}
-.tv-head{display:flex; justify-content:space-between; padding:13px 22px;
-  background:linear-gradient(90deg,#101b33,#0a0a0a); color:#fff; font-size:21px; font-weight:700}
-.tv-head .cat{color:var(--accent-gold); font-size:14px; align-self:center}
-.tv table{font-size:19px}
-.tv th{font-size:12px; padding:10px 14px}
-.tv td{padding:11px 14px; border-bottom:1px solid #181818; color:#e8e8e8}
-.tv-rodape{display:flex; gap:12px; padding:12px 22px; font-size:13px; color:#666}
-
 .switch{display:flex; align-items:center; gap:10px; margin:9px 0; font-size:14px}
 .switch .ck{width:20px; height:20px; border-radius:5px; border:2px solid var(--border-card);
   background:var(--bg-input); display:inline-flex; align-items:center; justify-content:center; font-size:13px}
@@ -114,64 +64,6 @@ tr:hover td{background:rgba(58,134,255,.06)}
 
 /* conteúdo */
 .conteudo{padding:22px 26px 60px}
-.carrossel{position:relative; border-radius:6px; overflow:hidden; margin-bottom:26px;
-  border:1px solid #222d42}
-.slide{display:none; height:260px; padding:38px 44px; align-items:center;
-  background:linear-gradient(110deg,#0d111a 0%,#16233f 55%,#1d3a6e 100%)}
-.slide.ativo{display:flex}
-.slide .txto h2{color:#fff; font-size:38px; line-height:1.1; margin-bottom:12px}
-.slide .txto h2 em{color:var(--accent-gold); font-style:normal}
-.slide .txto p{color:#aeb9cc; max-width:520px; margin-bottom:18px}
-.slide .txto .btn-slide{padding:10px 22px; border:none; border-radius:4px;
-  background:linear-gradient(180deg,#2ec4b6,#1d9b90); color:#04110f; font-weight:700;
-  cursor:pointer; font-size:14px}
-.slide .tag-slide{display:inline-block; background:rgba(58,134,255,.2);
-  color:var(--accent-blue); font-size:11px; font-weight:700; padding:4px 12px;
-  border-radius:4px; margin-bottom:14px}
-.slide.live{background:linear-gradient(110deg,#0d111a 0%,#331a2e 55%,#6e1d4f 100%)}
-.slide .medidores{display:flex; gap:26px}
-.slide .medidor{text-align:center}
-.slide .medidor .valor{font-size:30px; font-weight:800; color:#fff}
-.slide .medidor .rot{font-size:11px; color:#aeb9cc; text-transform:uppercase; letter-spacing:1px}
-.carrossel .seta{position:absolute; top:50%; transform:translateY(-50%);
-  background:rgba(0,0,0,.5); border:none; color:#fff; font-size:34px; width:42px; height:70px;
-  cursor:pointer; opacity:.7}
-.carrossel .seta:hover{opacity:1; background:rgba(58,134,255,.4)}
-.carrossel .seta.esq{left:0}
-.carrossel .seta.dir{right:0}
-.dots{position:absolute; bottom:14px; left:50%; transform:translateX(-50%); display:flex; gap:7px}
-.dots span{width:26px; height:4px; border-radius:2px; background:rgba(255,255,255,.28); cursor:pointer}
-.dots span.on{background:#fff}
-
-/* card de destaque (referência: card de jogo da loja Steam) */
-.destaque-card{position:relative; border-radius:6px; overflow:hidden; background:#16202c;
-  border:1px solid #22303f; display:flex; flex-direction:column}
-.destaque-capa{height:132px; position:relative;
-  background:linear-gradient(120deg,#1a2b45,#0d111a 70%),repeating-linear-gradient(45deg,rgba(255,255,255,.02) 0 14px,transparent 14px 28px)}
-.destaque-capa .faixa{position:absolute; top:10px; left:0; font-size:9px; font-weight:700;
-  letter-spacing:.5px; padding:3px 10px; border-radius:0 4px 4px 0; color:#04110f; background:var(--accent-green)}
-.destaque-capa .faixa.gold{background:var(--accent-gold)}
-.destaque-capa .faixa.azul{background:var(--accent-blue); color:#fff}
-.destaque-capa .faixa.rosa{background:var(--accent-gap); color:#fff}
-.destaque-capa .tit{position:absolute; bottom:8px; left:12px; right:12px; color:#fff;
-  font-size:15px; font-weight:700; text-shadow:0 1px 4px #000}
-.destaque-thumbs{display:flex; gap:4px; padding:4px; background:#0f1620}
-.destaque-thumbs div{flex:1; height:44px; border-radius:3px; background:#1a2635;
-  background-size:cover; background-position:center}
-.destaque-thumbs div:first-child{position:relative}
-.destaque-thumbs .play{position:absolute; inset:0; display:flex; align-items:center;
-  justify-content:center; color:#fff; font-size:16px; background:rgba(0,0,0,.25)}
-.card-barra{display:flex; align-items:center; justify-content:space-between; gap:8px;
-  padding:10px 12px; background:#1b2838}
-.btn-detalhes{padding:9px 16px; border:none; border-radius:3px; font-size:12px; font-weight:700;
-  letter-spacing:.5px; color:#cfe3f5; background:linear-gradient(180deg,#2a475e,#1f3a4f); cursor:pointer}
-.btn-detalhes:hover{color:#fff; background:linear-gradient(180deg,#3a86ff,#2b6de0)}
-.selos{display:flex; align-items:center; gap:8px}
-.selo{font-size:9px; font-weight:700; padding:3px 7px; border-radius:2px; background:#4c6b22; color:#a4d007}
-.selo.rosa{background:#6e1d4f; color:#ff7ad9}
-.selo.azul{background:#1d3a6e; color:#67c1f5}
-.valor{color:#beee11; font-size:14px; font-weight:700}
-.valor .un{font-size:11px; color:#8f9297; font-weight:400; margin-left:4px}
 
 /* ===== PAINEL DO OPERADOR (referência: tela principal do ZRound) ===== */
 .barra-op{display:flex; align-items:center; gap:18px; flex-wrap:wrap; background:#0a0f1a;
@@ -330,17 +222,6 @@ tr:hover td{background:rgba(58,134,255,.06)}
 .secao-tit h2{color:#fff; font-size:19px; font-weight:600}
 .secao-tit a{color:var(--text-muted); font-size:12px; text-decoration:none; cursor:pointer}
 .secao-tit a:hover{color:var(--accent-blue)}
-.destaque-card{position:relative; border-radius:6px; overflow:hidden; min-height:170px;
-  border:1px solid var(--border-card); background:var(--bg-card); padding:18px}
-.destaque-card .faixa{position:absolute; top:12px; left:0; font-size:10px; font-weight:700;
-  letter-spacing:.5px; padding:3px 12px; border-radius:0 4px 4px 0; color:#04110f;
-  background:var(--accent-green)}
-.destaque-card .faixa.gold{background:var(--accent-gold)}
-.destaque-card .faixa.azul{background:var(--accent-blue); color:#fff}
-.destaque-card h4{color:#fff; font-size:17px; margin:22px 0 8px}
-.destaque-card .meta{font-size:12px; color:var(--text-muted); line-height:1.7}
-.destaque-card .valor{font-size:24px; font-weight:800; color:#fff; margin-top:8px}
-.destaque-card .desconto{color:var(--accent-green); font-size:12px}
 .rodape-bar{position:fixed; bottom:0; left:0; right:0; height:34px; background:#171a21;
   border-top:1px solid #000; display:flex; align-items:center; justify-content:space-between;
   padding:0 18px; font-size:11px; color:#8f9297; z-index:55}
@@ -348,25 +229,6 @@ tr:hover td{background:rgba(58,134,255,.06)}
 .rodape-bar .add:hover{color:#fff}
 .rodape-bar .dir{display:flex; gap:16px}
 .pill.novo{background:rgba(58,134,255,.2); color:var(--accent-blue)}
-
-/* seleção de perfis (referência: "Quem vai jogar?" do Steam) */
-.perfis-wrap{height:calc(100vh - 34px); display:flex; flex-direction:column;
-  align-items:center; justify-content:center; padding:40px;
-  background:
-    linear-gradient(180deg, rgba(19,32,67,.55), rgba(13,17,26,.96) 60%),
-    repeating-linear-gradient(45deg, rgba(255,255,255,.022) 0 22px, transparent 22px 44px);
-}
-.perfis-topo img{height:74px; margin-bottom:8px}
-.perfis-titulo{color:var(--text-title); font-size:30px; font-weight:600; margin:14px 0 34px}
-.perfis{display:flex; gap:22px; justify-content:center; flex-wrap:wrap}
-.perfil-card{width:150px; text-align:center; cursor:pointer; padding:16px 10px;
-  border-radius:14px; border:2px solid transparent; transition:all .15s}
-.perfil-card:hover{border-color:var(--accent-blue); background:rgba(58,134,255,.08);
-  transform:translateY(-2px)}
-.avatar{width:100px; height:100px; border-radius:50%; margin:0 auto 12px;
-  display:flex; align-items:center; justify-content:center; font-size:40px; font-weight:700;
-  color:#fff; border:3px solid rgba(255,255,255,.14); overflow:hidden}
-.avatar img{width:100%; height:100%; object-fit:cover}
 
 /* ---- resultados da busca global ---- */
 .busca-resultados{position:absolute; top:100%; left:0; right:0; margin-top:6px; z-index:60;
@@ -405,23 +267,6 @@ tr:hover td{background:rgba(58,134,255,.06)}
 .credito-nome{color:var(--text-title); font-size:19px; font-weight:700}
 .credito-cargo{color:var(--accent-blue); font-size:12px; letter-spacing:.5px;
   text-transform:uppercase; margin-bottom:8px}
-.perfil-nome{color:var(--text-title); font-weight:600; font-size:15px}
-.nivel-badge{font-size:10px; letter-spacing:.5px; padding:2px 9px; border-radius:10px;
-  margin-top:7px; display:inline-block}
-.nivel-badge.super{background:rgba(255,183,3,.18); color:var(--accent-gold)}
-.nivel-badge.admin{background:rgba(58,134,255,.18); color:var(--accent-blue)}
-.nivel-badge.gest{background:rgba(46,196,182,.15); color:var(--accent-green)}
-.perfil-add .avatar{background:var(--bg-header); border:2px dashed var(--border-card);
-  font-size:44px; color:var(--text-muted)}
-.perfil-add:hover{border-color:var(--border-card); background:rgba(255,255,255,.03)}
-.toggle-perfil{display:flex; align-items:center; gap:12px; margin-top:34px;
-  font-size:13px; color:var(--text-muted)}
-.toggle-perfil .track{width:46px; height:24px; border-radius:12px; background:var(--accent-blue);
-  position:relative; cursor:pointer}
-.toggle-perfil .track .knob{position:absolute; right:2px; top:2px; width:20px; height:20px;
-  border-radius:50%; background:#fff}
-.toggle-perfil .track.off{background:var(--bg-header); border:1px solid var(--border-card)}
-.toggle-perfil .track.off .knob{right:auto; left:2px}
 
 /* ---- menu lateral: logo full-width + status do decoder + QR Gestão Remota ---- */
 .side-logo{padding:2px 4px 10px}
@@ -454,9 +299,7 @@ tr:hover td{background:rgba(58,134,255,.06)}
 .camp-etapa-atual b,
 .credito-nome,
 .stat-mini .big,
-.card .big,
-.destaque-card h4,
-.destaque-card .valor{
+.card .big{
   text-shadow:0 1px 2px rgba(0,0,0,.9), 0 0 5px rgba(0,0,0,.65);
 }
 /* ---- wallpaper da área principal (Admin → Configurações) ---- */

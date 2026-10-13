@@ -1,7 +1,7 @@
 # KChrono — Arquitetura (nome provisório)
 
 > Software de cronometragem e telemetria PT-BR, substituto do ZRound, para Windows e Linux.
-> Ecossistema: alimenta/espelha o CTAD (krathus-telemetria) e integra com o hardware MyLaps já em uso.
+> Ecossistema: alimenta/espelha o site (Fonte: app KChrono → Firebase projeto `kchrono`) e integra com o hardware MyLaps já em uso.
 >
 > **Status:** rascunho v0.1 — criado a partir da análise do ZRound 1.28.8.21 instalado,
 > da engenharia reversa do protocolo Live/Results e de capturas ao vivo do decoder AMB P3 (192.168.0.50).
@@ -186,13 +186,13 @@ o sync mapeia para o banco do CTAD.
 |---|---|---|
 | **0. Fundação** | driver `MyLapsP3` + CLI ao vivo | ✅ concluída (29 passings reais) |
 | **1. Motor + banco** | modelos, SQLite, máquina de estados, replay | ✅ concluída (validado com captura real) |
-| **1.5. Núcleo hard** | relógio QPC/monotonic · ring buffer · filtro tempo mínimo/ghost lap · drift · log com severidades | ⬜ próxima |
-| **2. Interface operador** | servidor local + telas (design aprovado) + TTS + console com ação contextual | ⬜ |
-| **3. Sync CTAD** | envio de sessões/voltas, espelho de cadastros, upload refinado | ⬜ |
-| **4. Telão + mobile** | telão 4K, semáforo, colunas selecionáveis, perfis de exibição | ⬜ |
-| **5. Campeonatos** | grid builder piramidal, varredura RF, drop rounds, bônus pole/melhor volta | ⬜ |
-| **6. Outros decodificadores** | drivers LapZ, GiroZ, RiCino, Arduino/RC | ⬜ |
-| **7. Empacotamento** | instaladores Windows/Linux + autoupdate | ⬜ |
+| **1.5. Núcleo hard** | relógio QPC/monotonic · ring buffer · filtro tempo mínimo/ghost lap · drift · log com severidades | ✅ concluída |
+| **2. Interface operador** | menu persistente + painel completo + telão + TTS + QR Gestão Remota + wallpaper | ✅ concluída |
+| **3. Sync Firebase** | envio de sessões/voltas, fila offline, projeto `kchrono` | ✅ ligada e validada (falta sessão real) |
+| **4. Telão + mobile** | telão 4K, semáforo, colunas selecionáveis, perfis de exibição | ✅ interface pronta (mobile leve pendente) |
+| **5. Campeonatos** | grid builder, varredura RF, drop rounds, bônus pole/melhor volta | ✅ motor validado + UI no Admin |
+| **6. Outros decodificadores** | EASYLAP (pronto s/ hardware), LapWiz (só captura), LapZ/GiroZ/RiCino (roadmap) | 🟡 parcial |
+| **7. Empacotamento** | instaladores Windows/Linux + autoupdate | 🟡 arquivos prontos, nunca executados |
 
 ---
 

@@ -21,16 +21,13 @@ function marcarNav(btn) {
 
 function mostrar(id) {
   const op = document.getElementById("operador");
-  const tv = document.getElementById("telao");
   const adm = document.getElementById("admin-conteudo");
   if (op) op.classList.toggle("visivel", id === "operador");
-  if (tv) tv.classList.toggle("visivel", id === "telao");
   if (adm) adm.style.display = id === "admin" ? "" : "none";
   const br = document.getElementById("busca-resultados"); if (br) br.classList.remove("on");
   // QR de Gestão Remota: exclusivo do Painel do Operador
   const sideQr = document.getElementById("side-qr");
   if (sideQr) sideQr.style.display = (id === "operador") ? "" : "none";
-  if (id === "telao") setTimeout(iniciarSemaforo, 50);
 }
 
 function mostrarOperador(btn) {
@@ -392,39 +389,6 @@ function logMsg(texto, classe, elementoId) {
   el.appendChild(linha);
   el.scrollTop = el.scrollHeight;
   while (el.children.length > 120) el.removeChild(el.firstChild);
-}
-
-// ---------------------------------------------------------------- semáforo (decorativo; integração real na Fase 4)
-let semTimer = null;
-function iniciarSemaforo() {
-  if (semTimer) return;
-  const luzes = document.querySelectorAll("#semaforo .luz");
-  const count = document.getElementById("countdown");
-  let i = 0;
-  count.textContent = "PRONTO";
-  semTimer = setInterval(() => {
-    if (i < 5) {
-      luzes[i].style.background = luzes[i].style.color;
-      luzes[i].classList.add("on");
-      i++;
-      setTimeout(() => {
-        luzes.forEach(l => { l.classList.remove("on"); setTimeout(() => l.style.background = "#161616", 150); });
-      }, Math.random() * 300 + 200);
-    } else {
-      clearInterval(semTimer); semTimer = null;
-      let n = 3;
-      count.textContent = n;
-      const t2 = setInterval(() => {
-        n--;
-        if (n > 0) count.textContent = n;
-        else {
-          count.textContent = "VAI!"; count.style.color = "#2ec4b6";
-          clearInterval(t2);
-          setTimeout(() => { count.textContent = "KCHRONO"; count.style.color = "#fff"; }, 2500);
-        }
-      }, 1000);
-    }
-  }, 800);
 }
 
 // ---------------------------------------------------------------- gráficos (Fase 4)

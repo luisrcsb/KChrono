@@ -13,16 +13,12 @@ Integra com o hardware MyLaps/AMB já em uso na pista e sincroniza com o CTAD.
 | **0 — Fundação** | driver `MyLapsP3` + CLI de teste ao vivo | ✅ **Concluída** (11/10/2026 — 29 passings reais capturados do decoder 192.168.0.50) |
 | **1 — Motor + banco** | modelos, SQLite, máquina de estados + replay de validação | ✅ **Concluída** (11/10/2026 — 28 voltas consolidadas da captura real; simulação 3 pilotos OK) |
 | **1.5 — Núcleo hard** | relógio alta precisão · ring buffer · filtro ghost lap · log | ✅ **Concluída** (11/10/2026 — µs validado, drift, descarte seguro, ghost lap auditado) |
-| **2 — Interface operador** | 5 telas reais + telão 4K + módulo de som/voz | ✅ **Implementada** (11/10/2026 — login Steam, dashboard loja, operador ZRound, telão, admin biblioteca) |
-| **3 — Sync CTAD** | fila offline, payload no formato do site, auto-upload, dedup | ✅ **Implementada** (11/10/2026 — aguardando teste com conta real) |
+| **2 — Interface operador** | menu persistente + painel completo + telão + som/voz + QR Gestão Remota | ✅ **Concluída** (menu/corpó, sessão por abertura, wallpaper) |
+| **3 — Sync Firebase** | fila offline, payload, auto-upload, dedup — projeto `kchrono` | ✅ **Ligada e validada** (13/10/2026 — login superuser + escrita/leitura no banco novo; falta sessão real) |
 | **4 — Telão real** | voz TTS, gráficos Chart.js, track view, estimativas | ✅ **Implementada** (11/10/2026 — Maria pt-BR ativa, gráficos offline) |
 | **5 — Campeonatos** | grid builder, espectro RF, drop rounds, bônus, ranking | ✅ **Implementada** (11/10/2026 — motor validado + UI no Admin) |
-| 6 — Drivers extras | EASYLAP-USB, SKYRC LapWiz (BLE), LapZ/GiroZ/RiCino | ⬜ |
-| 7 — Empacotamento | instaladores Windows/Linux + autoupdate | ⬜ |
-| 4 — Telão + mobile | telão 4K, semáforo, colunas selecionáveis | ⬜ |
-| 5 — Campeonatos | grid builder, varredura RF, drop rounds, bônus | ⬜ |
-| 6 — Drivers extras | LapZ, GiroZ, RiCino, Arduino/RC | ⬜ |
-| 7 — Empacotamento | instaladores Windows/Linux + autoupdate | ⬜ |
+| 6 — Drivers extras | EASYLAP-USB, SKYRC LapWiz (BLE), LapZ/GiroZ/RiCino | 🟡 **Parcial** (EASYLAP pronto s/ hardware · LapWiz só captura · demais roadmap) |
+| 7 — Empacotamento | instaladores Windows/Linux + autoupdate | 🟡 **Parcial** (arquivos prontos; `.exe`/instalador/autoupdate nunca executados) |
 
 ## Como rodar o teste ao vivo (Fase 0)
 
@@ -44,19 +40,24 @@ python cli.py p3 --host 192.168.0.50 --duracao 30
 KChrono/
 ├── ARQUITETURA.md            # arquitetura e roadmap
 ├── docs/
-│   └── PROTOCOLO-P3.md       # spec do protocolo + amostras reais
-├── cli.py                    # CLI: p3 (teste ao vivo) e replay (validação do motor)
-├── drivers/
-│   ├── base.py               # interface comum + eventos Passing/Status
-│   ├── mylaps_p3.py          # driver MyLaps P3 (TCP 5403)
-│   └── __init__.py
-├── nucleo/
-│   ├── modelos.py            # entidades + máquina de estados
-│   ├── banco.py              # SQLite + migrações
-│   ├── motor_corrida.py      # consolida voltas e calcula classificação
-│   └── demo.py               # validação: replay da captura real + simulação
-└── tools/
-    └── crc_probe.py          # sonda do CRC-16 (pendente identificar)
+│   ├── PROTOCOLO-P3.md       # spec do protocolo + amostras reais
+│   ├── ESPECIFICACAO-TECNICA.md
+│   ├── DESIGN-FASE2.md
+│   └── DRIVERS-ROADMAP.md
+├── cli.py                    # CLI: p3, replay, servidor, easylap, lapwiz, campeonato-teste
+├── caminhos.py               # resolve pastas (fonte vs empacotado)
+├── atualizador.py            # verifica/baixa novas versões (versao.json)
+├── config.json               # config local (Firebase, som, gerente) — não versionado
+├── dados/                    # banco SQLite, logs, capturas — não versionado
+├── drivers/                  # base.py + mylaps_p3.py, easylap.py, lapwiz.py
+├── nucleo/                   # modelos, banco, motor_corrida, relogio, ring_buffer,
+│                             # voz, log, campeonatos, demo
+├── servidor/                 # api.py, estado.py, config.py, gerente.py, qr.py, som.py
+├── sync/                     # ctad_client.py (Auth+RTDB) + sincronizador.py (fila offline)
+├── interface/                # index.html, app.js, estilo.css, telao.*, gerente.*
+├── imagens/                  # logos, fotos
+├── empacotamento/            # PyInstaller, NSIS, systemd, versao.json
+└── tools/                    # crc_probe.py
 ```
 
 ## Como validar o motor (Fase 1)
