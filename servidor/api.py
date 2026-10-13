@@ -1,7 +1,9 @@
 """KChrono — API REST + WebSocket do servidor local (Fase 2)."""
 from __future__ import annotations
 
+import asyncio
 import json
+import logging
 import os
 from typing import Dict, Optional
 
@@ -17,6 +19,8 @@ from .qr import (base_url_para_qr as qr_base_url, data_uri as qr_data_uri,
 from sync import ErroAuth
 from caminhos import dir_recursos
 
+log = logging.getLogger("kchrono.api")
+
 DIR_PROJETO = dir_recursos()
 DIR_INTERFACE = DIR_PROJETO / "interface"
 DIR_IMAGENS = DIR_PROJETO / "imagens"
@@ -27,6 +31,23 @@ app = FastAPI(title="KChrono", version="1.0.0")
 
 app.mount("/imagens", StaticFiles(directory=DIR_IMAGENS), name="imagens")
 app.mount("/static", StaticFiles(directory=DIR_INTERFACE), name="static")
+
+
+@app.on_event("startup")
+async def _auto_conectar_sync():
+    """Reconecta o sync no boot (thread separada — nunca trava a subida)."""
+    cfg = estado.config
+    if not (cfg.get("email") and cfg.get("password")):
+        return
+    if estado.sincronizador.configurado:
+        return
+    try:
+        info = await asyncio.to_thread(
+            estado.configurar_sync,
+            cfg["email"], cfg["password"], cfg.get("pistaId"))
+        log.info("sync reconectado no boot (nível %s)", info.get("nivel"))
+    except Exception as e:
+        log.warning("sync não reconectado no boot: %s", e)
 
 
 @app.get("/api/status")
