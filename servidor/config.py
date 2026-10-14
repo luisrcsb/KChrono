@@ -25,6 +25,7 @@ CONFIG_MODELO = {
     "decoder_tipo": "p3",         # p3 | easylap | lapwiz
     "decoder_host": "192.168.0.50",
     "decoder_porta": 5403,
+    "decoder_auto": True,         # tenta conectar em loop ao abrir o app
 }
 
 

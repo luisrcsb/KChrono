@@ -89,6 +89,18 @@ const conectarDecoder = () => {
     `?tipo=${encodeURIComponent(tipo)}${alvoField ? "&alvo=" + encodeURIComponent(alvoField) : ""}`);
 };
 const desconectarDecoder = () => api("decoder/desconectar");
+async function carregarAutoConectar() {
+  try {
+    const r = await api("decoder/auto", "GET");
+    document.getElementById("hw-auto").checked = r.ativo !== false;
+  } catch (e) {}
+}
+async function definirAutoConectar() {
+  const ativo = document.getElementById("hw-auto").checked;
+  const r = await api(`decoder/auto?ativo=${ativo}`);
+  logMsg(`auto-conexão do decoder: ${r.ativo ? "ligada (tenta em loop ao abrir)" : "desligada"}`,
+    "l-sistema", "log-operador");
+}
 async function detectarPortas() {
   const r = await api("decoder/portas", "GET");
   const portas = (r.portas || []);
@@ -2215,6 +2227,7 @@ previewNome();
 aplicarAparencia();
 carregarIdioma();
 atualizarBotaoPrincipal();
+carregarAutoConectar();
 conectarWS();
 carregarNotificacoes();
 mostrar("operador");

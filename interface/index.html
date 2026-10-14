@@ -593,9 +593,8 @@
 
       <!-- ============ HARDWARE ============ -->
       <div class="admin-sec" id="a-hw">
-        <div class="grid g2">
-          <div class="card">
-            <h3>Decoder <span class="pill ok" id="hw-status-pill">—</span></h3>
+        <div class="card" style="margin-bottom:16px">
+          <h3>Decoder <span class="pill ok" id="hw-status-pill">—</span></h3>
             <div class="form-sessao">
               <div><label>Tipo de decoder</label>
                 <select id="hw-tipo" onchange="hwTrocarTipo()">
@@ -608,10 +607,13 @@
               <div id="hw-porta-wrap"><label>Porta TCP</label><input id="hw-porta" value="5403"></div>
             </div>
             <p class="hint">Status: <b id="hw-status">—</b> · temp <b id="hw-temp">—</b> · tensão <b id="hw-tensao">—</b> · ruído <b id="hw-ruido">—</b></p>
-            <div style="display:flex; gap:8px; flex-wrap:wrap">
+            <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center">
               <button class="btn-slide" onclick="conectarDecoder()">🔌 (Re)conectar</button>
               <button class="btn-slide" onclick="desconectarDecoder()">⏏ Desconectar</button>
               <button class="btn-slide" onclick="detectarPortas()">🔍 Detectar portas</button>
+              <label class="chk-linha" title="Ao abrir o aplicativo, tenta conectar sozinho em loop até conseguir">
+                <input type="checkbox" id="hw-auto" checked onchange="definirAutoConectar()"> 🔁 Conectar ao abrir
+              </label>
             </div>
           </div>
           <div class="card">
@@ -625,7 +627,6 @@
             </table>
             <p class="hint">Teste de bancada via CLI: <code>python cli.py easylap --porta COM3</code> · <code>python cli.py lapwiz</code></p>
           </div>
-        </div>
       </div>
 
       <!-- ============ PILOTOS ============ -->

@@ -54,6 +54,8 @@ class EstadoApp:
         self._filas: List[asyncio.Queue] = []
         self._task_decoder: Optional[asyncio.Task] = None
         self._task_vigia: Optional[asyncio.Task] = None
+        #: loop de auto-conexão do boot (conectar em loop até conseguir)
+        self._task_auto_conectar: Optional[asyncio.Task] = None
         self._ultimo_status: Optional[Dict] = None
         #: o operador quer conexão (liga no conectar, desliga no desconectar —
         #: base do auto-reconnect e do watchdog de silêncio)
@@ -166,6 +168,7 @@ class EstadoApp:
     async def desconectar_decoder(self) -> None:
         """Encerra o driver atual e a tarefa de leitura, se houver."""
         self._quer_decoder = False
+        self.parar_auto_conectar()
         if self._task_decoder and not self._task_decoder.done():
             self._task_decoder.cancel()
             try:
@@ -194,6 +197,75 @@ class EstadoApp:
             return
         if self._task_vigia is None or self._task_vigia.done():
             self._task_vigia = asyncio.create_task(self._vigiar_decoder())
+
+    # ------------------------------------------------- auto-conexão (boot)
+    def decoder_auto_ativo(self) -> bool:
+        """Checkbox 'Conectar ao abrir' (padrão ligado)."""
+        return bool(self.config.get("decoder_auto", True))
+
+    def definir_decoder_auto(self, ativo: bool) -> Dict:
+        cfg = carregar_config()
+        cfg["decoder_auto"] = bool(ativo)
+        salvar_config(cfg)
+        self.config = cfg
+        if ativo:
+            self.iniciar_auto_conectar()
+        else:
+            self.parar_auto_conectar()
+        return {"ok": True, "ativo": bool(ativo)}
+
+    def iniciar_auto_conectar(self):
+        """Dispara o loop de conexão do boot (se ligado e ainda desconectado)."""
+        try:
+            asyncio.get_running_loop()
+        except RuntimeError:
+            return
+        if not self.decoder_auto_ativo() or self.conectado:
+            return
+        if self._task_auto_conectar is None or self._task_auto_conectar.done():
+            self._task_auto_conectar = asyncio.create_task(self._loop_auto_conectar())
+
+    def parar_auto_conectar(self):
+        if self._task_auto_conectar and not self._task_auto_conectar.done():
+            self._task_auto_conectar.cancel()
+        self._task_auto_conectar = None
+
+    def _apos_conectar(self, tipo: str, como: str = "conectado"):
+        """Estado comum após (re)conexão bem-sucedida."""
+        self._quer_decoder = True
+        self.conectado = True
+        self._ultimo_rx_us = agora_monotonic_us()
+        self.config["decoder_tipo"] = tipo
+        self.publicar("sistema", {"msg": f"decoder {tipo} {como}"
+                                         + (f" ({getattr(self.driver, 'porta_usada', '')})"
+                                            if getattr(self.driver, "porta_usada", None)
+                                            else "")})
+        self._task_decoder = asyncio.create_task(self._ler_decoder())
+        self._garantir_vigia()
+
+    async def _loop_auto_conectar(self):
+        """Tenta conectar em loop até conseguir (ou até desligarem a chave)."""
+        try:
+            tentativa = 0
+            while self.decoder_auto_ativo() and not self.conectado:
+                tentativa += 1
+                tipo = self.config.get("decoder_tipo", "p3")
+                if tentativa == 1:
+                    log.info("auto-conexão do decoder (%s) em loop...", tipo)
+                try:
+                    self.driver = self._criar_driver(tipo, None)
+                    await self.driver.connect()
+                except (OSError, asyncio.TimeoutError, ValueError) as e:
+                    if tentativa == 1:
+                        self.publicar("erro", {"msg": f"auto-conexão: {e}"
+                                                        " — tentando em loop..."})
+                    log.debug("auto-conexão tentativa %d falhou: %s", tentativa, e)
+                    await asyncio.sleep(5)
+                    continue
+                self._apos_conectar(tipo, "conectado (auto-conexão)")
+                break
+        except asyncio.CancelledError:
+            pass
 
     async def _vigiar_decoder(self):
         """Watchdog: conectado mas sem frames há >20 s = algo errado na rede."""
@@ -227,11 +299,7 @@ class EstadoApp:
                 except (OSError, asyncio.TimeoutError, ValueError) as e:
                     log.warning("reconexão ao decoder falhou: %s", e)
                     continue
-                self.conectado = True
-                self._ultimo_rx_us = agora_monotonic_us()
-                self.publicar("sistema", {"msg": f"decoder {tipo} reconectado"})
-                self._task_decoder = asyncio.create_task(self._ler_decoder())
-                self._garantir_vigia()
+                self._apos_conectar(tipo, "reconectado")
                 break
         except asyncio.CancelledError:
             pass
@@ -257,17 +325,10 @@ class EstadoApp:
             await self.driver.connect()
         except (OSError, asyncio.TimeoutError, ValueError) as e:
             self.publicar("erro", {"msg": f"falha ao conectar ({tipo}): {e}"})
+            if self.decoder_auto_ativo():
+                self.iniciar_auto_conectar()
             return False
-        self._quer_decoder = True
-        self.conectado = True
-        self._ultimo_rx_us = agora_monotonic_us()
-        self.config["decoder_tipo"] = tipo
-        self.publicar("sistema", {"msg": f"decoder {tipo} conectado"
-                                         + (f" ({getattr(self.driver, 'porta_usada', '')})"
-                                            if getattr(self.driver, "porta_usada", None)
-                                            else "")})
-        self._task_decoder = asyncio.create_task(self._ler_decoder())
-        self._garantir_vigia()
+        self._apos_conectar(tipo)
         return True
 
     async def _ler_decoder(self):

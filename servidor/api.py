@@ -38,16 +38,17 @@ async def _auto_conectar_sync():
     """Reconecta o sync no boot (thread separada — nunca trava a subida)."""
     cfg = estado.config
     if not (cfg.get("email") and cfg.get("password")):
-        return
-    if estado.sincronizador.configurado:
-        return
-    try:
-        info = await asyncio.to_thread(
-            estado.configurar_sync,
-            cfg["email"], cfg["password"], cfg.get("pistaId"))
-        log.info("sync reconectado no boot (nível %s)", info.get("nivel"))
-    except Exception as e:
-        log.warning("sync não reconectado no boot: %s", e)
+        pass
+    elif not estado.sincronizador.configurado:
+        try:
+            info = await asyncio.to_thread(
+                estado.configurar_sync,
+                cfg["email"], cfg["password"], cfg.get("pistaId"))
+            log.info("sync reconectado no boot (nível %s)", info.get("nivel"))
+        except Exception as e:
+            log.warning("sync não reconectado no boot: %s", e)
+    # auto-conexão do decoder em loop (checkbox 'Conectar ao abrir', padrão on)
+    estado.iniciar_auto_conectar()
 
 
 @app.get("/api/status")
@@ -58,6 +59,17 @@ async def api_status():
 @app.post("/api/decoder/conectar")
 async def api_conectar(tipo: str = Query("p3"), alvo: Optional[str] = Query(None)):
     return {"ok": await estado.conectar_decoder(tipo, alvo)}
+
+
+@app.get("/api/decoder/auto")
+async def api_decoder_auto():
+    """Checkbox 'Conectar ao abrir' (padrão ligado)."""
+    return {"ativo": estado.decoder_auto_ativo()}
+
+
+@app.post("/api/decoder/auto")
+async def api_decoder_auto_definir(ativo: bool = Query(True)):
+    return estado.definir_decoder_auto(ativo)
 
 
 @app.post("/api/decoder/desconectar")
