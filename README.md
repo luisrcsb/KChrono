@@ -18,7 +18,7 @@ Integra com o hardware MyLaps/AMB já em uso na pista e sincroniza com o CTAD.
 | **4 — Telão real** | voz TTS, gráficos Chart.js, track view, estimativas | ✅ **Implementada** (11/10/2026 — Maria pt-BR ativa, gráficos offline) |
 | **5 — Campeonatos** | grid builder, espectro RF, drop rounds, bônus, ranking | ✅ **Implementada** (11/10/2026 — motor validado + UI no Admin) |
 | 6 — Drivers extras | EASYLAP-USB, SKYRC LapWiz (BLE), LapZ/GiroZ/RiCino | 🟡 **Parcial** (EASYLAP pronto s/ hardware · LapWiz só captura · demais roadmap) |
-| 7 — Empacotamento | instaladores Windows/Linux + autoupdate | 🟡 **Parcial** (arquivos prontos; `.exe`/instalador/autoupdate nunca executados) |
+| 7 — Empacotamento | app nativo pywebview + instaladores Windows/Linux + autoupdate | ✅ **Funcional** (13/10/2026 — `KChrono.exe` testado: janela nativa, `/api/sync/status` 200, modo instalado usa `%APPDATA%\KChrono`; `KChrono-Setup.exe` ~64 MB compilado no NSIS com CTAD; falta teste de pista real) |
 
 ## Como rodar o teste ao vivo (Fase 0)
 
