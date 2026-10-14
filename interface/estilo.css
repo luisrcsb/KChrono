@@ -295,6 +295,9 @@ label.btn-slide{line-height:1.4}
   font-variant-numeric:tabular-nums}
 .plano-seta{align-self:center; flex:none; padding:0 8px; font-size:20px;
   color:var(--accent-blue); font-weight:700}
+/* etapa em andamento (destacada na sequência) */
+.plano-etapa.atual{outline:3px solid var(--accent-gold); outline-offset:1px;
+  background:rgba(255,183,3,.12); box-shadow:0 0 14px rgba(255,183,3,.35)}
 
 /* ---- check-in (Admin → Gerente de Pista) ---- */
 .lista-checkin{max-height:340px; overflow:auto; display:grid; grid-template-columns:1fr 1fr 1fr;

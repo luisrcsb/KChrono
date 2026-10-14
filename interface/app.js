@@ -2063,6 +2063,10 @@ function renderPlanoCampeonato() {
        <div class="plano-rotulo">${_esc(e.rotulo)}</div>
        <div class="plano-dur"><b>${e.duracao}</b><span>min</span></div>
      </div>`).join("");
+  if (ultimoEstadoCamp && ultimoEstadoCamp.ativo) {
+    const cards = t.querySelectorAll(".plano-etapa");
+    cards.forEach((c, i) => c.classList.toggle("atual", i === ultimoEstadoCamp.indice));
+  }
   atualizarTotalCamp();
 }
 function lerPlanoCampeonato() {
@@ -2142,13 +2146,18 @@ async function iniciarCampeonato() {
 }
 
 // ---------------------------------------------------------------- campeonato em andamento
+let ultimoEstadoCamp = null;
 function renderEstadoCampeonato(est) {
+  ultimoEstadoCamp = est;
   const el = document.getElementById("camp-atual");
+  // destaca na sequência o box da etapa em andamento
+  const cards = document.querySelectorAll("#camp-plano-lista .plano-etapa");
   if (!el) return;
   const etapaEl = document.getElementById("camp-etapa-atual");
   if (!est || !est.ativo) {
     el.innerHTML = '<span class="hint">nenhum campeonato em andamento</span>';
     if (etapaEl) etapaEl.textContent = "—";
+    cards.forEach(c => c.classList.remove("atual"));
     const prox = document.getElementById("camp-proxima");
     if (prox) prox.disabled = true;
     const enc = document.getElementById("camp-encerrar");
@@ -2159,6 +2168,7 @@ function renderEstadoCampeonato(est) {
   const nome = e ? e.rotulo : "—";
   const tipo = e ? e.etapa : "";
   if (etapaEl) etapaEl.textContent = `Etapa ${est.numero} de ${est.total} — ${nome}`;
+  cards.forEach((c, i) => c.classList.toggle("atual", i === est.indice));
   el.innerHTML = `
     <div class="camp-etapa-atual">
       <span class="camp-etapa-num">Etapa ${est.numero} de ${est.total}</span>
