@@ -4,11 +4,16 @@ Sobe o servidor local (FastAPI/uvicorn) em thread separada e abre janela nativa
 (WebView2 no Windows) carregando a interface web — **sem barra de endereço,
 abas ou chrome do navegador**.
 
+Um processo = UMA janela (o pywebview trava ao criar a 2ª janela noutra
+thread). O telão abre num processo filho (``--sem-servidor``) com janela
+própria, na tela das Configurações.
+
     KChrono.exe                 → janela nativa 1280x800 em http://localhost:8780
     KChrono.exe --porta 9000    → porta alternativa
     KChrono.exe --telao         → abre direto no telão (/telao)
     KChrono.exe --gerente       → abre direto no gerente (/gerente)
     KChrono.exe --sem-janela    → roda headless (uso como serviço/systemd)
+    KChrono.exe --sem-servidor --telao  → só a janela (liga no servidor ativo)
     KChrono.exe --largura 1920 --altura 1080  → tamanho customizado
 """
 from __future__ import annotations
@@ -32,62 +37,75 @@ URL_BASE = "http://127.0.0.1:8780"  # 127.0.0.1 evita prompt de firewall na 1ª 
 
 
 class Ponte:
-    """Ponte JS→Python, exposta como ``window.pywebview.api`` na janela principal.
+    """Ponte JS→Python, exposta como ``window.pywebview.api``.
 
-    Permite abrir o telão numa **segunda janela nativa** (sem escapar para
-    o navegador do sistema, como o ``window.open`` faz no WebView2).
+    Cada processo tem UMA janela (o pywebview cria janelas filhas numa
+    thread separada — trava o app no Windows). O telão abre num processo
+    filho (``--sem-servidor``) com janela própria, na tela escolhida.
     """
 
     def __init__(self):
-        self.telao = None
+        self.janela = None            # janela deste processo (modo filho)
+        self._proc_telao = None       # processo filho do telão (modo pai)
 
-    def _visivel(self) -> bool:
-        try:
-            self.telao.show()
-            try:
-                self.telao.restore()
-            except Exception:
-                pass
-            return True
-        except Exception:
-            return False
+    # ------------------------------------------------- lado pai (operador)
+    def _telao_vivo(self) -> bool:
+        return (self._proc_telao is not None
+                and self._proc_telao.poll() is None)
+
+    def _abrir_processo_telao(self):
+        import os
+        import subprocess
+        if getattr(sys, "frozen", False):
+            cmd = [sys.executable, "--sem-servidor", "--telao"]
+        else:
+            cmd = [sys.executable,
+                   os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                "kchrono_launcher.py"),
+                   "--sem-servidor", "--telao"]
+        self._proc_telao = subprocess.Popen(cmd)
 
     def abrir_telao(self):
-        """Mostra a janela do telão (criada oculta na largada)."""
-        if self.telao is None:
-            return "sem-telao"
-        return "ok" if self._visivel() else "fechada"
+        """Abre o telão em janela nativa própria (processo filho)."""
+        try:
+            if self._telao_vivo():
+                return "ja-aberta"
+            self._abrir_processo_telao()
+            return "ok"
+        except Exception:
+            return "falhou"
 
     def telao_segunda_tela(self):
-        """Telão maximizado na tela escolhida (Configurações → Telão)."""
-        if self.telao is None:
-            return "sem-telao"
+        """Idem (a tela é a das Configurações → Telão)."""
+        return self.abrir_telao()
+
+    def fechar_telao(self):
+        """Fecha o telão (o ESC no telão fecha a própria janela)."""
         try:
-            from servidor.config import carregar_config
-            indice = max(0, int(carregar_config().get("telao_tela", 1)))
+            if self._telao_vivo():
+                self._proc_telao.terminate()
+                return "ok"
+            return "fechada"
         except Exception:
-            indice = 1
+            return "fechada"
+
+    def encerrar_filhos(self):
         try:
-            telas = webview.screens
-            alvo = telas[indice] if 0 <= indice < len(telas) else telas[0]
-            # ordem importa: move/maximize numa janela oculta trava 20 s
-            # (_shown_call) — mostra primeiro, depois posiciona
-            if not self._visivel():
-                return "fechada"
-            try:
-                self.telao.move(alvo.x, alvo.y)
-            except Exception:
-                pass
-            try:
-                self.telao.maximize()
-            except Exception:
-                try:
-                    self.telao.resize(alvo.width, alvo.height)
-                except Exception:
-                    pass
-            return f"ok-tela-{telas.index(alvo) + 1}"
+            if self._telao_vivo():
+                self._proc_telao.terminate()
         except Exception:
-            return "ok" if self._visivel() else "fechada"
+            pass
+
+    # ------------------------------------------------ lado filho (telão)
+    def fechar_janela(self):
+        """Fecha a própria janela (ESC no telão)."""
+        try:
+            if self.janela is not None:
+                self.janela.destroy()
+                return "ok"
+        except Exception:
+            pass
+        return "falhou"
 
     def telas(self):
         """Monitores disponíveis (para o seletor em Configurações)."""
@@ -98,16 +116,6 @@ class Ponte:
                     for i, s in enumerate(webview.screens)]
         except Exception:
             return []
-
-    def fechar_telao(self):
-        """Esconde a janela do telão (reabre pelo botão; ESC no telão chama aqui)."""
-        if self.telao is None:
-            return "sem-telao"
-        try:
-            self.telao.hide()
-            return "ok"
-        except Exception:
-            return "fechada"
 
 
 def _rodar_servidor(host: str, porta: int, pronto: threading.Event):
@@ -152,18 +160,21 @@ def main() -> int:
     ap.add_argument("--largura", type=int, default=1280, help="largura da janela")
     ap.add_argument("--altura", type=int, default=800, help="altura da janela")
     ap.add_argument("--fullscreen", action="store_true", help="janela em tela cheia (telão)")
+    ap.add_argument("--sem-servidor", action="store_true",
+                    help="só abre a janela (usa o servidor já ativo; modo do telão)")
     args = ap.parse_args()
 
     # Monta URL final
     rota = "/telao" if args.telao else ("/gerente" if args.gerente else "/")
     url = f"http://{args.host}:{args.porta}{rota}"
 
-    # Inicia servidor em background
+    # Servidor local em background (o modo --sem-servidor usa o que já roda)
     pronto = threading.Event()
-    t_server = threading.Thread(
-        target=_rodar_servidor, args=(args.host, args.porta, pronto), daemon=True
-    )
-    t_server.start()
+    if not args.sem_servidor:
+        t_server = threading.Thread(
+            target=_rodar_servidor, args=(args.host, args.porta, pronto), daemon=True
+        )
+        t_server.start()
 
     print(f"KChrono {VERSAO} — servidor em http://{args.host}:{args.porta}")
     print(f"  Interface: {url}")
@@ -192,38 +203,34 @@ def main() -> int:
         base = os.path.dirname(os.path.abspath(__file__))
     icone = os.path.join(base, "imagens", "KCHRONO-LOGO.png")
 
-    # Cria janela nativa
+    # Cria a ÚNICA janela deste processo (a 2ª janela nasce noutra thread:
+    # trava o app no Windows — por isso o telão é um processo filho).
     ponte = Ponte()
     localizacao_pt = {
         "global.quitConfirmation": "Deseja realmente sair do KChrono?",
     }
-    janela = webview.create_window(
-        title=TITULO_JANELA,
-        url=url,
-        width=args.largura,
-        height=args.altura,
-        fullscreen=args.fullscreen,
-        min_size=(900, 600),
-        resizable=True,
-        frameless=False,          # True = sem barra de título (só para telão/kiosk)
-        easy_drag=True,
-        on_top=False,
-        confirm_close=True,
-        background_color="#0D0D0D",
-        text_select=False,
-        zoomable=False,
-        js_api=ponte,
-        localization=localizacao_pt,
-    )
-
-    # Janela do telão (oculta): aberta sob demanda via window.pywebview.api,
-    # sempre dentro do app — nunca no navegador do sistema.
-    if not args.telao:
-        ponte.telao = webview.create_window(
+    if args.telao and args.sem_servidor:
+        # modo telão: janela maximizada na tela das Configurações
+        try:
+            from servidor.config import carregar_config
+            indice = max(0, int(carregar_config().get("telao_tela", 1)))
+        except Exception:
+            indice = 1
+        x = y = None
+        try:
+            telas = webview.screens
+            alvo = telas[indice] if 0 <= indice < len(telas) else telas[0]
+            x, y = alvo.x, alvo.y
+        except Exception:
+            pass
+        janela = webview.create_window(
             title=TITULO_TELAO,
-            url=f"http://{args.host}:{args.porta}/telao",
-            width=1280,
-            height=800,
+            url=url,
+            width=args.largura,
+            height=args.altura,
+            x=x,
+            y=y,
+            maximized=True,
             resizable=True,
             frameless=False,
             on_top=False,
@@ -231,9 +238,29 @@ def main() -> int:
             background_color="#0D0D0D",
             text_select=False,
             zoomable=False,
-            hidden=True,
-            js_api=ponte,          # ESC no telão chama fechar_telao()
+            js_api=ponte,
+            localization=localizacao_pt,
         )
+    else:
+        janela = webview.create_window(
+            title=TITULO_JANELA,
+            url=url,
+            width=args.largura,
+            height=args.altura,
+            fullscreen=args.fullscreen,
+            min_size=(900, 600),
+            resizable=True,
+            frameless=False,          # True = sem barra de título (só para telão/kiosk)
+            easy_drag=True,
+            on_top=False,
+            confirm_close=True,
+            background_color="#0D0D0D",
+            text_select=False,
+            zoomable=False,
+            js_api=ponte,
+            localization=localizacao_pt,
+        )
+    ponte.janela = janela
 
     # Define ícone após criar (pywebview permite)
     if os.path.exists(icone):
@@ -243,7 +270,10 @@ def main() -> int:
             pass
 
     # Inicia loop da GUI (bloqueante — encerra quando fecha a janela)
+    import atexit
+    atexit.register(ponte.encerrar_filhos)
     webview.start(debug=False, private_mode=False, storage_path=None)
+    ponte.encerrar_filhos()
 
     print("Janela fechada — encerrando.")
     return 0

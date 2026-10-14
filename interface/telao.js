@@ -445,7 +445,7 @@ document.addEventListener("keydown", (e) => {
   if (e.key === "Escape") {
     try {
       const api = window.pywebview && window.pywebview.api;
-      if (api && api.fechar_telao) { api.fechar_telao(); return; }
+      if (api && api.fechar_janela) { api.fechar_janela(); return; }
     } catch (err) {}
     try { window.close(); } catch (err) {}
   }
