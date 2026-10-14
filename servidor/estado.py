@@ -1373,12 +1373,11 @@ class EstadoApp:
 
     @staticmethod
     def _etapas_para_provas(n_provas: int) -> list:
-        """Sequência padrão repetida por prova: treino → classif → corrida."""
-        etapas = []
+        """Um treino na abertura, depois classificação + corrida por prova."""
+        etapas = [{"etapa": "treino", "rotulo": "Treino", "duracao": 10}]
         for p in range(1, n_provas + 1):
             suf = f" P{p}" if n_provas > 1 else ""
             etapas += [
-                {"etapa": "treino", "rotulo": f"Treino{suf}", "duracao": 10},
                 {"etapa": "intervalo", "rotulo": "Intervalo", "duracao": 5},
                 {"etapa": "classificacao", "rotulo": f"Classificação{suf}", "duracao": 10},
                 {"etapa": "intervalo", "rotulo": "Intervalo", "duracao": 5},
