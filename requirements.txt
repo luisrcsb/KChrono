@@ -13,3 +13,6 @@ bleak>=0.21            # SKYRC LapWiz (Bluetooth BLE)
 pyttsx3>=2.90
 comtypes>=1.2
 pywin32>=306; sys_platform == "win32"
+
+# Janela nativa (WebView2 no Windows, WebKitGTK no Linux) — substitui "abrir navegador"
+pywebview>=5.0

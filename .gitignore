@@ -12,7 +12,12 @@ __pycache__/
 # empacotamento
 dist/
 build/
+empacotamento/stage/
 *.spec.tmp
+# binários gerados (rebuild local via build-windows.bat / makensis)
+*.exe
+*.zip
+*.tar.gz
 # sistema
 .DS_Store
 Thumbs.db

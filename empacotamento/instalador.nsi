@@ -4,6 +4,7 @@
 ;  Compile este arquivo no NSIS (compilador makensis).
 ;
 ;  Gera: KChrono-Setup.exe
+;  App nativo com pywebview (WebView2) — NÃO abre navegador.
 ; ============================================================
 !include "MUI2.nsh"
 !include "FileFunc.nsh"
@@ -24,72 +25,23 @@ RequestExecutionLevel admin
 Unicode true
 SetCompressor /SOLID lzma
 
-; ==================== Variáveis de configuração ====================
-; Telemetria (integração com outros sistemas)
-Var /GLOBAL TELEMETRIA_DIR
-Var /GLOBAL TELEMETRIA_EXISTENTE
+; Ícone do instalador e do app
+!define MUI_ICON "..\imagens\KCHRONO-LOGO.ico"
+!define MUI_UNICON "..\imagens\KCHRONO-LOGO.ico"
 
-; CTAD-Upload-Auto
-Var /GLOBAL INSTALAR_CTAD
+; ==================== Variáveis de configuração ====================
+Var /GLOBAL TELEMETRIA_DIR
 Var /GLOBAL CTAD_DIR
+Var /GLOBAL INSTALAR_CTAD
+Var /GLOBAL INSTALAR_AUTO
 
 !insertmacro MUI_PAGE_WELCOME
 !insertmacro MUI_PAGE_DIRECTORY
-Page Custom MinhaPaginaTelemetria
-Page Custom MinhaPaginaCTAD
-Page Custom MinhaPaginaAutoStart
 !insertmacro MUI_PAGE_INSTFILES
 !insertmacro MUI_PAGE_FINISH
 !insertmacro MUI_UNPAGE_CONFIRM
 !insertmacro MUI_UNPAGE_INSTFILES
 !insertmacro MUI_LANGUAGE "PortugueseBR"
-
-; ==================== Páginas customizadas ====================
-
-; --- Pasta de telemetria (integração) ---
-Function MinhaPaginaTelemetria
-  !insertmacro MUI_HEADER_TEXT "Pasta de Telemetria" \
-    "Escolha onde ficará a pasta de telemetria (dados brutos de voltas). \
-     Outros sistemas (ex.: app de análise) podem ler desta pasta."
-  ${NSD_CreateLabel} 0 30 100% 14u "Pasta de telemetria:"
-  ${NSD_CreateDirRequest} 0 44u 100% 18u "$PROGRAMFILES64\KChrono\Telemetria"
-  Pop $TELEMETRIA_DIR
-  ${NSD_AddStyle} $TELEMETRIA_DIR ${WS_VISIBLE}|${WS_TABSTOP}|${WS_GROUP}|${ES_AUTOHSCROLL}
-  ${GetParameters} $0
-  ${NSD_OnChange} $TELEMETRIA_DIR OnTelemetriaChange
-FunctionEnd
-
-Function OnTelemetriaChange
-  ${NSD_GetText} $TELEMETRIA_DIR $TELEMETRIA_DIR
-  ${If} ${FileExists} "$TELEMETRIA_DIR\*"
-    StrCpy $TELEMETRIA_EXISTENTE "1"
-  ${Else}
-    StrCpy $TELEMETRIA_EXISTENTE "0"
-  ${EndIf}
-FunctionEnd
-
-; --- CTAD-Upload-Auto (PDF) ---
-Function MinhaPaginaCTAD
-  !insertmacro MUI_HEADER_TEXT "CTAD-Upload-Auto (v1.2.4)" \
-    "Incluir o CTAD-Upload-Auto para geração de PDFs de sessão/campeonato. \
-     Requer Java 17+ instalado."
-  ${NSD_CreateCheckbox} 0 30u 100% 14u "Instalar CTAD-Upload-Auto v1.2.4 (Windows 64-bit)" $INSTALAR_CTAD
-  ${NSD_CreateLabel} 0 50u 100% 14u "Pasta de instalação do CTAD:"
-  ${NSD_CreateDirRequest} 0 64u 100% 18u "$PROGRAMFILES64\CTAD-Upload-Auto"
-  Pop $CTAD_DIR
-FunctionEnd
-
-; --- Iniciar com o Windows ---
-Function MinhaPaginaAutoStart
-  !insertmacro MUI_HEADER_TEXT "Iniciar com o Windows" \
-    "O KChrono pode iniciar automaticamente ao ligar o computador (modo serviço, sem navegador)."
-  ${NSD_CreateCheckbox} 0 30u 100% 14u "Iniciar KChrono automaticamente com o Windows" $0
-  Pop $0
-  StrCpy $INSTALAR_AUTO 0
-  ${If} $0 == 1
-    StrCpy $INSTALAR_AUTO 1
-  ${EndIf}
-FunctionEnd
 
 ; ==================== Instalação ====================
 Section "KChrono" SecPrincipal
@@ -102,42 +54,55 @@ Section "KChrono" SecPrincipal
   WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${APP}" "Publisher" "${FABRICANTE}"
   WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${APP}" "UninstallString" "$INSTDIR\Desinstalar.exe"
   WriteUninstaller "$INSTDIR\Desinstalar.exe"
-  CreateDirectory "$SMPROGRAMS\${APP}"
-  CreateShortcut "$SMPROGRAMS\${APP}\${APP}.lnk" "$INSTDIR\${APP}.exe"
-  CreateShortcut "$SMPROGRAMS\${APP}\Telão.lnk" "$INSTDIR\${APP}.exe" "--sem-navegador"
-  CreateShortcut "$DESKTOP\${APP}.lnk" "$INSTDIR\${APP}.exe"
 
-  ; Salva pasta de telemetria escolhida
-  ${NSD_GetText} $TELEMETRIA_DIR $TELEMETRIA_DIR
+  CreateDirectory "$SMPROGRAMS\${APP}"
+  ; Atalhos do menu Iniciar — cada um abre direto na view certa
+  CreateShortcut "$SMPROGRAMS\${APP}\${APP} (Operador).lnk" "$INSTDIR\${APP}.exe" ""
+  CreateShortcut "$SMPROGRAMS\${APP}\${APP} (Telão).lnk" "$INSTDIR\${APP}.exe" "--telao --fullscreen"
+  CreateShortcut "$SMPROGRAMS\${APP}\${APP} (Gerente de Pista).lnk" "$INSTDIR\${APP}.exe" "--gerente"
+  CreateShortcut "$SMPROGRAMS\${APP}\${APP} (Serviço / Headless).lnk" "$INSTDIR\${APP}.exe" "--sem-janela"
+
+  ; Atalhos na área de trabalho
+  CreateShortcut "$DESKTOP\${APP}.lnk" "$INSTDIR\${APP}.exe" ""
+  CreateShortcut "$DESKTOP\${APP} (Telão).lnk" "$INSTDIR\${APP}.exe" "--telao --fullscreen"
+
+  ; Pasta de dados (banco, logs, capturas) — em APPDATA para persistir entre updates
+  StrCpy $TELEMETRIA_DIR "$APPDATA\KChrono"
   WriteRegStr HKLM "Software\${APP}" "TelemetriaDir" "$TELEMETRIA_DIR"
+  CreateDirectory "$TELEMETRIA_DIR"
 SectionEnd
 
 Section "CTAD-Upload-Auto" SecCTAD
-  ${NSD_GetState} $INSTALAR_CTAD $INSTALAR_CTAD
-  ${If} $INSTALAR_CTAD == ${BST_CHECKED}
+  StrCpy $INSTALAR_CTAD 1
+  StrCpy $CTAD_DIR "$PROGRAMFILES64\CTAD-Upload-Auto"
+  ${If} $INSTALAR_CTAD == 1
     SetOutPath "$CTAD_DIR"
-    ; Extrai o zip do CTAD (deve estar na mesma pasta do instalador)
     !define CTAD_ZIP_PATH "..\..\CTAD\downloads\${CTAD_ZIP}"
     ${If} ${FileExists} "${CTAD_ZIP_PATH}"
       File "${CTAD_ZIP_PATH}"
-      ; Extrai usando 7zip (precisa estar no PATH) ou PowerShell
-      nsExec::ExecToStack 'powershell -Command "Expand-Archive -Path \'$CTAD_DIR\${CTAD_ZIP}\' -DestinationPath \'$CTAD_DIR\' -Force"'
+      nsExec::ExecToStack 'powershell -ExecutionPolicy Bypass -NoProfile -Command "try { Expand-Archive -Path \'$CTAD_DIR\${CTAD_ZIP}\' -DestinationPath \'$CTAD_DIR\' -Force } catch { exit 1 }"'
       Pop $0
+      ${If} $0 != 0
+        MessageBox MB_ICONEXCLAMATION "Falha ao extrair CTAD-Upload-Auto."
+        Delete "$CTAD_DIR\${CTAD_ZIP}"
+        Abort
+      ${EndIf}
       Delete "$CTAD_DIR\${CTAD_ZIP}"
       WriteRegStr HKLM "Software\${APP}" "CTADDir" "$CTAD_DIR"
       CreateDirectory "$SMPROGRAMS\CTAD-Upload-Auto"
       CreateShortcut "$SMPROGRAMS\CTAD-Upload-Auto\CTAD-Upload-Auto.lnk" "$CTAD_DIR\${CTAD_EXE}"
       CreateShortcut "$DESKTOP\CTAD-Upload-Auto.lnk" "$CTAD_DIR\${CTAD_EXE}"
     ${Else}
-      MessageBox MB_ICONWARNING "Arquivo ${CTAD_ZIP} não encontrado ao lado do instalador.\nO CTAD-Upload-Auto não foi instalado."
+      MessageBox MB_OK "Arquivo CTAD-Upload-Auto-v1.2.4.zip nao encontrado ao lado do instalador. O CTAD nao sera instalado."
     ${EndIf}
   ${EndIf}
 SectionEnd
 
-Section "Iniciar com o Windows" SecAuto
-  ${NSD_GetState} $INSTALAR_AUTO $INSTALAR_AUTO
-  ${If} $INSTALAR_AUTO == ${BST_CHECKED}
-    WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Run" "${APP}" '"$INSTDIR\${APP}.exe" --sem-navegador'
+Section "Iniciar com o Windows (Serviço)" SecAuto
+  StrCpy $INSTALAR_AUTO 1
+  ${If} $INSTALAR_AUTO == 1
+    ; Inicia headless (--sem-janela) para rodar como serviço de fundo
+    WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Run" "${APP}_service" '"$INSTDIR\${APP}.exe" --sem-janela'
   ${EndIf}
 SectionEnd
 
@@ -145,12 +110,14 @@ SectionEnd
 Section "Uninstall"
   Delete "$INSTDIR\${APP}.exe"
   Delete "$INSTDIR\Desinstalar.exe"
-  Delete "$SMPROGRAMS\${APP}\${APP}.lnk"
-  Delete "$SMPROGRAMS\${APP}\Telão.lnk"
+  Delete "$SMPROGRAMS\${APP}\${APP} (Operador).lnk"
+  Delete "$SMPROGRAMS\${APP}\${APP} (Telão).lnk"
+  Delete "$SMPROGRAMS\${APP}\${APP} (Gerente de Pista).lnk"
+  Delete "$SMPROGRAMS\${APP}\${APP} (Serviço / Headless).lnk"
   Delete "$DESKTOP\${APP}.lnk"
+  Delete "$DESKTOP\${APP} (Telão).lnk"
   RMDir "$SMPROGRAMS\${APP}"
 
-  ; Remove CTAD se foi instalado
   ReadRegStr $0 HKLM "Software\${APP}" "CTADDir"
   ${If} $0 != ""
     Delete "$0\${CTAD_EXE}"
@@ -163,17 +130,15 @@ Section "Uninstall"
 
   DeleteRegKey HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${APP}"
   DeleteRegKey HKLM "Software\${APP}"
-  DeleteRegValue HKLM "Software\Microsoft\Windows\CurrentVersion\Run" "${APP}"
+  DeleteRegValue HKLM "Software\Microsoft\Windows\CurrentVersion\Run" "${APP}_service"
   RMDir "$INSTDIR"
 
-  ; Dados do usuário (pergunta)
-  MessageBox MB_YESNO "Deseja apagar também o histórico e a configuração ($APPDATA\KChrono)?" IDNO fim
+  MessageBox MB_YESNO "Deseja apagar também o histórico e a configuração em APPDATA\KChrono?" IDNO fim
     RMDir /r "$APPDATA\KChrono"
   fim:
-  ; Pasta de telemetria (pergunta separada)
   ReadRegStr $0 HKLM "Software\${APP}" "TelemetriaDir"
   ${If} $0 != ""
-    MessageBox MB_YESNO "Deseja apagar também a pasta de telemetria ($0)?" IDNO fim2
+    MessageBox MB_YESNO "Deseja apagar também a pasta de telemetria $0?" IDNO fim2
       RMDir /r "$0"
     fim2:
   ${EndIf}

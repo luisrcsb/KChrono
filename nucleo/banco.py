@@ -1,17 +1,131 @@
 """KChrono — banco local SQLite com migrações (Fase 1).
 
 Local-first: todas as sessões ficam gravadas aqui; a sincronização com o CTAD
-(Fase 3) é uma camógica separada sobre estes dados.
+(Fase 3) é uma camada separada sobre estes dados.
+
+Thread-safety: a conexão é envolvida por _ConexaoTravada (RLock) — o uvicorn
+atende cada request em thread própria e o loop do decoder roda em outra;
+sem a trava, `sqlite3.ProgrammingError: objects created in a thread can only
+be used in that same thread` derruba /api/sync/status e afins.
 """
 from __future__ import annotations
 
 import json
 import sqlite3
+import threading
 import uuid
 from typing import Dict, List, Optional
 
 from .modelos import (EstadoSessao, Pista, Piloto, Sessao, TipoSessao,
                       Transponder, Volta, agora_iso)
+
+
+class _CursorBufferizado:
+    """Cursor com linhas já buscadas — seguro para usar após liberar a trava.
+
+    Suporta o que o código usa: fetchone/fetchall, iteração, índice [0],
+    lastrowid e rowcount.
+    """
+
+    def __init__(self, linhas, lastrowid=None, rowcount=-1):
+        self._linhas = linhas
+        self._pos = 0
+        self.lastrowid = lastrowid
+        self.rowcount = rowcount
+
+    def fetchone(self):
+        if self._pos >= len(self._linhas):
+            return None
+        linha = self._linhas[self._pos]
+        self._pos += 1
+        return linha
+
+    def fetchall(self):
+        resto = self._linhas[self._pos:]
+        self._pos = len(self._linhas)
+        return resto
+
+    def __iter__(self):
+        while self._pos < len(self._linhas):
+            yield self.fetchone()
+
+    def __getitem__(self, i):
+        return self._linhas[i]
+
+
+class _ConexaoTravada:
+    """Envolve sqlite3.Connection com RLock — todo acesso é serializado.
+
+    Compatível com os usos existentes: execute/executemany/executescript,
+    commit/rollback e o bloco `with conn:` (transação).
+
+    Detalhe importante: execute/executemany já devolvem as linhas buscadas
+    (_CursorBufferizado) AINDA COM a trava — o fetch acontece dentro do
+    lock, então duas threads nunca intercalam buscas na mesma conexão.
+    """
+
+    def __init__(self, caminho: str):
+        interna = sqlite3.connect(caminho, check_same_thread=False)
+        interna.row_factory = sqlite3.Row
+        interna.execute("PRAGMA foreign_keys = ON")
+        interna.execute("PRAGMA busy_timeout = 5000")
+        object.__setattr__(self, "_interna", interna)
+        object.__setattr__(self, "_trava", threading.RLock())
+
+    def _executar(self, metodo: str, *a, **kw):
+        trava = object.__getattribute__(self, "_trava")
+        interna = object.__getattribute__(self, "_interna")
+        with trava:
+            cur = getattr(interna, metodo)(*a, **kw)
+            try:
+                linhas = cur.fetchall()
+            except Exception:
+                linhas = []
+            return _CursorBufferizado(
+                linhas,
+                lastrowid=getattr(cur, "lastrowid", None),
+                rowcount=getattr(cur, "rowcount", -1))
+
+    def execute(self, *a, **kw):
+        return self._executar("execute", *a, **kw)
+
+    def executemany(self, *a, **kw):
+        return self._executar("executemany", *a, **kw)
+
+    def executescript(self, *a, **kw):
+        trava = object.__getattribute__(self, "_trava")
+        interna = object.__getattribute__(self, "_interna")
+        with trava:
+            return interna.executescript(*a, **kw)
+
+    def __getattr__(self, nome):
+        alvo = getattr(object.__getattribute__(self, "_interna"), nome)
+        if callable(alvo):
+            trava = object.__getattribute__(self, "_trava")
+
+            def embrulhado(*a, **kw):
+                with trava:
+                    return alvo(*a, **kw)
+            return embrulhado
+        return alvo
+
+    def __setattr__(self, nome, valor):
+        if nome in ("_interna", "_trava"):
+            object.__setattr__(self, nome, valor)
+        else:
+            with object.__getattribute__(self, "_trava"):
+                setattr(object.__getattribute__(self, "_interna"), nome, valor)
+
+    def __enter__(self):
+        object.__getattribute__(self, "_trava").acquire()
+        object.__getattribute__(self, "_interna").__enter__()
+        return self
+
+    def __exit__(self, *exc):
+        try:
+            return object.__getattribute__(self, "_interna").__exit__(*exc)
+        finally:
+            object.__getattribute__(self, "_trava").release()
 
 ESQUEMA_V1 = """
 CREATE TABLE IF NOT EXISTS pistas (
@@ -133,12 +247,14 @@ CREATE TABLE IF NOT EXISTS resultados (
 
 
 class Banco:
-    """Acesso ao SQLite local com migrações versionadas (PRAGMA user_version)."""
+    """Acesso ao SQLite local com migrações versionadas (PRAGMA user_version).
+
+    Thread-safe via _ConexaoTravada — pode ser usado do loop asyncio do
+    decoder e das threads do uvicorn ao mesmo tempo.
+    """
 
     def __init__(self, caminho: str = ":memory:"):
-        self.conn = sqlite3.connect(caminho)
-        self.conn.row_factory = sqlite3.Row
-        self.conn.execute("PRAGMA foreign_keys = ON")
+        self.conn = _ConexaoTravada(caminho)
         self._migrar()
 
     # ----- migrações -----

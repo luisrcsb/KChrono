@@ -4,6 +4,29 @@
 let ws = null;
 let usuario = { nome: "", nivel: "superuser" };
 
+// ---------------------------------------------------------------- áudio (beep/fala)
+let audioCtx = null;
+function initAudio() {
+  try {
+    audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === "suspended") audioCtx.resume();
+  } catch (e) {}
+}
+function beep(freq = 880, dur = 0.08, vol = 0.18) {
+  initAudio();
+  if (!audioCtx) return;
+  try {
+    const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+    o.frequency.value = freq; o.type = "square"; g.gain.value = vol;
+    o.connect(g); g.connect(audioCtx.destination);
+    o.start();
+    setTimeout(() => { try { o.stop(); } catch (e) {} }, dur * 1000);
+  } catch (e) {}
+}
+function beepPassing() { beep(1200, 0.06, 0.15); }   // bip curto ao passar
+function beepVolta() { beep(880, 0.12, 0.22); }       // bip volta completada
+function beepRecorde() { beep(1500, 0.2, 0.25); }      // bip recorde
+
 // ---------------------------------------------------------------- navegação
 // Shell persistente: o menu lateral está sempre visível; aqui só alterna o
 // conteúdo (painel completo do operador, telão ou seções do admin).
@@ -92,7 +115,15 @@ function hwTrocarTipo() {
     if (wrapPorta) wrapPorta.style.display = "none";
   }
 }
-const abrirTelao = () => window.open("/telao", "_blank");const iniciarSessao = (tipo) => api("sessao/iniciar?tipo=" + tipo);
+const abrirTelao = () => window.open("/telao", "_blank");
+function abrirTelaoSegundaTela() {
+  const w = window.open("/telao", "telao-2", "noopener,noreferrer");
+  if (w) {
+    // Tenta maximizar na segunda tela
+    try { w.moveTo(screen.width, 0); w.resizeTo(screen.width, screen.height); } catch (e) {}
+  }
+}
+const iniciarSessao = (tipo) => api("sessao/iniciar?tipo=" + tipo);
 const largada = () => api("sessao/largada");
 const pausar = (p) => api("sessao/pausar?pausar=" + p);
 const finalizar = () => api("sessao/finalizar");
@@ -120,12 +151,14 @@ function tratarEvento(ev) {
       if (ev.recorde) {
         notificar("recorde",
           `Novo recorde ${ev.recorde === "pista" ? "da pista" : "pessoal"}: ${ev.tempo}s`, "⏱️");
+        beepRecorde();
         break;
       }
       logMsg(`volta #${ev.numero} — ${ev.nome}: ${ev.tempo}s`, "l-volta", "log-operador");
       logMsg(`volta #${ev.numero} — ${ev.nome}: ${ev.tempo}s`, "l-volta", "log-dashboard");
       const fr = document.getElementById("flag-volta-rapida");
       if (fr) { fr.classList.add("pisca"); setTimeout(() => fr.classList.remove("pisca"), 2500); }
+      beepVolta();
       break;
     case "admin":
       logMsg(`[admin] ${ev.msg}`, "l-admin", "log-operador");

@@ -18,7 +18,17 @@ from typing import Dict, Optional
 
 from caminhos import dir_recursos
 
-VERSAO_ATUAL = "1.0.0"
+def _versao_atual() -> str:
+    try:
+        base = Path(__file__).resolve().parent
+        vfile = base / "empacotamento" / "versao.json"
+        if vfile.exists():
+            return json.loads(vfile.read_text(encoding="utf-8")).get("versao", "1.0.0")
+    except Exception:
+        pass
+    return "1.0.0"
+
+VERSAO_ATUAL = _versao_atual()
 log = logging.getLogger("kchrono.atualizador")
 
 

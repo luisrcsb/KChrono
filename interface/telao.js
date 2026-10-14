@@ -38,6 +38,9 @@ function falar(texto) {
   } catch (e) { /* sem voz no dispositivo */ }
 }
 
+function beepVolta() { beep(880, 0.12, 0.22); }
+function beepRecorde() { beep(1500, 0.2, 0.25); }
+
 // ---------------------------------------------------------------- WebSocket
 function conectarWS() {
   if (ws && ws.readyState <= 1) return;
@@ -70,8 +73,12 @@ function tratarEvento(ev) {
       renderBandeira(ev);
       break;
     case "classificacao":
-    case "classificacao":
       renderClassificacao(ev.linhas || []);
+      break;
+    case "volta":
+      // bip sonoro no telão a cada volta completada
+      if (ev.recorde) beepRecorde();
+      else beepVolta();
       break;
     case "voltas":
       ultimasVoltas = ev;

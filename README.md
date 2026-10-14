@@ -74,3 +74,58 @@ valida classificação e gaps (por tempo e por voltas).
 O driver é 100% read-only por design. Comandos que alteram estado do decoder
 (ex.: limpar passings, acertar relógio) só serão implementados com ação explícita
 do operador.
+
+---
+
+## 📦 Empacotamento — App Nativo (Fase 7)
+
+O KChrono agora é um **app nativo de verdade** (não abre navegador):
+- **Windows**: usa **WebView2** (Edge) via `pywebview` — janela sem barra de endereço, ícone na barra de tarefas, atalhos diretos para Operador / Telão / Gerente.
+- **Linux**: usa **WebKitGTK** via `pywebview` — mesmo comportamento, integra com menu de aplicações.
+
+### Build Windows (gera `KChrono.exe` + instalador NSIS)
+
+```bash
+cd empacotamento
+build-windows.bat          # compila KChrono.exe com PyInstaller
+# Depois, no NSIS (makensis instalador.nsi) gera KChrono-Setup.exe
+```
+
+**Requisitos**: Python 3.11+, WebView2 Runtime (já incluso no Windows 10/11 atualizado).
+
+### Build Linux (instalação usuário)
+
+```bash
+bash empacotamento/instalar-linux.sh
+```
+
+Cria dois comandos:
+- `kchrono` — servidor headless (para systemd/serviço)
+- `kchrono-app` — **app nativo com janela** (WebKitGTK)
+
+Requisitos de sistema: `libwebkit2gtk-4.1-0` (Ubuntu/Debian), `webkit2gtk4.1` (Fedora), `webkit2gtk-4.1` (Arch).
+
+### Executar o app nativo (já empacotado)
+
+```bash
+# Windows
+KChrono.exe                    # Operador (padrão)
+KChrono.exe --telao --fullscreen   # Telão em tela cheia
+KChrono.exe --gerente              # Gerente de Pista
+KChrono.exe --sem-janela           # Headless (serviço)
+
+# Linux
+kchrono-app                    # Operador
+kchrono-app --telao --fullscreen
+kchrono-app --gerente
+kchrono --sem-janela           # Headless
+```
+
+### Atualização automática
+
+Configure `url_base` em `empacotamento/versao.json` apontando para onde você publica:
+- `versao.json` (mesmo formato)
+- `KChrono-Setup.exe` (Windows)
+- `kchrono-linux.tar.gz` (Linux — opcional)
+
+No painel Admin → **Salvamento/Uploads** aparece botão "Verificar atualização" e "Baixar".

@@ -24,6 +24,10 @@ HIDDEN = [
     # voz (TTS)
     "pyttsx3", "pyttsx3.drivers", "pyttsx3.drivers.sapi5",
     "comtypes", "comtypes.client", "win32com", "win32com.client",
+    # pywebview (janela nativa)
+    "webview", "webview.platforms", "webview.platforms.edgechromium",
+    "webview.platforms.gtk", "webview.platforms.qt", "webview.platforms.cocoa",
+    "webview.dom", "webview.localization",
 ]
 
 a = Analysis(
@@ -57,9 +61,10 @@ exe = EXE(
     upx=True,
     upx_exclude=[],
     runtime_tmpdir=None,
-    console=True,                     # mostra o log; use False para janela oculta
+    console=False,                    # SEM console — app nativo silencioso
     disable_windowed_traceback=False,
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
+    icon=os.path.join(RAIZ, "imagens", "KCHRONO-LOGO.ico"),
 )

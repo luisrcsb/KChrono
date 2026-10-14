@@ -1,5 +1,5 @@
 [Unit]
-Description=KChrono - cronometragem RC
+Description=KChrono - cronometragem RC (servidor headless)
 After=network.target
 
 [Service]
@@ -9,6 +9,11 @@ WorkingDirectory=__DEST__
 ExecStart=__DEST__/venv/bin/python cli.py servidor --host 0.0.0.0 --porta 8780
 Restart=on-failure
 RestartSec=3
+# Hardening
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ReadWritePaths=__DEST__/dados
 
 [Install]
 WantedBy=multi-user.target

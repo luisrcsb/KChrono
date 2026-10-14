@@ -1,0 +1,23 @@
+{
+  "firebase": {
+    "apiKey": "AIzaSyDCTkeIa6QsY2zYs8S__HlIwcY-zcuhZCA",
+    "databaseURL": "https://krathus-telemetria-default-rtdb.firebaseio.com",
+    "storageBucket": "krathus-telemetria.firebasestorage.app"
+  },
+  "email": "",
+  "password": "",
+  "pasta": "C:\\telemetria",
+  "intervalo_segundos": 15,
+  "tempo_real": true,
+  "extensoes": [".pdf", ".html", ".htm"],
+  "pistaId": "krathus",
+  "mover_para_enviados": true,
+  "apagar_remoto": false,
+  "tentativas": 4,
+  "timeout_segundos": 60,
+  "log_nivel": "INFO",
+  "atualizar_auto": true,
+  "update_url": "https://krathus-telemetria.web.app/downloads/versao.json",
+  "auto_iniciar_monitor": false,
+  "iniciar_com_windows": false
+}

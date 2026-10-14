@@ -1,26 +1,27 @@
 @echo off
 REM ============================================================
-REM  KChrono - build do executavel Windows (PyInstaller)
+REM  KChrono - build do executavel Windows (PyInstaller + pywebview)
 REM  Gera: empacotamento\dist\KChrono.exe
+REM  Requisitos: WebView2 Runtime (já incluso no Windows 10/11 moderno)
 REM ============================================================
 setlocal
 cd /d "%~dp0"
 
-echo [1/4] Instalando dependencias de build...
+echo [1/5] Instalando dependencias de build...
 python -m pip install --upgrade pyinstaller || goto :erro
 python -m pip install -r ..\requirements.txt || goto :erro
 
 echo.
-echo [2/4] Limpando builds anteriores...
+echo [2/5] Limpando builds anteriores...
 if exist build rmdir /s /q build
 if exist dist rmdir /s /q dist
 
 echo.
-echo [3/4] Compilando KChrono.exe (pode demorar alguns minutos)...
+echo [3/5] Compilando KChrono.exe (pode demorar alguns minutos)...
 python -m PyInstaller --clean --noconfirm KChrono.spec || goto :erro
 
 echo.
-echo [4/4] Copiando CTAD-Upload-Auto para o instalador...
+echo [4/5] Copiando CTAD-Upload-Auto para o instalador...
 if exist "..\..\CTAD\downloads\CTAD-Upload-Auto-v1.2.4.zip" (
     copy "..\..\CTAD\downloads\CTAD-Upload-Auto-v1.2.4.zip" "CTAD-Upload-Auto-v1.2.4.zip"
     echo   CTAD-Upload-Auto-v1.2.4.zip copiado.
@@ -29,11 +30,12 @@ if exist "..\..\CTAD\downloads\CTAD-Upload-Auto-v1.2.4.zip" (
 )
 
 echo.
-echo [5/4] Pronto!
+echo [5/5] Pronto!
 echo   Executavel: %cd%\dist\KChrono.exe
-echo   Os dados (banco/config) serao criados em %%APPDATA%%\KChrono no primeiro uso.
+echo   Janela nativa (WebView2) — SEM navegador, SEM barra de endereço.
+echo   Dados (banco/config) em %%APPDATA%%\KChrono no primeiro uso.
 echo.
-echo Para gerar o instalador:
+echo Para gerar o instalador NSIS:
 echo   1. Instale o NSIS (https://nsis.sourceforge.io/)
 echo   2. Compile instalador.nsi no NSIS (makensis instalador.nsi)
 echo   3. O CTAD-Upload-Auto-v1.2.4.zip ja esta na pasta empacotamento\

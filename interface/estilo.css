@@ -47,6 +47,11 @@ tr:hover td{background:rgba(58,134,255,.06)}
 .acoes button.destaque{background:linear-gradient(180deg,#3a86ff,#2b6de0); border:none; color:#fff; font-weight:600}
 .acoes button.perigo:hover{border-color:var(--accent-red); color:var(--accent-red)}
 .acoes button:disabled{opacity:.45; cursor:not-allowed}
+
+.acoes-topo{display:flex; gap:10px; margin:8px 0 16px 0; padding-top:8px; border-top:1px solid var(--border-card)}
+.acoes-topo button{padding:8px 16px; border-radius:8px; border:1px solid var(--border-card);
+  background:var(--bg-header); color:var(--text-main); cursor:pointer; font-size:13px}
+.acoes-topo button:hover{border-color:var(--accent-blue); color:#fff}
 .log{background:var(--bg-input); border:1px solid var(--border-card); border-radius:8px;
   padding:12px; font-family:Consolas,monospace; font-size:12px; max-height:230px; overflow:auto; color:var(--text-muted)}
 .log .l-aviso{color:var(--accent-gold)}

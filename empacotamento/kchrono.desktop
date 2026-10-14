@@ -2,9 +2,19 @@
 Type=Application
 Name=KChrono
 GenericName=Cronometragem RC
-Comment=Sistema de cronometragem para pistas de RC (MyLaps P3, EASYLAP, LapWiz)
+Comment=Sistema de cronometragem nativo para pistas de RC (MyLaps P3, EASYLAP, LapWiz)
 Exec=__EXEC__
 Icon=kchrono
-Terminal=true
+Terminal=false
+StartupNotify=true
 Categories=Utility;Sports;
 Keywords=cronometragem;RC;carrinho;timing;
+Actions=Telao;Gerente;
+
+[Desktop Action Telao]
+Name=Telão (tela cheia)
+Exec=__EXEC__ --telao --fullscreen
+
+[Desktop Action Gerente]
+Name=Gerente de Pista
+Exec=__EXEC__ --gerente
