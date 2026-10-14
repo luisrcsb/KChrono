@@ -26,7 +26,67 @@ from servidor.api import app
 
 VERSAO = "1.0.0"
 TITULO_JANELA = "KChrono — Cronometragem RC"
+TITULO_TELAO = "KChrono — Telão"
 URL_BASE = "http://127.0.0.1:8780"  # 127.0.0.1 evita prompt de firewall na 1ª execução
+
+
+class Ponte:
+    """Ponte JS→Python, exposta como ``window.pywebview.api`` na janela principal.
+
+    Permite abrir o telão numa **segunda janela nativa** (sem escapar para
+    o navegador do sistema, como o ``window.open`` faz no WebView2).
+    """
+
+    def __init__(self):
+        self.telao = None
+        self._telao_fs = False
+
+    def _visivel(self) -> bool:
+        try:
+            self.telao.show()
+            try:
+                self.telao.restore()
+            except Exception:
+                pass
+            return True
+        except Exception:
+            return False
+
+    def abrir_telao(self):
+        """Mostra a janela do telão (criada oculta na largada)."""
+        if self.telao is None:
+            return "sem-telao"
+        return "ok" if self._visivel() else "fechada"
+
+    def telao_segunda_tela(self):
+        """Telão em tela cheia no 2º monitor (ou mostra, se só houver um)."""
+        if self.telao is None:
+            return "sem-telao"
+        try:
+            telas = webview.screens
+            if len(telas) > 1:
+                s = telas[1]
+                if self._telao_fs:
+                    try:
+                        self.telao.toggle_fullscreen()
+                    except Exception:
+                        pass
+                    self._telao_fs = False
+                try:
+                    self.telao.move(s.x, s.y)
+                except Exception:
+                    pass
+                if not self._visivel():
+                    return "fechada"
+                try:
+                    self.telao.toggle_fullscreen()
+                    self._telao_fs = True
+                except Exception:
+                    pass
+                return "ok-2a-tela"
+            return "ok" if self._visivel() else "fechada"
+        except Exception:
+            return "ok" if self._visivel() else "fechada"
 
 
 def _rodar_servidor(host: str, porta: int, pronto: threading.Event):
@@ -111,6 +171,7 @@ def main() -> int:
     icone = os.path.join(base, "imagens", "KCHRONO-LOGO.png")
 
     # Cria janela nativa
+    ponte = Ponte()
     janela = webview.create_window(
         title=TITULO_JANELA,
         url=url,
@@ -126,7 +187,26 @@ def main() -> int:
         background_color="#0D0D0D",
         text_select=False,
         zoomable=False,
+        js_api=ponte,
     )
+
+    # Janela do telão (oculta): aberta sob demanda via window.pywebview.api,
+    # sempre dentro do app — nunca no navegador do sistema.
+    if not args.telao:
+        ponte.telao = webview.create_window(
+            title=TITULO_TELAO,
+            url=f"http://{args.host}:{args.porta}/telao",
+            width=1280,
+            height=800,
+            resizable=True,
+            frameless=False,
+            on_top=False,
+            confirm_close=False,
+            background_color="#0D0D0D",
+            text_select=False,
+            zoomable=False,
+            hidden=True,
+        )
 
     # Define ícone após criar (pywebview permite)
     if os.path.exists(icone):

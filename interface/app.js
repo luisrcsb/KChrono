@@ -115,8 +115,18 @@ function hwTrocarTipo() {
     if (wrapPorta) wrapPorta.style.display = "none";
   }
 }
-const abrirTelao = () => window.open("/telao", "_blank");
+// Telão em janela NATIVA do app (via Python); fora do app, cai no window.open.
+function telaoNativo(segundaTela) {
+  try {
+    const api = window.pywebview && window.pywebview.api;
+    if (!api) return false;
+    (segundaTela ? api.telao_segunda_tela() : api.abrir_telao());
+    return true;
+  } catch (e) { return false; }
+}
+const abrirTelao = () => { if (!telaoNativo(false)) window.open("/telao", "_blank"); };
 function abrirTelaoSegundaTela() {
+  if (telaoNativo(true)) return;
   const w = window.open("/telao", "telao-2", "noopener,noreferrer");
   if (w) {
     // Tenta maximizar na segunda tela
@@ -1789,6 +1799,9 @@ function _renderEstadoPista(r) {
   el.textContent = r.bandeira === "verde"
     ? "pista aberta (verde)"
     : `${r.bandeira}${r.motivo ? " — " + r.motivo : ""}`;
+  // destaca o botão da bandeira vigente
+  document.querySelectorAll("button.bd").forEach(b =>
+    b.classList.toggle("ativa", b.classList.contains(r.bandeira)));
 }
 async function definirBandeira(cor) {
   const motivo = (document.getElementById("ger-motivo").value || "").trim();

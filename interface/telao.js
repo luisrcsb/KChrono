@@ -7,7 +7,19 @@ let ws = null;
 let estadoAtual = "parado";
 let ultimaLinhas = [];
 let ultimasVoltas = { pilotos: [], parametros: { duracao: 10, criterio: "tempo" } };
-let ultimoTempoSessao = null;
+// cronômetro da sessão: base do servidor + contagem local (como no operador)
+let clockBaseS = null, clockEm = 0, clockPausada = false, clockFim = false;
+function definirClock(tempo_s, pausada, estado) {
+  clockBaseS = (typeof tempo_s === "number" ? tempo_s : null);
+  clockEm = Date.now();
+  clockPausada = !!pausada;
+  clockFim = estado === "finalizado";
+}
+function atualizarClockViaStatus() {
+  fetch("/api/status").then(r => r.json()).then(s => {
+    if (s && s.sessao) definirClock(s.sessao.tempo_s, s.sessao.pausada, s.sessao.estado);
+  }).catch(() => {});
+}
 let largadaClock = null;
 let graficoRitmo = null, graficoPosicoes = null, trackLoop = null;
 let tabAtual = "tv-class";
@@ -57,7 +69,7 @@ function conectarWS() {
 
 function tratarEvento(ev) {
   if (ev.tipo === "snapshot") {
-    if (ev.sessao && ev.sessao.tempo_s != null) ultimoTempoSessao = ev.sessao.tempo_s;
+    if (ev.sessao) definirClock(ev.sessao.tempo_s, ev.sessao.pausada, ev.sessao.estado);
     if (ev.sessao && ev.sessao.parametros) ultimasVoltas.parametros = ev.sessao.parametros;
     renderSessao(ev.sessao);
     renderClassificacao(ev.classificacao || []);
@@ -67,6 +79,7 @@ function tratarEvento(ev) {
   switch (ev.tipo) {
     case "sessao":
       renderSessao(ev);
+      atualizarClockViaStatus();   // o evento não traz tempo_s — busca a base
       if (ev.classificacao) renderClassificacao(ev.classificacao);
       break;
     case "bandeira":
@@ -416,15 +429,15 @@ function desenharTrack() {
   });
 }
 
-// race time (tique visual; oficial vem do servidor no snapshot)
+// race time: base do servidor + contagem local (congela na pausa/fim)
 setInterval(() => {
-  const s = ultimoTempoSessao;
-  if (s != null) {
-    const min = Math.floor(s / 60), seg = Math.floor(s % 60);
-    const cs = Math.floor((s % 1) * 100);
-    document.getElementById("t-race").textContent =
-      `${String(min).padStart(2, "0")}:${String(seg).padStart(2, "0")}:${String(cs).padStart(2, "0")}`;
-  }
+  if (clockBaseS == null) return;
+  let s = clockBaseS;
+  if (!clockPausada && !clockFim) s += (Date.now() - clockEm) / 1000;
+  const min = Math.floor(s / 60), seg = Math.floor(s % 60);
+  const cs = Math.floor((s % 1) * 100);
+  document.getElementById("t-race").textContent =
+    `${String(min).padStart(2, "0")}:${String(seg).padStart(2, "0")}:${String(cs).padStart(2, "0")}`;
 }, 250);
 
 conectarWS();

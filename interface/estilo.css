@@ -47,6 +47,26 @@ tr:hover td{background:rgba(58,134,255,.06)}
 .acoes button.destaque{background:linear-gradient(180deg,#3a86ff,#2b6de0); border:none; color:#fff; font-weight:600}
 .acoes button.perigo:hover{border-color:var(--accent-red); color:var(--accent-red)}
 .acoes button:disabled{opacity:.45; cursor:not-allowed}
+.acoes button.destaque:active{filter:brightness(1.2)}
+
+/* feedback de clique global: todo botão "afunda" ao pressionar */
+button{user-select:none; -webkit-tap-highlight-color:transparent}
+button:not(:disabled){transition:transform .06s ease, filter .06s ease,
+  background-color .12s ease, border-color .12s ease, color .12s ease}
+button:not(:disabled):active{transform:scale(.95); filter:brightness(1.3)}
+button:focus-visible{outline:2px solid var(--accent-blue); outline-offset:2px}
+.menu nav a:active{transform:scale(.97)}
+.ck-piloto:active{transform:scale(.98)}
+.tabela-op .acao:active{transform:scale(.8)}
+.abas button:active{transform:scale(.95)}
+.admin-busca button:active{transform:scale(.92)}
+
+/* botão padrão das telas de Admin (era classe sem estilo — caía no nativo) */
+.btn-slide{display:inline-block; padding:10px 18px; border-radius:8px;
+  border:1px solid var(--border-card); background:var(--bg-header);
+  color:var(--text-main); cursor:pointer; font-size:14px; text-align:center}
+.btn-slide:hover{border-color:var(--accent-blue); color:#fff}
+label.btn-slide{line-height:1.4}
 
 .acoes-topo{display:flex; gap:10px; margin:8px 0 16px 0; padding-top:8px; border-top:1px solid var(--border-card)}
 .acoes-topo button{padding:8px 16px; border-radius:8px; border:1px solid var(--border-card);
@@ -259,7 +279,10 @@ tr:hover td{background:rgba(58,134,255,.06)}
 .ck-piloto input{accent-color:var(--accent-green)}
 
 /* ---- bandeira ---- */
-.bd{border:none; color:#0b0f18; font-weight:700}
+.bd{border:none; color:#0b0f18; font-weight:700; cursor:pointer}
+/* bandeira vigente (contorno branco) — marcada via JS em _renderEstadoPista */
+.bd.ativa{outline:3px solid #fff; outline-offset:2px;
+  box-shadow:0 0 14px rgba(255,255,255,.4)}
 .bd.verde{background:#2ec4b6}
 .bd.amarela{background:#ffb703}
 .bd.vermelha{background:#e63946; color:#fff}
