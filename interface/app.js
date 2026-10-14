@@ -1956,10 +1956,17 @@ async function carregarPlanoCampeonato() {
 function renderPlanoCampeonato() {
   const t = document.getElementById("camp-plano-lista");
   if (!t || !planoCamp) return;
-  t.innerHTML = "<tr><th>Etapa</th><th>Duração (min)</th></tr>" + planoCamp.etapas.map((e, i) =>
-    `<tr><td>${_esc(e.rotulo)} ${e.etapa === "intervalo" ? '<span class="prev">intervalo</span>' : ""}</td>
-      <td><input type="number" min="0" step="1" value="${e.duracao}" data-camp-i="${i}"
-           style="width:92px" oninput="atualizarTotalCamp()"></td></tr>`).join("");
+  const icones = { treino: "🏎️", intervalo: "⏸", classificacao: "⏱️", corrida: "🏁" };
+  t.innerHTML = planoCamp.etapas.map((e, i) =>
+    `${i ? '<div class="plano-seta">→</div>' : ""}
+     <div class="plano-etapa${e.etapa === "intervalo" ? " intervalo" : ""}">
+       <div class="plano-icone">${icones[e.etapa] || "🏁"}</div>
+       <div class="plano-rotulo">${_esc(e.rotulo)}</div>
+       <div class="plano-dur">
+         <input type="number" min="0" step="1" value="${e.duracao}" data-camp-i="${i}"
+              oninput="atualizarTotalCamp()"><span>min</span>
+       </div>
+     </div>`).join("");
   atualizarTotalCamp();
 }
 function lerPlanoCampeonato() {

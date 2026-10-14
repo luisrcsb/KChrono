@@ -268,6 +268,22 @@ label.btn-slide{line-height:1.4}
 .busca-item .m{color:var(--text-muted); font-size:11px; margin-left:auto}
 .busca-vazio{padding:14px; text-align:center; color:var(--text-muted); font-size:12px}
 
+/* ---- sequência do campeonato (lado a lado) ---- */
+.plano-linha{display:flex; align-items:stretch; gap:0; overflow-x:auto; padding:4px 2px}
+.plano-etapa{flex:1 1 0; min-width:118px; background:rgba(58,134,255,.07);
+  border:1px solid var(--border-card); border-radius:10px; padding:12px 10px;
+  text-align:center}
+.plano-etapa.intervalo{flex:0 1 96px; min-width:92px; opacity:.75; background:rgba(255,255,255,.03)}
+.plano-icone{font-size:24px; line-height:1.2}
+.plano-rotulo{color:var(--text-title); font-size:13px; font-weight:600; margin:6px 0 8px}
+.plano-dur{display:flex; align-items:center; justify-content:center; gap:6px;
+  color:var(--text-muted); font-size:12px}
+.plano-dur input{width:64px; padding:7px 8px; border-radius:7px;
+  border:1px solid var(--border-card); background:var(--bg-input);
+  color:var(--text-title); font-size:14px; text-align:center}
+.plano-seta{align-self:center; flex:none; padding:0 8px; font-size:20px;
+  color:var(--accent-blue); font-weight:700}
+
 /* ---- check-in (Admin → Gerente de Pista) ---- */
 .lista-checkin{max-height:340px; overflow:auto; display:grid; grid-template-columns:1fr 1fr 1fr;
   gap:6px}
