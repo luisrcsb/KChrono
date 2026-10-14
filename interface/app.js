@@ -176,7 +176,10 @@ function tratarEvento(ev) {
       notificar("ghost_lap", `Ghost lap descartado — transponder ${ev.transponder}`, "👻");
       break;
     case "aviso": logMsg(`AVISO: ${ev.msg}`, "l-aviso", "log-operador"); break;
-    case "erro": logMsg(`ERRO: ${ev.msg}`, "l-erro", "log-operador"); break;
+    case "erro":
+      logMsg(`ERRO: ${ev.msg}`, "l-erro", "log-operador");
+      if (/decoder|conectad|conex/i.test(ev.msg || "")) refreshDecoderPainel();
+      break;
     case "bandeira":
       _renderEstadoPista(ev);
       logMsg(`bandeira: ${ev.bandeira || ev.cor}${ev.motivo ? " — " + ev.motivo : ""}`,
@@ -200,6 +203,7 @@ function tratarEvento(ev) {
     case "sistema":
       logMsg(ev.msg, "l-sistema", "log-operador");
       logMsg(ev.msg, "l-sistema", "log-dashboard");
+      if (/decoder|conectad|conex/i.test(ev.msg || "")) refreshDecoderPainel();
       break;
     case "campeonato":
       renderEstadoCampeonato(ev.estado || null);
@@ -212,6 +216,12 @@ function tratarEvento(ev) {
         notificar("decoder_offline", ev.msg, "🔌");
       break;
   }
+}
+
+function refreshDecoderPainel() {
+  api("status", "GET")
+    .then(s => { if (s && s.decoder) renderDecoder(s.decoder); })
+    .catch(() => {});
 }
 
 let ultimaClassificacao = { linhas: [] };
