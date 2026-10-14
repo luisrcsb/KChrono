@@ -2092,19 +2092,22 @@ async function iniciarCampeonato() {
   const tmin = parseFloat(document.getElementById("cfg-tempo-minimo").value) || 0;
   await salvarPlanoCampeonato();
   // se há chave do CTAD, confirma as regras antes de começar
-  const chave = document.getElementById("camp-chave-ctad").value.trim();
+  const chaveEl = document.getElementById("camp-chave-ctad");
+  const chave = chaveEl.value.trim();
   if (chave) {
     const r = await api(`campeonato/ctad?chave=${encodeURIComponent(chave)}`, "GET");
     if (!r.ok) {
-      alert("Não foi possível confirmar o campeonato no CTAD: " + (r.erro || "erro") +
-            "\n\nCorrija a chave ou limpe o campo para iniciar sem vínculo.");
-      return;
+      if (!confirm(`Não encontrei o campeonato "${chave}" no CTAD (${r.erro || "erro"}).` +
+          "\n\nIniciar mesmo assim SEM vínculo com o site?")) return;
+      chaveEl.value = "";
+      logMsg("campeonato: iniciado sem vínculo com o CTAD", "l-aviso", "log-operador");
+    } else {
+      if (!confirm(`Iniciar o campeonato "${r.nome}"?\n\n` +
+          `Regras do site: ${r.pilotosPorChave ?? "—"} pilotos por chave, ` +
+          `inversão ${r.inverterSegundaBateria ? "ligada" : "desligada"}, ` +
+          `${r.numeroProvas ?? "—"} provas.`)) return;
+      logMsg(`campeonato vinculado ao CTAD: "${r.nome}"`, "l-sistema", "log-operador");
     }
-    if (!confirm(`Iniciar o campeonato "${r.nome}"?\n\n` +
-        `Regras do site: ${r.pilotosPorChave ?? "—"} pilotos por chave, ` +
-        `inversão ${r.inverterSegundaBateria ? "ligada" : "desligada"}, ` +
-        `${r.numeroProvas ?? "—"} provas.`)) return;
-    logMsg(`campeonato vinculado ao CTAD: "${r.nome}"`, "l-sistema", "log-operador");
   }
   const r = await api(`campeonato/iniciar?tempo_minimo_s=${tmin}`);
   if (r.ok) { logMsg(`campeonato iniciado — ${r.etapa.rotulo}`, "l-sistema", "log-operador"); abrirOperador(); }
