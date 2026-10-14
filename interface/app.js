@@ -207,6 +207,10 @@ function tratarEvento(ev) {
       logMsg(`sessão: ${ev.estado}`, "l-sistema", "log-operador");
       document.getElementById("operador-estado").textContent = ev.estado;
       if (ev.classificacao) renderClassificacao({ linhas: ev.classificacao });
+      // estado otimista imediato (o refresh abaixo confirma pelo snapshot)
+      if (ev.estado === "finalizada") { sessaoAtiva = false; estadoSessao = "finalizado"; }
+      else if (ev.estado === "iniciada" || ev.estado === "correndo") sessaoAtiva = true;
+      atualizarBotaoPrincipal();
       // atualiza a base do cronômetro (o snapshot só chega ao conectar o WS)
       api("status", "GET").then(s => { if (s && s.sessao) renderSessao(s.sessao); }).catch(() => {});
       break;
@@ -318,6 +322,10 @@ function renderSessao(s) {
   if (opEst) opEst.textContent = s.estado || "sem sessão";
   const opSes = document.getElementById("operador-sessao");
   if (opSes) opSes.textContent = s.id ? s.id.slice(0, 8) : "—";
+  // estado da sessão → botão principal de ação
+  estadoSessao = s.estado || "parado";
+  sessaoAtiva = !!(s.id && !["parado", "finalizado"].includes(estadoSessao));
+  atualizarBotaoPrincipal();
   // base do cronômetro da sessão (tick local atualiza o display a cada 500 ms)
   sessaoClock = {
     id: s.id || null, estado: s.estado || "parado",
@@ -1905,6 +1913,40 @@ function tipoSessaoMudou() {
   const tipo = document.getElementById("cfg-tipo").value;
   if (bloco) bloco.style.display = tipo === "campeonato" ? "block" : "none";
   if (tipo === "campeonato") carregarPlanoCampeonato();
+  atualizarBotaoPrincipal();
+}
+
+// Botão principal de ação: rótulo e comportamento seguem o tipo de sessão.
+// Treino/classificação saem contando direto (sem largada); corrida pede largada.
+let sessaoAtiva = false, estadoSessao = "parado";
+const ROTULO_ACAO = {
+  treino: "▶ Iniciar treino",
+  classificacao: "▶ Iniciar classificação",
+  corrida: "▶ Iniciar corrida",
+};
+function atualizarBotaoPrincipal() {
+  const btn = document.getElementById("btn-acao-principal");
+  if (!btn) return;
+  const tipo = (document.getElementById("cfg-tipo") || {}).value || "treino";
+  if (tipo === "campeonato") { btn.style.display = "none"; return; }  // tem botões próprios no plano
+  btn.style.display = "";
+  if (sessaoAtiva && estadoSessao === "largada") {
+    btn.disabled = false;
+    btn.textContent = "▶ Largada";
+  } else if (sessaoAtiva) {
+    btn.disabled = true;
+    btn.textContent = "● Em andamento";
+  } else {
+    btn.disabled = false;
+    btn.textContent = ROTULO_ACAO[tipo] || "▶ Iniciar";
+  }
+}
+function acaoPrincipal() {
+  const tipo = (document.getElementById("cfg-tipo") || {}).value || "treino";
+  if (tipo === "campeonato") return;
+  if (sessaoAtiva && estadoSessao === "largada") { largada(); return; }
+  if (sessaoAtiva) return;
+  iniciarSessaoConfigurada();
 }
 async function carregarPlanoCampeonato() {
   const r = await api("campeonato/plano", "GET");
@@ -2165,6 +2207,7 @@ function previewNome() {
 previewNome();
 aplicarAparencia();
 carregarIdioma();
+atualizarBotaoPrincipal();
 conectarWS();
 carregarNotificacoes();
 mostrar("operador");

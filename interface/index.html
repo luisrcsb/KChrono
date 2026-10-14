@@ -107,7 +107,6 @@
         <div><label>Saída</label>
           <select id="cfg-saida"><option>1ª passagem pela meta</option><option>1ª detecção</option></select></div>
         <div><label>Tempo mínimo de volta (s)</label><input id="cfg-tempo-minimo" value="3"></div>
-        <button class="btn-slide" onclick="iniciarSessaoConfigurada()">▶ Iniciar sessão</button>
       </div>
 
       <div id="cfg-camp-plano" style="display:none;margin-top:16px">
@@ -148,9 +147,9 @@
         “Próxima etapa”. A sessão da etapa anterior é encerrada automaticamente.</p>
     </div>
 
-    <!-- controles -->
+    <!-- controles (o botão principal muda com o tipo: treino/classificação/corrida) -->
     <div class="acoes">
-      <button class="destaque" onclick="largada()">▶ Largada</button>
+      <button class="destaque" id="btn-acao-principal" onclick="acaoPrincipal()">▶ Iniciar treino</button>
       <button onclick="pausar(true)">⏸ Pausar</button>
       <button onclick="pausar(false)">⏵ Retomar</button>
       <button onclick="finalizar()">⏹ Finalizar</button>
