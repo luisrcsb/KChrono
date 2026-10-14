@@ -121,7 +121,11 @@ class EstadoApp:
             self._filas.remove(fila)
 
     def publicar(self, tipo: str, dados: Dict):
-        evento = {"tipo": tipo, "ts": time.strftime("%H:%M:%S"), **dados}
+        # "tipo"/"ts" são o canal e o carimbo do evento — dados nunca os
+        # sobrescrevem (ex.: iniciar sessão manda "tipo": "treino" nos dados,
+        # que antes apagava o "tipo": "sessao" e o frontend descartava o evento).
+        limpos = {k: v for k, v in (dados or {}).items() if k not in ("tipo", "ts")}
+        evento = {"tipo": tipo, "ts": time.strftime("%H:%M:%S"), **limpos}
         self.eventos.append(evento)
         del self.eventos[:-200]
         for fila in list(self._filas):
