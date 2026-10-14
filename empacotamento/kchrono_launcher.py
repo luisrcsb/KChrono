@@ -234,6 +234,11 @@ def main() -> int:
         except Exception:
             pass
 
+    # Diálogo de saída em PT-BR (pywebview traz "Do you really want to quit?")
+    janela.localization.update({
+        "global.quitConfirmation": "Deseja realmente sair do KChrono?",
+    })
+
     # Inicia loop da GUI (bloqueante — encerra quando fecha a janela)
     webview.start(debug=False, private_mode=False, storage_path=None)
 
