@@ -23,6 +23,7 @@ import uvicorn
 import webview
 
 from servidor.api import app
+from nucleo.log import configurar_log
 
 VERSAO = "1.0.0"
 TITULO_JANELA = "KChrono — Cronometragem RC"
@@ -69,12 +70,14 @@ class Ponte:
         try:
             telas = webview.screens
             alvo = telas[indice] if 0 <= indice < len(telas) else telas[0]
+            # ordem importa: move/maximize numa janela oculta trava 20 s
+            # (_shown_call) — mostra primeiro, depois posiciona
+            if not self._visivel():
+                return "fechada"
             try:
                 self.telao.move(alvo.x, alvo.y)
             except Exception:
                 pass
-            if not self._visivel():
-                return "fechada"
             try:
                 self.telao.maximize()
             except Exception:
@@ -138,6 +141,7 @@ def _esperar_servidor(url: str, timeout: float = 15.0) -> bool:
 
 def main() -> int:
     multiprocessing.freeze_support()
+    configurar_log()
 
     ap = argparse.ArgumentParser(prog="KChrono", description="KChrono — cronometragem RC")
     ap.add_argument("--host", default="127.0.0.1", help="interface de rede (default: 127.0.0.1)")
@@ -190,6 +194,9 @@ def main() -> int:
 
     # Cria janela nativa
     ponte = Ponte()
+    localizacao_pt = {
+        "global.quitConfirmation": "Deseja realmente sair do KChrono?",
+    }
     janela = webview.create_window(
         title=TITULO_JANELA,
         url=url,
@@ -206,6 +213,7 @@ def main() -> int:
         text_select=False,
         zoomable=False,
         js_api=ponte,
+        localization=localizacao_pt,
     )
 
     # Janela do telão (oculta): aberta sob demanda via window.pywebview.api,
@@ -233,11 +241,6 @@ def main() -> int:
             janela.icon = icone
         except Exception:
             pass
-
-    # Diálogo de saída em PT-BR (pywebview traz "Do you really want to quit?")
-    janela.localization.update({
-        "global.quitConfirmation": "Deseja realmente sair do KChrono?",
-    })
 
     # Inicia loop da GUI (bloqueante — encerra quando fecha a janela)
     webview.start(debug=False, private_mode=False, storage_path=None)

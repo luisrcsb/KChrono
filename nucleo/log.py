@@ -61,5 +61,15 @@ def configurar_log(nivel: int = logging.INFO) -> logging.Logger:
         handler = logging.StreamHandler(sys.stdout)
         handler.setFormatter(_Formatador(com_cor=habilitar_ansi_windows()))
         raiz.addHandler(handler)
+        # arquivo persistente (única visibilidade quando empacotado sem console)
+        try:
+            from caminhos import dir_dados
+            pasta = dir_dados() / "dados"
+            pasta.mkdir(parents=True, exist_ok=True)
+            fh = logging.FileHandler(pasta / "kchrono.log", encoding="utf-8")
+            fh.setFormatter(_Formatador(com_cor=False))
+            raiz.addHandler(fh)
+        except Exception:
+            pass
         raiz.propagate = False
     return raiz
