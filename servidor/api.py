@@ -341,6 +341,15 @@ async def api_salvar_campeonato_plano(dados: dict = Body(...)):
         return {"ok": False, "erro": str(e)}
 
 
+@app.post("/api/campeonato/plano/montar")
+async def api_montar_campeonato_plano(provas: int = Query(1)):
+    """Remonta a sequência (treino → classif → corrida) pelo nº de provas."""
+    try:
+        return estado.montar_plano_campeonato(provas)
+    except ValueError as e:
+        return {"ok": False, "erro": str(e)}
+
+
 @app.post("/api/campeonato/iniciar")
 async def api_iniciar_campeonato(tempo_minimo_s: float = Query(0)):
     try:

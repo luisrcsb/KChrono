@@ -1985,7 +1985,19 @@ function acaoPrincipal() {
 async function carregarPlanoCampeonato() {
   const r = await api("campeonato/plano", "GET");
   planoCamp = r;
+  const np = document.getElementById("camp-num-provas");
+  if (np) np.value = r.numero_provas || 1;
   renderPlanoCampeonato();
+}
+async function remontarPlanoCampeonato() {
+  const n = parseInt((document.getElementById("camp-num-provas") || {}).value, 10) || 1;
+  const r = await api(`campeonato/plano/montar?provas=${n}`);
+  if (!r.ok) { alert(r.erro || "erro ao remontar"); return; }
+  planoCamp = r;
+  const np = document.getElementById("camp-num-provas");
+  if (np) np.value = r.numero_provas || n;
+  renderPlanoCampeonato();
+  logMsg(`sequência remontada: ${r.numero_provas} prova(s) — ${r.duracao_exata}`, "l-sistema", "log-operador");
 }
 function renderPlanoCampeonato() {
   const t = document.getElementById("camp-plano-lista");
@@ -2038,6 +2050,10 @@ async function buscarCampeonatoCTAD() {
     return;
   }
   const inv = r.inverterSegundaBateria ? "ligada" : "desligada";
+  if (r.numeroProvas) {
+    const np = document.getElementById("camp-num-provas");
+    if (np) np.value = r.numeroProvas;
+  }
   if (box) box.innerHTML = `
     <div class="card" style="padding:12px">
       <b>${_esc(r.nome)}</b>

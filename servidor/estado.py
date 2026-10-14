@@ -1364,7 +1364,41 @@ class EstadoApp:
             exata = f"{total // 60}h{total % 60:02d}min"
         else:
             exata = f"{total} min"
-        return {"etapas": etapas, "total_min": total, "duracao_exata": exata}
+        try:
+            n_provas = max(1, int(cfg.get("numero_provas") or 1))
+        except (TypeError, ValueError):
+            n_provas = 1
+        return {"etapas": etapas, "total_min": total, "duracao_exata": exata,
+                "numero_provas": n_provas}
+
+    @staticmethod
+    def _etapas_para_provas(n_provas: int) -> list:
+        """Sequência padrão repetida por prova: treino → classif → corrida."""
+        etapas = []
+        for p in range(1, n_provas + 1):
+            suf = f" P{p}" if n_provas > 1 else ""
+            etapas += [
+                {"etapa": "treino", "rotulo": f"Treino{suf}", "duracao": 10},
+                {"etapa": "intervalo", "rotulo": "Intervalo", "duracao": 5},
+                {"etapa": "classificacao", "rotulo": f"Classificação{suf}", "duracao": 10},
+                {"etapa": "intervalo", "rotulo": "Intervalo", "duracao": 5},
+                {"etapa": "corrida", "rotulo": f"Corrida{suf}", "duracao": 20},
+            ]
+        return etapas
+
+    def montar_plano_campeonato(self, numero_provas: int = 1) -> Dict:
+        """Remonta a sequência conforme o nº de provas (1–20) e salva."""
+        try:
+            n_provas = max(1, min(int(numero_provas), 20))
+        except (TypeError, ValueError):
+            raise ValueError("nº de provas inválido (1–20)")
+        cfg = carregar_config()
+        cfg["campeonato_plano"] = {"etapas": self._etapas_para_provas(n_provas),
+                                   "numero_provas": n_provas}
+        salvar_config(cfg)
+        self.config = cfg
+        self.publicar("campeonato", {"msg": f"sequência remontada: {n_provas} prova(s)"})
+        return {"ok": True, **self.campeonato_plano()}
 
     def salvar_campeonato_plano(self, etapas) -> Dict:
         if not isinstance(etapas, list) or not etapas:
@@ -1373,7 +1407,9 @@ class EstadoApp:
                   "rotulo": str(e.get("rotulo") or e.get("etapa") or "Etapa"),
                   "duracao": max(0, int(e.get("duracao") or 0))} for e in etapas]
         cfg = carregar_config()
-        cfg["campeonato_plano"] = {"etapas": limpo}
+        anterior = cfg.get("campeonato_plano") or {}
+        cfg["campeonato_plano"] = {"etapas": limpo,
+                                   "numero_provas": anterior.get("numero_provas", 1)}
         salvar_config(cfg)
         self.config = cfg
         self.publicar("campeonato", {"msg": "plano do campeonato salvo"})
