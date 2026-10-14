@@ -268,6 +268,7 @@ function tratarEvento(ev) {
     case "campeonato":
       renderEstadoCampeonato(ev.estado || null);
       logMsg(`[campeonato] ${ev.msg}`, "l-sistema", "log-operador");
+      api("status", "GET").then(s => { if (s && s.sessao) renderSessao(s.sessao); }).catch(() => {});
       break;
     case "decoder":
       marcarRxDecoder();
@@ -394,6 +395,7 @@ function renderSessao(s) {
   sessaoClock = {
     id: s.id || null, estado: s.estado || "parado",
     base_s: (typeof s.tempo_s === "number" ? s.tempo_s : null),
+    restante_s: (typeof s.restante_s === "number" ? s.restante_s : null),
     pausada: !!s.pausada, finalizada: s.estado === "finalizado",
     recebidoEm: Date.now(),
   };
@@ -411,15 +413,24 @@ function fmtClock(total_s) {
 let sessaoClock = null;
 setInterval(() => {
   tickDecoderSilencio();
-  if (!sessaoClock || !sessaoClock.id || sessaoClock.base_s == null) return;
+  if (!sessaoClock || !sessaoClock.id) return;
+  const el = document.getElementById("disp-tempo");
+  if (!el) return;
+  // intervalo: mostra a regressiva configurada (tem prioridade sobre o líder)
+  if (sessaoClock.restante_s != null) {
+    let r = sessaoClock.restante_s;
+    if (!sessaoClock.pausada) r = Math.max(0, r - (Date.now() - sessaoClock.recebidoEm) / 1000);
+    el.textContent = fmtClock(r);
+    return;
+  }
+  if (sessaoClock.base_s == null) return;
   if (!["treino", "classificacao", "correndo", "largada", "finalizado"].includes(sessaoClock.estado)) return;
   const temVolta = ultimaClassificacao.linhas && ultimaClassificacao.linhas.some(l => l.voltas > 0);
   if (temVolta) return;   // líder manda no display
   let t = sessaoClock.base_s;
   if (!sessaoClock.pausada && !sessaoClock.finalizada)
     t += (Date.now() - sessaoClock.recebidoEm) / 1000;
-  const el = document.getElementById("disp-tempo");
-  if (el) el.textContent = fmtClock(t);
+  el.textContent = fmtClock(t);
 }, 500);
 
 function renderStatus(st) {

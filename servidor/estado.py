@@ -70,6 +70,9 @@ class EstadoApp:
         self._tempo_final_s: Optional[float] = None
         self._pausa_inicio_us: Optional[int] = None
         self._pausado_total_us: int = 0
+        #: regressiva de intervalo (campeonato): {"dur_s", "rotulo", "indice"}
+        self._regressiva: Optional[Dict] = None
+        self._task_regressiva: Optional[asyncio.Task] = None
         self.parametros: Dict = {"duracao": 10, "criterio": "tempo",
                                  "tempo_minimo_volta_s": 3}
         self.som = ModuloSom(ativo=True)
@@ -561,6 +564,7 @@ class EstadoApp:
         self._pausa_inicio_us = None
         self._pausado_total_us = 0
         self.pausado = False
+        self._cancelar_regressiva()
         # recordes para a locução (base = histórico já gravado) e anúncio periódico
         self._recorde_pista_us = self.banco.melhor_volta_pista_us()
         self._recorde_pessoal = self.banco.melhores_por_piloto()
@@ -696,6 +700,48 @@ class EstadoApp:
         fim = self._pausa_inicio_us if self.pausado and self._pausa_inicio_us else agora_monotonic_us()
         return max(0.0, (fim - self.inicio_sessao_us - self._pausado_total_us) / 1e6)
 
+    def restante_intervalo_s(self) -> Optional[float]:
+        """Tempo restante da regressiva do intervalo (None fora de intervalo)."""
+        if not self._regressiva:
+            return None
+        decorrido = self.tempo_sessao_s()
+        if decorrido is None:
+            return float(self._regressiva["dur_s"])
+        return max(0.0, float(self._regressiva["dur_s"]) - decorrido)
+
+    def _cancelar_regressiva(self):
+        self._regressiva = None
+        if self._task_regressiva and not self._task_regressiva.done():
+            self._task_regressiva.cancel()
+        self._task_regressiva = None
+
+    async def _loop_regressiva(self, indice: int, proxima_rotulo: str):
+        """Avisa o fim do intervalo (avanço continua manual)."""
+        try:
+            avisado = False
+            while (self.campeonato_ativo and self._regressiva
+                   and self.campeonato_ativo.get("indice") == indice):
+                await asyncio.sleep(1)
+                if not (self.campeonato_ativo and self._regressiva
+                        and self.campeonato_ativo.get("indice") == indice):
+                    break
+                restante = self.restante_intervalo_s()
+                if restante is not None and restante <= 0 and not avisado:
+                    avisado = True
+                    msg = "Fim do intervalo!"
+                    if proxima_rotulo:
+                        msg += f" Preparar para {proxima_rotulo}."
+                    try:
+                        self.anunciar_texto(msg)
+                    except Exception as e:
+                        log.warning("aviso de fim de intervalo falhou: %s", e)
+                    self.publicar("campeonato", {
+                        "msg": msg + " Avance manualmente para a próxima etapa.",
+                        "estado": self.campeonato_estado()})
+                    break
+        except asyncio.CancelledError:
+            pass
+
     def finalizar(self) -> bool:
         if not self.motor:
             return False
@@ -704,6 +750,7 @@ class EstadoApp:
         # congela o cronômetro no tempo final da sessão
         self._tempo_final_s = self.tempo_sessao_s()
         self._pausa_inicio_us = None
+        self._cancelar_regressiva()
         if self._task_posicoes and not self._task_posicoes.done():
             self._task_posicoes.cancel()
         self._task_posicoes = None
@@ -1501,10 +1548,28 @@ class EstadoApp:
         # encerra a etapa atual antes de mudar (intervalo não tem sessão própria)
         if self.motor and self.motor.estado.value not in ("parado", "finalizado"):
             self.finalizar()
+        self._cancelar_regressiva()
         if etapa["etapa"] in ("treino", "classificacao", "corrida"):
             self.iniciar_sessao(etapa["etapa"],
                                 tempo_minimo_s=ativo.get("tempo_minimo_s", 0),
                                 duracao=etapa["duracao"], criterio="tempo")
+        elif etapa["etapa"] == "intervalo":
+            # intervalo: zera o relógio e conta a regressiva configurada
+            self.inicio_sessao_us = agora_monotonic_us()
+            self._tempo_final_s = None
+            self._pausa_inicio_us = None
+            self._pausado_total_us = 0
+            self.pausado = False
+            self._regressiva = {"dur_s": max(0, int(etapa.get("duracao") or 0)) * 60,
+                                "rotulo": etapa.get("rotulo") or "Intervalo",
+                                "indice": prox_i}
+            proxima = etapas[prox_i + 1] if prox_i + 1 < len(etapas) else None
+            try:
+                asyncio.get_running_loop()
+                self._task_regressiva = asyncio.create_task(
+                    self._loop_regressiva(prox_i, (proxima or {}).get("rotulo", "")))
+            except RuntimeError:
+                pass
         ativo["indice"] = prox_i
         self.publicar("campeonato", {"msg": f"etapa {etapa['rotulo']}",
                                      "estado": self.campeonato_estado()})
@@ -1515,6 +1580,7 @@ class EstadoApp:
         if self.motor and self.motor.estado.value not in ("parado", "finalizado"):
             self.finalizar()
         self.campeonato_ativo = None
+        self._cancelar_regressiva()
         self.publicar("campeonato", {"msg": "campeonato encerrado pelo operador",
                                      "estado": self.campeonato_estado()})
         return {"ok": True, "ativo": False}
@@ -1841,6 +1907,7 @@ class EstadoApp:
                         "segundos_sem_dados": sem_dados_s},
             "sessao": {"id": self.sessao_id, "estado": motor_estado,
                        "pausada": self.pausado, "tempo_s": tempo_sessao,
+                       "restante_s": self.restante_intervalo_s(),
                        "parametros": self.parametros},
             "pista": self.estado_pista(),
             "contadores": self.contadores,
