@@ -214,6 +214,25 @@ class EstadoApp:
             self.parar_auto_conectar()
         return {"ok": True, "ativo": bool(ativo)}
 
+    def telao_tela(self) -> Dict:
+        """Monitor escolhido para o telão (Configurações → Telão)."""
+        try:
+            indice = max(0, int(self.config.get("telao_tela", 1)))
+        except (TypeError, ValueError):
+            indice = 1
+        return {"indice": indice}
+
+    def definir_telao_tela(self, indice: int) -> Dict:
+        try:
+            indice = max(0, int(indice))
+        except (TypeError, ValueError):
+            raise ValueError("tela inválida")
+        cfg = carregar_config()
+        cfg["telao_tela"] = indice
+        salvar_config(cfg)
+        self.config = cfg
+        return {"ok": True, "indice": indice}
+
     def iniciar_auto_conectar(self):
         """Dispara o loop de conexão do boot (se ligado e ainda desconectado)."""
         try:

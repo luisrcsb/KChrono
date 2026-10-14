@@ -72,6 +72,20 @@ async def api_decoder_auto_definir(ativo: bool = Query(True)):
     return estado.definir_decoder_auto(ativo)
 
 
+@app.get("/api/telao/tela")
+async def api_telao_tela():
+    """Monitor escolhido para o telão 2ª tela."""
+    return estado.telao_tela()
+
+
+@app.post("/api/telao/tela")
+async def api_telao_tela_definir(indice: int = Query(1)):
+    try:
+        return estado.definir_telao_tela(indice)
+    except ValueError as e:
+        return {"ok": False, "erro": str(e)}
+
+
 @app.post("/api/decoder/desconectar")
 async def api_desconectar():
     await estado.desconectar_decoder()

@@ -26,6 +26,7 @@ CONFIG_MODELO = {
     "decoder_host": "192.168.0.50",
     "decoder_porta": 5403,
     "decoder_auto": True,         # tenta conectar em loop ao abrir o app
+    "telao_tela": 1,                # monitor do telão 2ª tela (0 = principal)
 }
 
 

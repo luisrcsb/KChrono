@@ -101,6 +101,28 @@ async function definirAutoConectar() {
   logMsg(`auto-conexão do decoder: ${r.ativo ? "ligada (tenta em loop ao abrir)" : "desligada"}`,
     "l-sistema", "log-operador");
 }
+async function carregarTelaoTela() {
+  const sel = document.getElementById("cfg-telao");
+  if (!sel) return;
+  let telas = [];
+  try {
+    if (window.pywebview && window.pywebview.api && window.pywebview.api.telas)
+      telas = await window.pywebview.api.telas() || [];
+  } catch (e) {}
+  if (!telas.length) telas = [{ indice: 0, largura: 0, altura: 0, principal: true }];
+  sel.innerHTML = telas.map(t =>
+    `<option value="${t.indice}">Tela ${t.indice + 1}${t.principal ? " (principal)" : ""}` +
+    `${t.largura ? ` — ${t.largura}x${t.altura}` : ""}</option>`).join("");
+  try {
+    const r = await api("telao/tela", "GET");
+    sel.value = String(r.indice ?? 1);
+  } catch (e) {}
+}
+async function salvarTelaoTela() {
+  const i = parseInt((document.getElementById("cfg-telao") || {}).value, 10) || 0;
+  const r = await api(`telao/tela?indice=${i}`);
+  if (r.ok) logMsg(`telão abre na Tela ${r.indice + 1} (maximizado)`, "l-sistema", "log-operador");
+}
 async function detectarPortas() {
   const r = await api("decoder/portas", "GET");
   const portas = (r.portas || []);
@@ -2228,6 +2250,7 @@ aplicarAparencia();
 carregarIdioma();
 atualizarBotaoPrincipal();
 carregarAutoConectar();
+carregarTelaoTela();
 conectarWS();
 carregarNotificacoes();
 mostrar("operador");

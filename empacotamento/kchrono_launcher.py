@@ -39,7 +39,6 @@ class Ponte:
 
     def __init__(self):
         self.telao = None
-        self._telao_fs = False
 
     def _visivel(self) -> bool:
         try:
@@ -59,34 +58,43 @@ class Ponte:
         return "ok" if self._visivel() else "fechada"
 
     def telao_segunda_tela(self):
-        """Telão em tela cheia no 2º monitor (ou mostra, se só houver um)."""
+        """Telão maximizado na tela escolhida (Configurações → Telão)."""
         if self.telao is None:
             return "sem-telao"
         try:
+            from servidor.config import carregar_config
+            indice = max(0, int(carregar_config().get("telao_tela", 1)))
+        except Exception:
+            indice = 1
+        try:
             telas = webview.screens
-            if len(telas) > 1:
-                s = telas[1]
-                if self._telao_fs:
-                    try:
-                        self.telao.toggle_fullscreen()
-                    except Exception:
-                        pass
-                    self._telao_fs = False
+            alvo = telas[indice] if 0 <= indice < len(telas) else telas[0]
+            try:
+                self.telao.move(alvo.x, alvo.y)
+            except Exception:
+                pass
+            if not self._visivel():
+                return "fechada"
+            try:
+                self.telao.maximize()
+            except Exception:
                 try:
-                    self.telao.move(s.x, s.y)
+                    self.telao.resize(alvo.width, alvo.height)
                 except Exception:
                     pass
-                if not self._visivel():
-                    return "fechada"
-                try:
-                    self.telao.toggle_fullscreen()
-                    self._telao_fs = True
-                except Exception:
-                    pass
-                return "ok-2a-tela"
-            return "ok" if self._visivel() else "fechada"
+            return f"ok-tela-{telas.index(alvo) + 1}"
         except Exception:
             return "ok" if self._visivel() else "fechada"
+
+    def telas(self):
+        """Monitores disponíveis (para o seletor em Configurações)."""
+        try:
+            return [{"indice": i, "x": s.x, "y": s.y,
+                     "largura": s.width, "altura": s.height,
+                     "principal": i == 0}
+                    for i, s in enumerate(webview.screens)]
+        except Exception:
+            return []
 
 
 def _rodar_servidor(host: str, porta: int, pronto: threading.Event):
