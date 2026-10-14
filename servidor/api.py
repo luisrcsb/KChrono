@@ -72,6 +72,17 @@ async def api_decoder_auto_definir(ativo: bool = Query(True)):
     return estado.definir_decoder_auto(ativo)
 
 
+@app.get("/api/sessao/voz-contagem")
+async def api_voz_contagem():
+    """Checkbox 'voz na contagem' (padrão ligada)."""
+    return {"ativa": estado.voz_contagem_ativa()}
+
+
+@app.post("/api/sessao/voz-contagem")
+async def api_voz_contagem_definir(ativa: bool = Query(True)):
+    return estado.definir_voz_contagem(ativa)
+
+
 @app.get("/api/telao/tela")
 async def api_telao_tela():
     """Monitor escolhido para o telão 2ª tela."""
@@ -342,10 +353,27 @@ async def api_salvar_campeonato_plano(dados: dict = Body(...)):
 
 
 @app.post("/api/campeonato/plano/montar")
-async def api_montar_campeonato_plano(provas: int = Query(1)):
+async def api_montar_campeonato_plano(provas: int = Query(1),
+                                      treino: Optional[int] = Query(None),
+                                      classificacao: Optional[int] = Query(None),
+                                      corrida: Optional[int] = Query(None),
+                                      intervalo: Optional[int] = Query(None)):
     """Remonta a sequência (treino → classif → corrida) pelo nº de provas."""
     try:
-        return estado.montar_plano_campeonato(provas)
+        return estado.montar_plano_campeonato(provas, treino, classificacao,
+                                              corrida, intervalo)
+    except ValueError as e:
+        return {"ok": False, "erro": str(e)}
+
+
+@app.post("/api/campeonato/duracoes")
+async def api_salvar_duracoes(treino: int = Query(10), classificacao: int = Query(10),
+                              corrida: int = Query(20), intervalo: int = Query(5)):
+    """Salva as durações do campeonato (escolhidas 1 vez) e remonta a sequência."""
+    try:
+        return estado.montar_plano_campeonato(
+            (estado.campeonato_plano().get("numero_provas") or 1),
+            treino, classificacao, corrida, intervalo)
     except ValueError as e:
         return {"ok": False, "erro": str(e)}
 

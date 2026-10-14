@@ -214,6 +214,17 @@ class EstadoApp:
             self.parar_auto_conectar()
         return {"ok": True, "ativo": bool(ativo)}
 
+    def voz_contagem_ativa(self) -> bool:
+        """Checkbox 'voz na contagem' da configuração da sessão (padrão ligada)."""
+        return bool(self.config.get("voz_contagem", True))
+
+    def definir_voz_contagem(self, ativa: bool) -> Dict:
+        cfg = carregar_config()
+        cfg["voz_contagem"] = bool(ativa)
+        salvar_config(cfg)
+        self.config = cfg
+        return {"ok": True, "ativa": bool(ativa)}
+
     def telao_tela(self) -> Dict:
         """Monitor escolhido para o telão (Configurações → Telão)."""
         try:
@@ -539,7 +550,7 @@ class EstadoApp:
                  self.sessao_id[:8], tipo, len(vinculos), len(self.motor._pilotos))
         self.motor.iniciar(TipoSessao(tipo))
         self.som.iniciada(tipo)
-        if tipo == "corrida":
+        if tipo == "corrida" and self.voz_contagem_ativa():
             self.som.anunciar_largada()
         self.contadores = {"passings_validos": 0, "ghost_laps": 0, "gaps": 0,
                            "sem_piloto": 0}
@@ -1369,31 +1380,57 @@ class EstadoApp:
         except (TypeError, ValueError):
             n_provas = 1
         return {"etapas": etapas, "total_min": total, "duracao_exata": exata,
-                "numero_provas": n_provas}
+                "numero_provas": n_provas,
+                "treino_min": cfg.get("treino_min", 10),
+                "classificacao_min": cfg.get("classificacao_min", 10),
+                "corrida_min": cfg.get("corrida_min", 20),
+                "intervalo_min": cfg.get("intervalo_min", 5)}
 
     @staticmethod
-    def _etapas_para_provas(n_provas: int) -> list:
+    def _etapas_para_provas(n_provas: int, d_treino: int = 10,
+                            d_class: int = 10, d_corr: int = 20,
+                            d_int: int = 5) -> list:
         """Um treino na abertura, depois classificação + corrida por prova."""
-        etapas = [{"etapa": "treino", "rotulo": "Treino", "duracao": 10}]
+        etapas = [{"etapa": "treino", "rotulo": "Treino", "duracao": d_treino}]
         for p in range(1, n_provas + 1):
             suf = f" P{p}" if n_provas > 1 else ""
             etapas += [
-                {"etapa": "intervalo", "rotulo": "Intervalo", "duracao": 5},
-                {"etapa": "classificacao", "rotulo": f"Classificação{suf}", "duracao": 10},
-                {"etapa": "intervalo", "rotulo": "Intervalo", "duracao": 5},
-                {"etapa": "corrida", "rotulo": f"Corrida{suf}", "duracao": 20},
+                {"etapa": "intervalo", "rotulo": "Intervalo", "duracao": d_int},
+                {"etapa": "classificacao", "rotulo": f"Classificação{suf}", "duracao": d_class},
+                {"etapa": "intervalo", "rotulo": "Intervalo", "duracao": d_int},
+                {"etapa": "corrida", "rotulo": f"Corrida{suf}", "duracao": d_corr},
             ]
         return etapas
 
-    def montar_plano_campeonato(self, numero_provas: int = 1) -> Dict:
-        """Remonta a sequência conforme o nº de provas (1–20) e salva."""
+    def montar_plano_campeonato(self, numero_provas: int = 1, treino=None,
+                                classificacao=None, corrida=None,
+                                intervalo=None) -> Dict:
+        """Remonta a sequência: durações escolhidas 1 vez + nº de provas."""
         try:
             n_provas = max(1, min(int(numero_provas), 20))
         except (TypeError, ValueError):
             raise ValueError("nº de provas inválido (1–20)")
         cfg = carregar_config()
-        cfg["campeonato_plano"] = {"etapas": self._etapas_para_provas(n_provas),
-                                   "numero_provas": n_provas}
+        anterior = cfg.get("campeonato_plano") or {}
+
+        def _dur(valor, chave, padrao):
+            for candidato in (valor, anterior.get(chave)):
+                try:
+                    return max(0, int(candidato))
+                except (TypeError, ValueError):
+                    continue
+            return padrao
+
+        d_treino = _dur(treino, "treino_min", 10)
+        d_class = _dur(classificacao, "classificacao_min", 10)
+        d_corr = _dur(corrida, "corrida_min", 20)
+        d_int = _dur(intervalo, "intervalo_min", 5)
+        cfg["campeonato_plano"] = {
+            "etapas": self._etapas_para_provas(n_provas, d_treino, d_class,
+                                               d_corr, d_int),
+            "numero_provas": n_provas, "treino_min": d_treino,
+            "classificacao_min": d_class, "corrida_min": d_corr,
+            "intervalo_min": d_int}
         salvar_config(cfg)
         self.config = cfg
         self.publicar("campeonato", {"msg": f"sequência remontada: {n_provas} prova(s)"})
@@ -1407,8 +1444,11 @@ class EstadoApp:
                   "duracao": max(0, int(e.get("duracao") or 0))} for e in etapas]
         cfg = carregar_config()
         anterior = cfg.get("campeonato_plano") or {}
-        cfg["campeonato_plano"] = {"etapas": limpo,
-                                   "numero_provas": anterior.get("numero_provas", 1)}
+        for chave in ("numero_provas", "treino_min", "classificacao_min",
+                      "corrida_min", "intervalo_min"):
+            if chave in anterior:
+                cfg["campeonato_plano"][chave] = anterior[chave]
+        cfg["campeonato_plano"]["etapas"] = limpo
         salvar_config(cfg)
         self.config = cfg
         self.publicar("campeonato", {"msg": "plano do campeonato salvo"})

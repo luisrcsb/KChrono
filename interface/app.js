@@ -101,6 +101,18 @@ async function definirAutoConectar() {
   logMsg(`auto-conexão do decoder: ${r.ativo ? "ligada (tenta em loop ao abrir)" : "desligada"}`,
     "l-sistema", "log-operador");
 }
+async function carregarVozContagem() {
+  try {
+    const r = await api("sessao/voz-contagem", "GET");
+    document.getElementById("cfg-voz-contagem").checked = r.ativa !== false;
+  } catch (e) {}
+}
+async function salvarVozContagem() {
+  const ativa = document.getElementById("cfg-voz-contagem").checked;
+  const r = await api(`sessao/voz-contagem?ativa=${ativa}`);
+  logMsg(`voz na contagem: ${r.ativa ? "ligada" : "desligada"}`,
+    "l-sistema", "log-operador");
+}
 async function carregarTelaoTela() {
   const sel = document.getElementById("cfg-telao");
   if (!sel) return;
@@ -1962,9 +1974,12 @@ function baixarRelatorio(tipo) {
 let planoCamp = null;
 function tipoSessaoMudou() {
   const bloco = document.getElementById("cfg-camp-plano");
+  const dur = document.getElementById("cfg-camp-dur");
   const tipo = document.getElementById("cfg-tipo").value;
-  if (bloco) bloco.style.display = tipo === "campeonato" ? "block" : "none";
-  if (tipo === "campeonato") carregarPlanoCampeonato();
+  const camp = tipo === "campeonato";
+  if (bloco) bloco.style.display = camp ? "block" : "none";
+  if (dur) dur.style.display = camp ? "block" : "none";
+  if (camp) carregarPlanoCampeonato();
   atualizarBotaoPrincipal();
 }
 
@@ -2009,7 +2024,10 @@ async function carregarPlanoCampeonato() {
 }
 async function remontarPlanoCampeonato() {
   const n = parseInt((document.getElementById("camp-num-provas") || {}).value, 10) || 1;
-  const r = await api(`campeonato/plano/montar?provas=${n}`);
+  const v = (id) => (document.getElementById(id) || {}).value;
+  const r = await api(`campeonato/plano/montar?provas=${n}` +
+    `&treino=${v("camp-d-treino")}&classificacao=${v("camp-d-class")}` +
+    `&corrida=${v("camp-d-corr")}&intervalo=${v("camp-d-int")}`);
   if (!r.ok) { alert(r.erro || "erro ao remontar"); return; }
   planoCamp = r;
   const np = document.getElementById("camp-num-provas");
@@ -2017,29 +2035,38 @@ async function remontarPlanoCampeonato() {
   renderPlanoCampeonato();
   logMsg(`sequência remontada: ${r.numero_provas} prova(s) — ${r.duracao_exata}`, "l-sistema", "log-operador");
 }
+async function salvarDuracoesCamp() {
+  const v = (id, fb) => parseInt((document.getElementById(id) || {}).value, 10) || fb;
+  const r = await api("campeonato/duracoes" +
+    `?treino=${v("camp-d-treino", 10)}&classificacao=${v("camp-d-class", 10)}` +
+    `&corrida=${v("camp-d-corr", 20)}&intervalo=${v("camp-d-int", 5)}`);
+  if (!r.ok) { alert(r.erro || "erro ao salvar durações"); return; }
+  planoCamp = r;
+  renderPlanoCampeonato();
+  logMsg("durações do campeonato salvas", "l-sistema", "log-operador");
+}
 function renderPlanoCampeonato() {
   const t = document.getElementById("camp-plano-lista");
   if (!t || !planoCamp) return;
   const icones = { treino: "🏎️", intervalo: "⏸", classificacao: "⏱️", corrida: "🏁" };
+  // durações (escolhidas 1 vez na configuração da sessão)
+  const d = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };
+  d("camp-d-treino", planoCamp.treino_min ?? 10);
+  d("camp-d-class", planoCamp.classificacao_min ?? 10);
+  d("camp-d-corr", planoCamp.corrida_min ?? 20);
+  d("camp-d-int", planoCamp.intervalo_min ?? 5);
+  // sequência somente-leitura (vem das durações acima + nº de provas)
   t.innerHTML = planoCamp.etapas.map((e, i) =>
     `${i ? '<div class="plano-seta">→</div>' : ""}
      <div class="plano-etapa${e.etapa === "intervalo" ? " intervalo" : ""}">
        <div class="plano-icone">${icones[e.etapa] || "🏁"}</div>
        <div class="plano-rotulo">${_esc(e.rotulo)}</div>
-       <div class="plano-dur">
-         <input type="number" min="0" step="1" value="${e.duracao}" data-camp-i="${i}"
-              oninput="atualizarTotalCamp()"><span>min</span>
-       </div>
+       <div class="plano-dur"><b>${e.duracao}</b><span>min</span></div>
      </div>`).join("");
   atualizarTotalCamp();
 }
 function lerPlanoCampeonato() {
-  const etapas = [];
-  document.querySelectorAll("#camp-plano-lista input[data-camp-i]").forEach(inp => {
-    const base = planoCamp.etapas[parseInt(inp.getAttribute("data-camp-i"), 10)];
-    etapas.push({ etapa: base.etapa, rotulo: base.rotulo, duracao: parseInt(inp.value, 10) || 0 });
-  });
-  return etapas;
+  return (planoCamp && planoCamp.etapas) || [];
 }
 function atualizarTotalCamp() {
   const total = lerPlanoCampeonato().reduce((s, e) => s + e.duracao, 0);
@@ -2118,8 +2145,10 @@ async function iniciarCampeonato() {
 function renderEstadoCampeonato(est) {
   const el = document.getElementById("camp-atual");
   if (!el) return;
+  const etapaEl = document.getElementById("camp-etapa-atual");
   if (!est || !est.ativo) {
     el.innerHTML = '<span class="hint">nenhum campeonato em andamento</span>';
+    if (etapaEl) etapaEl.textContent = "—";
     const prox = document.getElementById("camp-proxima");
     if (prox) prox.disabled = true;
     const enc = document.getElementById("camp-encerrar");
@@ -2129,6 +2158,7 @@ function renderEstadoCampeonato(est) {
   const e = est.etapa;
   const nome = e ? e.rotulo : "—";
   const tipo = e ? e.etapa : "";
+  if (etapaEl) etapaEl.textContent = `Etapa ${est.numero} de ${est.total} — ${nome}`;
   el.innerHTML = `
     <div class="camp-etapa-atual">
       <span class="camp-etapa-num">Etapa ${est.numero} de ${est.total}</span>
@@ -2287,6 +2317,7 @@ aplicarAparencia();
 carregarIdioma();
 atualizarBotaoPrincipal();
 carregarAutoConectar();
+carregarVozContagem();
 carregarTelaoTela();
 conectarWS();
 carregarNotificacoes();

@@ -101,7 +101,9 @@
           <select id="cfg-criterio"><option>Tempo</option><option>Voltas</option></select></div>
         <div><label>Duração (min/voltas)</label><input id="cfg-duracao" value="10"></div>
         <div><label>Contador regressivo (s)</label><input id="cfg-contador" value="10"></div>
-        <div class="check-inline"><span class="ck on">✓</span> voz na contagem</div>
+        <div><label class="chk-linha" style="font-size:12.5px" title="Locução na contagem regressiva e na largada">
+          <input type="checkbox" id="cfg-voz-contagem" checked onchange="salvarVozContagem()"> voz na contagem
+        </label></div>
         <div><label>Aviso de saída (s)</label><input id="cfg-aviso-saida" value="30"></div>
         <div><label>Tempo para terminar (s)</label><input id="cfg-terminar" value="30"></div>
         <div><label>Tempo entre carros (s)</label><input id="cfg-entre-carros" value="2"></div>
@@ -112,6 +114,20 @@
         <div><label>Tempo mínimo de volta (s)</label><input id="cfg-tempo-minimo" value="3"></div>
       </div>
 
+      <div id="cfg-camp-dur" style="display:none;margin-top:14px">
+        <h3 style="margin-bottom:8px">Durações do campeonato (min) — escolha uma vez</h3>
+        <div class="form-sessao centro">
+          <div><label>Treino</label>
+            <input id="camp-d-treino" type="number" min="0" value="10" onchange="salvarDuracoesCamp()"></div>
+          <div><label>Classificação</label>
+            <input id="camp-d-class" type="number" min="0" value="10" onchange="salvarDuracoesCamp()"></div>
+          <div><label>Corrida</label>
+            <input id="camp-d-corr" type="number" min="0" value="20" onchange="salvarDuracoesCamp()"></div>
+          <div><label>Intervalo</label>
+            <input id="camp-d-int" type="number" min="0" value="5" onchange="salvarDuracoesCamp()"></div>
+        </div>
+      </div>
+
       <div id="cfg-camp-plano" style="display:none;margin-top:16px">
         <div style="display:flex; align-items:end; gap:14px; margin-bottom:8px">
           <h3 style="margin:0">Sequência do campeonato</h3>
@@ -120,8 +136,8 @@
                    style="width:80px" onchange="remontarPlanoCampeonato()"></div>
         </div>
         <div class="plano-linha" id="camp-plano-lista"></div>
-        <p class="hint">Duração exata do campeonato: <b id="camp-plano-total">—</b>
-          — soma das etapas (os intervalos contam apenas a duração).</p>
+        <p class="hint">Etapa atual: <b id="camp-etapa-atual">—</b>
+          · Total previsto: <b id="camp-plano-total">—</b></p>
 
         <h3 style="margin:14px 0 8px">Regras vindas do CTAD <span style="font-weight:400;font-size:12px;color:var(--text-muted)">(opcional)</span></h3>
         <div class="form-sessao">
