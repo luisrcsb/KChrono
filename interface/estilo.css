@@ -115,6 +115,9 @@ label.btn-slide{line-height:1.4}
   text-transform:uppercase; letter-spacing:.5px}
 .form-sessao select,.form-sessao input{width:100%; padding:8px 10px; border-radius:6px;
   border:1px solid var(--border-card); background:var(--bg-input); color:var(--text-title); font-size:13px}
+/* configuração da sessão: rótulos e valores centralizados no box */
+.form-sessao.centro>div{text-align:center}
+.form-sessao.centro select,.form-sessao.centro input{text-align:center; text-align-last:center}
 .check-inline{display:flex; align-items:center; gap:8px; font-size:12.5px; color:var(--text-main); padding-bottom:8px}
 .tabela-wrap{overflow-x:auto}
 .tabela-op{min-width:1160px; font-size:12.5px}
