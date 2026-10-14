@@ -440,4 +440,15 @@ setInterval(() => {
     `${String(min).padStart(2, "0")}:${String(seg).padStart(2, "0")}:${String(cs).padStart(2, "0")}`;
 }, 250);
 
+// ESC fecha a janela do telão (via app; no navegador, tenta fechar a aba)
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") {
+    try {
+      const api = window.pywebview && window.pywebview.api;
+      if (api && api.fechar_telao) { api.fechar_telao(); return; }
+    } catch (err) {}
+    try { window.close(); } catch (err) {}
+  }
+});
+
 conectarWS();

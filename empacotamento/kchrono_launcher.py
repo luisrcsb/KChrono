@@ -96,6 +96,16 @@ class Ponte:
         except Exception:
             return []
 
+    def fechar_telao(self):
+        """Esconde a janela do telão (reabre pelo botão; ESC no telão chama aqui)."""
+        if self.telao is None:
+            return "sem-telao"
+        try:
+            self.telao.hide()
+            return "ok"
+        except Exception:
+            return "fechada"
+
 
 def _rodar_servidor(host: str, porta: int, pronto: threading.Event):
     """Roda uvicorn em thread daemon; sinaliza quando pronto."""
@@ -214,6 +224,7 @@ def main() -> int:
             text_select=False,
             zoomable=False,
             hidden=True,
+            js_api=ponte,          # ESC no telão chama fechar_telao()
         )
 
     # Define ícone após criar (pywebview permite)

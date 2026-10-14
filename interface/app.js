@@ -263,6 +263,9 @@ function tratarEvento(ev) {
       if (ev.msg && /desconect|offline|perd/i.test(ev.msg))
         notificar("decoder_offline", ev.msg, "🔌");
       break;
+    case "semaforo":
+      renderMiniSemaforo(ev.acesas || 0, ev.fase || "vermelho");
+      break;
   }
 }
 
@@ -346,6 +349,17 @@ function tickDecoderSilencio() {
   if (txt) txt.textContent = "Ligado ao decoder" + (gap > 20 ? " — sem dados!" : "");
 }
 
+// Mini-semáforo do operador: fase "vermelho" (n luzes), "verde" ou "apagado".
+// A sequência de largada pilota luz a luz via evento "semaforo".
+function renderMiniSemaforo(acesas, fase) {
+  const box = document.getElementById("mini-semaforo");
+  if (!box) return;
+  const vermelhas = box.querySelectorAll(".mluz.vermelha");
+  const verde = box.querySelector(".mluz.verde");
+  vermelhas.forEach((l, i) => l.classList.toggle("on", fase === "vermelho" && i < acesas));
+  if (verde) verde.classList.toggle("on", fase === "verde");
+}
+
 function renderSessao(s) {
   const cs = document.getElementById("card-sessao");
   if (cs) cs.textContent = s.estado || "—";
@@ -360,6 +374,10 @@ function renderSessao(s) {
   estadoSessao = s.estado || "parado";
   sessaoAtiva = !!(s.id && !["parado", "finalizado"].includes(estadoSessao));
   atualizarBotaoPrincipal();
+  // mini-semáforo acompanha o estado (a sequência de largada pilota via evento)
+  if (estadoSessao === "largada") renderMiniSemaforo(5, "vermelho");
+  else if (["treino", "classificacao", "correndo"].includes(estadoSessao)) renderMiniSemaforo(0, "verde");
+  else renderMiniSemaforo(0, "apagado");
   // base do cronômetro da sessão (tick local atualiza o display a cada 500 ms)
   sessaoClock = {
     id: s.id || null, estado: s.estado || "parado",

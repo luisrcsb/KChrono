@@ -271,6 +271,13 @@ label.btn-slide{line-height:1.4}
 .busca-item .m{color:var(--text-muted); font-size:11px; margin-left:auto}
 .busca-vazio{padding:14px; text-align:center; color:var(--text-muted); font-size:12px}
 
+/* ---- mini-semáforo do painel do operador ---- */
+.mini-semaforo{display:inline-flex; align-items:center; gap:4px; padding:5px 9px;
+  border:1px solid var(--border-card); border-radius:14px; background:rgba(0,0,0,.35)}
+.mluz{width:10px; height:10px; border-radius:50%; background:#242e45}
+.mluz.vermelha.on{background:#ff2d2d; box-shadow:0 0 7px #ff2d2d}
+.mluz.verde.on{background:#2eff6e; box-shadow:0 0 7px #2eff6e}
+
 /* ---- sequência do campeonato (lado a lado) ---- */
 .plano-linha{display:flex; align-items:stretch; gap:0; overflow-x:auto; padding:4px 2px}
 .plano-etapa{flex:1 1 0; min-width:150px; background:rgba(58,134,255,.07);
