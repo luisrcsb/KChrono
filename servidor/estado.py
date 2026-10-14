@@ -53,7 +53,14 @@ class EstadoApp:
         self.eventos: List[Dict] = []      # log Recente p/ interface (máx 200)
         self._filas: List[asyncio.Queue] = []
         self._task_decoder: Optional[asyncio.Task] = None
+        self._task_vigia: Optional[asyncio.Task] = None
         self._ultimo_status: Optional[Dict] = None
+        #: o operador quer conexão (liga no conectar, desliga no desconectar —
+        #: base do auto-reconnect e do watchdog de silêncio)
+        self._quer_decoder = False
+        #: último frame recebido do decoder (qualquer tipo) — watchdog
+        self._ultimo_rx_us: Optional[int] = None
+        self._aviso_silencio_em: float = 0.0
         self.contadores = {"passings_validos": 0, "ghost_laps": 0, "gaps": 0,
                            "sem_piloto": 0}
         self.inicio_sessao_us: Optional[int] = None
@@ -158,6 +165,7 @@ class EstadoApp:
 
     async def desconectar_decoder(self) -> None:
         """Encerra o driver atual e a tarefa de leitura, se houver."""
+        self._quer_decoder = False
         if self._task_decoder and not self._task_decoder.done():
             self._task_decoder.cancel()
             try:
@@ -165,12 +173,68 @@ class EstadoApp:
             except (asyncio.CancelledError, Exception):
                 pass
         self._task_decoder = None
+        if self._task_vigia and not self._task_vigia.done():
+            self._task_vigia.cancel()
+            try:
+                await self._task_vigia
+            except (asyncio.CancelledError, Exception):
+                pass
+        self._task_vigia = None
         if self.driver is not None:
             try:
                 await self.driver.close()
             except Exception as e:
                 log.debug("erro fechando driver: %s", e)
         self.conectado = False
+
+    def _garantir_vigia(self):
+        try:
+            asyncio.get_running_loop()
+        except RuntimeError:
+            return
+        if self._task_vigia is None or self._task_vigia.done():
+            self._task_vigia = asyncio.create_task(self._vigiar_decoder())
+
+    async def _vigiar_decoder(self):
+        """Watchdog: conectado mas sem frames há >20 s = algo errado na rede."""
+        try:
+            while self._quer_decoder:
+                await asyncio.sleep(5)
+                if not (self._quer_decoder and self.conectado and self._ultimo_rx_us):
+                    continue
+                gap = (agora_monotonic_us() - self._ultimo_rx_us) / 1e6
+                if gap > 20 and time.monotonic() - self._aviso_silencio_em > 60:
+                    self._aviso_silencio_em = time.monotonic()
+                    log.warning("decoder silencioso há %.0fs", gap)
+                    self.publicar("aviso", {"msg":
+                        f"decoder conectado mas sem enviar dados há {gap:.0f}s — "
+                        "verifique rede/cabo/loop (o P3 aceita no máx 4 conexões)"})
+        except asyncio.CancelledError:
+            pass
+
+    async def _tentar_reconectar(self):
+        """Loop de auto-reconnect após queda (para no desconectar manual)."""
+        try:
+            while self._quer_decoder and not self.conectado:
+                await asyncio.sleep(5)
+                if not self._quer_decoder or self.conectado:
+                    break
+                tipo = self.config.get("decoder_tipo", "p3")
+                log.info("tentando reconectar o decoder (%s)...", tipo)
+                try:
+                    self.driver = self._criar_driver(tipo, None)
+                    await self.driver.connect()
+                except (OSError, asyncio.TimeoutError, ValueError) as e:
+                    log.warning("reconexão ao decoder falhou: %s", e)
+                    continue
+                self.conectado = True
+                self._ultimo_rx_us = agora_monotonic_us()
+                self.publicar("sistema", {"msg": f"decoder {tipo} reconectado"})
+                self._task_decoder = asyncio.create_task(self._ler_decoder())
+                self._garantir_vigia()
+                break
+        except asyncio.CancelledError:
+            pass
 
     async def conectar_decoder(self, tipo: Optional[str] = None,
                                alvo: Optional[str] = None) -> bool:
@@ -180,28 +244,67 @@ class EstadoApp:
             if tipo == self.config.get("decoder_tipo", "p3"):
                 return True                      # já conectado no mesmo driver
             await self.desconectar_decoder()      # trocar de driver
+        # encerra tarefa anterior (loop de reconexão pendente, se houver)
+        if self._task_decoder and not self._task_decoder.done():
+            self._task_decoder.cancel()
+            try:
+                await self._task_decoder
+            except (asyncio.CancelledError, Exception):
+                pass
+            self._task_decoder = None
         try:
             self.driver = self._criar_driver(tipo, alvo)
             await self.driver.connect()
         except (OSError, asyncio.TimeoutError, ValueError) as e:
             self.publicar("erro", {"msg": f"falha ao conectar ({tipo}): {e}"})
             return False
+        self._quer_decoder = True
         self.conectado = True
+        self._ultimo_rx_us = agora_monotonic_us()
         self.config["decoder_tipo"] = tipo
         self.publicar("sistema", {"msg": f"decoder {tipo} conectado"
                                          + (f" ({getattr(self.driver, 'porta_usada', '')})"
                                             if getattr(self.driver, "porta_usada", None)
                                             else "")})
         self._task_decoder = asyncio.create_task(self._ler_decoder())
+        self._garantir_vigia()
         return True
 
     async def _ler_decoder(self):
-        await self.driver.read_loop(
-            on_passing=self._on_passing,
-            on_status=self._on_status,
-            on_desconhecido=self._on_desconhecido)
+        try:
+            await self.driver.read_loop(
+                on_passing=self._on_passing,
+                on_status=self._on_status,
+                on_desconhecido=self._on_desconhecido)
+        except asyncio.CancelledError:
+            raise
+        except Exception as e:
+            log.warning("leitura do decoder interrompida: %s", e)
+            self.conectado = False
+            try:
+                await self.driver.close()
+            except Exception:
+                pass
+            if self._quer_decoder:
+                self.publicar("erro", {"msg": f"conexão com o decoder caiu ({e})"
+                                                  " — tentando reconectar..."})
+                self._task_decoder = asyncio.create_task(self._tentar_reconectar())
+            else:
+                self.publicar("erro", {"msg": f"conexão com o decoder caiu ({e})"})
+        else:
+            # read_loop terminou sem erro = decoder fechou a conexão
+            if self._quer_decoder:
+                self.conectado = False
+                try:
+                    await self.driver.close()
+                except Exception:
+                    pass
+                self.publicar("erro", {"msg": "decoder encerrou a conexão"
+                                              " — tentando reconectar..."})
+                self._task_decoder = asyncio.create_task(self._tentar_reconectar())
 
     def _on_status(self, status: Status, pacote):
+        self._ultimo_rx_us = agora_monotonic_us()
         drift = self.drift.observar(status.rtc_time if hasattr(status, "rtc_time") else None)
         self._ultimo_status = {
             "temperatura": status.temperatura, "tensao": str(status.tensao or "?"),
@@ -212,6 +315,7 @@ class EstadoApp:
         self.publicar("status", self._ultimo_status)
 
     def _on_desconhecido(self, pacote):
+        self._ultimo_rx_us = agora_monotonic_us()
         # mensagens cruas ainda não catalogadas (tor=0x1C no P3, notify no LapWiz…)
         if isinstance(pacote, dict) and "tor" in pacote:
             msg = f"mensagem tor=0x{pacote['tor']:04X}"
@@ -220,6 +324,7 @@ class EstadoApp:
         self.publicar("decoder", {"msg": msg[:300]})
 
     def _on_passing(self, passing: Passing, pacote):
+        self._ultimo_rx_us = agora_monotonic_us()
         if not self.motor or self.pausado:
             return
         # proteção: pico de tráfego na largada (ring buffer + contagem)
@@ -1567,6 +1672,9 @@ class EstadoApp:
     def snapshot(self) -> Dict:
         motor_estado = self.motor.estado.value if self.motor else "parado"
         tempo_sessao = self.tempo_sessao_s()
+        sem_dados_s = None
+        if self.conectado and self._ultimo_rx_us:
+            sem_dados_s = (agora_monotonic_us() - self._ultimo_rx_us) / 1e6
         return {
             "decoder": {"conectado": self.conectado,
                         "tipo": self.config.get("decoder_tipo", "p3"),
@@ -1574,7 +1682,8 @@ class EstadoApp:
                                         getattr(self.driver, "endereco", None)),
                         "porta": getattr(self.driver, "porta",
                                          getattr(self.driver, "porta_usada", None)),
-                        "status": self._ultimo_status},
+                        "status": self._ultimo_status,
+                        "segundos_sem_dados": sem_dados_s},
             "sessao": {"id": self.sessao_id, "estado": motor_estado,
                        "pausada": self.pausado, "tempo_s": tempo_sessao,
                        "parametros": self.parametros},

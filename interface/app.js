@@ -146,8 +146,9 @@ function conectarWS() {
 function tratarEvento(ev) {
   if (ev.tipo === "snapshot") { renderSnapshot(ev); return; }
   switch (ev.tipo) {
-    case "status": renderStatus(ev); break;
+    case "status": marcarRxDecoder(); renderStatus(ev); break;
     case "volta":
+      marcarRxDecoder();
       if (ev.recorde) {
         notificar("recorde",
           `Novo recorde ${ev.recorde === "pista" ? "da pista" : "pessoal"}: ${ev.tempo}s`, "⏱️");
@@ -205,6 +206,7 @@ function tratarEvento(ev) {
       logMsg(`[campeonato] ${ev.msg}`, "l-sistema", "log-operador");
       break;
     case "decoder":
+      marcarRxDecoder();
       logMsg(ev.msg, "", "log-dashboard");
       if (ev.msg && /desconect|offline|perd/i.test(ev.msg))
         notificar("decoder_offline", ev.msg, "🔌");
@@ -264,9 +266,26 @@ function renderDecoder(d) {
   const sideNome = document.getElementById("side-decoder-nome");
   if (sideNome) sideNome.textContent =
     `Decoder: ${nomes[d.tipo] || d.tipo || "—"}${d.conectado ? "" : " (desconectado)"}`;
-  const sideSub = document.getElementById("side-decoder-sub");
-  if (sideSub) sideSub.textContent =
-    d.conectado ? `${d.host || "—"}${d.porta ? ":" + d.porta : ""}` : "sem ligação";
+  decoderConectado = !!d.conectado;
+  decoderBaseTxt = d.conectado ? `${d.host || "—"}${d.porta ? ":" + d.porta : ""}` : "sem ligação";
+  ultimoRxDecoder = (typeof d.segundos_sem_dados === "number")
+    ? Date.now() - d.segundos_sem_dados * 1000 : (d.conectado ? Date.now() : 0);
+  tickDecoderSilencio();
+}
+
+// marca todo frame que chega do decoder (status/volta/mensagem crua)
+function marcarRxDecoder() { ultimoRxDecoder = Date.now(); tickDecoderSilencio(); }
+
+// "conectado mas sem dados há Xs" — atualizado pelo tick de 500 ms
+let decoderConectado = false, decoderBaseTxt = "sem ligação", ultimoRxDecoder = 0;
+function tickDecoderSilencio() {
+  if (!decoderConectado || !ultimoRxDecoder) return;
+  const gap = Math.floor((Date.now() - ultimoRxDecoder) / 1000);
+  const suf = gap > 20 ? ` · sem dados há ${gap}s` : "";
+  const sub = document.getElementById("side-decoder-sub");
+  if (sub) sub.textContent = decoderBaseTxt + suf;
+  const txt = document.getElementById("txt-ligacao");
+  if (txt) txt.textContent = "Ligado ao decoder" + (gap > 20 ? " — sem dados!" : "");
 }
 
 function renderSessao(s) {
@@ -299,6 +318,7 @@ function fmtClock(total_s) {
 }
 let sessaoClock = null;
 setInterval(() => {
+  tickDecoderSilencio();
   if (!sessaoClock || !sessaoClock.id || sessaoClock.base_s == null) return;
   if (!["treino", "classificacao", "correndo", "largada", "finalizado"].includes(sessaoClock.estado)) return;
   const temVolta = ultimaClassificacao.linhas && ultimaClassificacao.linhas.some(l => l.voltas > 0);
