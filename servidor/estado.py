@@ -57,6 +57,10 @@ class EstadoApp:
         self.contadores = {"passings_validos": 0, "ghost_laps": 0, "gaps": 0,
                            "sem_piloto": 0}
         self.inicio_sessao_us: Optional[int] = None
+        #: cronômetro da sessão: tempo congelado ao finalizar + pausas acumuladas
+        self._tempo_final_s: Optional[float] = None
+        self._pausa_inicio_us: Optional[int] = None
+        self._pausado_total_us: int = 0
         self.parametros: Dict = {"duracao": 10, "criterio": "tempo",
                                  "tempo_minimo_volta_s": 3}
         self.som = ModuloSom(ativo=True)
@@ -350,7 +354,13 @@ class EstadoApp:
             self.som.anunciar_largada()
         self.contadores = {"passings_validos": 0, "ghost_laps": 0, "gaps": 0,
                            "sem_piloto": 0}
-        self.inicio_sessao_us = None
+        # cronômetro da sessão: começa no "Iniciar sessão" para TODO tipo
+        # (treino/classificação/corrida) — a largada só redefine na corrida.
+        self.inicio_sessao_us = agora_monotonic_us()
+        self._tempo_final_s = None
+        self._pausa_inicio_us = None
+        self._pausado_total_us = 0
+        self.pausado = False
         # recordes para a locução (base = histórico já gravado) e anúncio periódico
         self._recorde_pista_us = self.banco.melhor_volta_pista_us()
         self._recorde_pessoal = self.banco.melhores_por_piloto()
@@ -423,6 +433,10 @@ class EstadoApp:
         try:
             self.motor.largada()
             self.inicio_sessao_us = agora_monotonic_us()
+            self._tempo_final_s = None
+            self._pausa_inicio_us = None
+            self._pausado_total_us = 0
+            self.pausado = False
             self.publicar("sessao", {"estado": "correndo"})
             return True
         except RuntimeError:
@@ -458,6 +472,13 @@ class EstadoApp:
     def pausar(self, pausar: bool) -> bool:
         if not self.motor:
             return False
+        # congela/retoma o cronômetro da sessão junto com a pausa
+        agora = agora_monotonic_us()
+        if pausar and not self.pausado:
+            self._pausa_inicio_us = agora
+        elif not pausar and self.pausado and self._pausa_inicio_us is not None:
+            self._pausado_total_us += agora - self._pausa_inicio_us
+            self._pausa_inicio_us = None
         self.pausado = pausar
         if pausar:
             self.som.pausada()
@@ -466,11 +487,23 @@ class EstadoApp:
         self.publicar("sessao", {"estado": "pausada" if pausar else "retomada"})
         return True
 
+    def tempo_sessao_s(self) -> Optional[float]:
+        """Cronômetro da sessão em segundos (desconta pausas; congela ao fim)."""
+        if self._tempo_final_s is not None:
+            return self._tempo_final_s
+        if not self.inicio_sessao_us:
+            return None
+        fim = self._pausa_inicio_us if self.pausado and self._pausa_inicio_us else agora_monotonic_us()
+        return max(0.0, (fim - self.inicio_sessao_us - self._pausado_total_us) / 1e6)
+
     def finalizar(self) -> bool:
         if not self.motor:
             return False
         self.motor.finalizar()
         self.pausado = False
+        # congela o cronômetro no tempo final da sessão
+        self._tempo_final_s = self.tempo_sessao_s()
+        self._pausa_inicio_us = None
         if self._task_posicoes and not self._task_posicoes.done():
             self._task_posicoes.cancel()
         self._task_posicoes = None
@@ -1529,9 +1562,7 @@ class EstadoApp:
     # ---------------------------------------------------------------- snapshot
     def snapshot(self) -> Dict:
         motor_estado = self.motor.estado.value if self.motor else "parado"
-        tempo_sessao = None
-        if self.inicio_sessao_us:
-            tempo_sessao = (agora_monotonic_us() - self.inicio_sessao_us) / 1e6
+        tempo_sessao = self.tempo_sessao_s()
         return {
             "decoder": {"conectado": self.conectado,
                         "tipo": self.config.get("decoder_tipo", "p3"),

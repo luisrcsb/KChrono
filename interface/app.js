@@ -193,6 +193,8 @@ function tratarEvento(ev) {
       logMsg(`sessão: ${ev.estado}`, "l-sistema", "log-operador");
       document.getElementById("operador-estado").textContent = ev.estado;
       if (ev.classificacao) renderClassificacao({ linhas: ev.classificacao });
+      // atualiza a base do cronômetro (o snapshot só chega ao conectar o WS)
+      api("status", "GET").then(s => { if (s && s.sessao) renderSessao(s.sessao); }).catch(() => {});
       break;
     case "sistema":
       logMsg(ev.msg, "l-sistema", "log-operador");
@@ -277,7 +279,36 @@ function renderSessao(s) {
   if (opEst) opEst.textContent = s.estado || "sem sessão";
   const opSes = document.getElementById("operador-sessao");
   if (opSes) opSes.textContent = s.id ? s.id.slice(0, 8) : "—";
+  // base do cronômetro da sessão (tick local atualiza o display a cada 500 ms)
+  sessaoClock = {
+    id: s.id || null, estado: s.estado || "parado",
+    base_s: (typeof s.tempo_s === "number" ? s.tempo_s : null),
+    pausada: !!s.pausada, finalizada: s.estado === "finalizado",
+    recebidoEm: Date.now(),
+  };
 }
+
+// cronômetro da sessão no display "Tempo" enquanto não há líder com voltas.
+// (Com voltas, o display mostra o total do líder — vide renderClassificacao.)
+function fmtClock(total_s) {
+  total_s = Math.max(0, Math.floor(total_s || 0));
+  const h = Math.floor(total_s / 3600);
+  const m = Math.floor((total_s % 3600) / 60);
+  const s = total_s % 60;
+  return `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+}
+let sessaoClock = null;
+setInterval(() => {
+  if (!sessaoClock || !sessaoClock.id || sessaoClock.base_s == null) return;
+  if (!["treino", "classificacao", "correndo", "largada", "finalizado"].includes(sessaoClock.estado)) return;
+  const temVolta = ultimaClassificacao.linhas && ultimaClassificacao.linhas.some(l => l.voltas > 0);
+  if (temVolta) return;   // líder manda no display
+  let t = sessaoClock.base_s;
+  if (!sessaoClock.pausada && !sessaoClock.finalizada)
+    t += (Date.now() - sessaoClock.recebidoEm) / 1000;
+  const el = document.getElementById("disp-tempo");
+  if (el) el.textContent = fmtClock(t);
+}, 500);
 
 function renderStatus(st) {
   if (st) {
