@@ -1019,10 +1019,9 @@ class EstadoApp:
         self._pausa_inicio_us = None
         self._cancelar_regressiva()
         self._cancelar_largada()
-        if self._task_posicoes and not self._task_posicoes.done():
-            self._task_posicoes.cancel()
-        self._task_posicoes = None
-        self.som.finalizada()
+        # anúncio de fim de sessão: o tipo vem do motor (Treino/Classificação/Corrida)
+        tipo_motor = (self.motor.tipo or "").value if self.motor and self.motor.tipo else ""
+        self.som.finalizada(tipo_motor)
         # auto-upload (Fase 3): enfileira a sessão completa para o CTAD
         if self.config.get("auto_upload") and self.sincronizador.configurado:
             try:

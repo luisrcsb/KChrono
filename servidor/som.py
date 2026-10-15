@@ -35,7 +35,9 @@ FRASES_TTS = {
     "contagem": "{n}",
     "vai": "Vai!",
     "treino_iniciado": "Treino iniciado. Boa prática a todos!",
+    "treino_finalizado": "Treino finalizado.",
     "classificacao_iniciada": "Classificação iniciada. Cada piloto tem seu tempo.",
+    "classificacao_finalizada": "Classificação finalizada.",
     "pausada": "Sessão pausada.",
     "retomada": "Sessão retomada.",
     "finalizada": "Sessão finalizada. Confiram a classificação.",
@@ -57,7 +59,9 @@ ROTULOS = [
     ("vai", "Vai!"),
     ("contagem", "Contagem do semáforo"),
     ("treino_iniciado", "Treino iniciado"),
+    ("treino_finalizado", "Treino finalizado"),
     ("classificacao_iniciada", "Classificação"),
+    ("classificacao_finalizada", "Classificação finalizada"),
     ("pausada", "Pausada"),
     ("retomada", "Retomada"),
     ("finalizada", "Finalizada"),
@@ -250,8 +254,18 @@ class ModuloSom:
     def retomada(self):
         self.falar("retomada")
 
-    def finalizada(self):
-        self.falar("finalizada")
+    def finalizada(self, tipo: str = ""):
+        """Anuncia o fim da sessão com a frase própria do tipo.
+
+        Treino -> "Treino finalizado."; classificação -> "Classificação
+        finalizada."; demais (corrida/intervalo) -> "Sessão finalizada."
+        """
+        if tipo == "treino":
+            self.falar("treino_finalizado")
+        elif tipo == "classificacao":
+            self.falar("classificacao_finalizada")
+        else:
+            self.falar("finalizada")
 
     def ghost_lap(self):
         self.falar("ghost_lap")
