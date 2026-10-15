@@ -60,6 +60,9 @@ function mostrarOperador(btn) {
 
 function abrirOperador() {
   mostrarOperador();
+  // volta ao painel: se o tipo for Campeonato, revalida a lista de campeonatos
+  const tipo = (document.getElementById("cfg-tipo") || {}).value;
+  if (tipo === "campeonato") carregarCampeonatosOperador();
 }
 
 // navega direto para uma seção do Admin (usado por busca/atalhos)
@@ -180,9 +183,27 @@ function abrirTelaoSegundaTela() {
   }
 }
 const iniciarSessao = (tipo) => api("sessao/iniciar?tipo=" + tipo);
-const largada = () => api("sessao/largada");
+const largada = () => {
+  const c = parseInt(document.getElementById("cfg-contador").value, 10) || 0;
+  return api("sessao/largada?contador_s=" + c);
+};
 const pausar = (p) => api("sessao/pausar?pausar=" + p);
 const finalizar = () => api("sessao/finalizar");
+
+// Um único botão Pausar/Retomar: o rótulo mostra a ação que ele vai executar.
+// (só faz sentido com sessão em andamento e sem sessão o botão fica desabilitado)
+function atualizarBotaoPausa() {
+  const btn = document.getElementById("btn-pausar");
+  if (!btn) return;
+  btn.disabled = !sessaoAtiva || estadoSessao === "largada";
+  const pausada = sessaoPausada;
+  btn.textContent = pausada ? "⏵ Retomar" : "⏸ Pausar";
+  btn.title = pausada ? "Retomar o cronômetro da sessão" : "Pausar o cronômetro da sessão";
+}
+function alternarPausa() {
+  if (!sessaoAtiva) return;
+  pausar(!sessaoPausada);
+}
 
 // ---------------------------------------------------------------- WebSocket
 function conectarWS() {
@@ -255,8 +276,11 @@ function tratarEvento(ev) {
       if (ev.classificacao) renderClassificacao({ linhas: ev.classificacao });
       // estado otimista imediato (o refresh abaixo confirma pelo snapshot)
       if (ev.estado === "finalizada") { sessaoAtiva = false; estadoSessao = "finalizado"; }
-      else if (ev.estado === "iniciada" || ev.estado === "correndo") sessaoAtiva = true;
+      else if (["iniciada", "correndo", "largada", "treino",
+                "classificacao"].includes(ev.estado)) sessaoAtiva = true;
+      if (typeof ev.pausada === "boolean") sessaoPausada = ev.pausada;
       atualizarBotaoPrincipal();
+      atualizarBotaoPausa();
       // atualiza a base do cronômetro (o snapshot só chega ao conectar o WS)
       api("status", "GET").then(s => { if (s && s.sessao) renderSessao(s.sessao); }).catch(() => {});
       break;
@@ -278,6 +302,7 @@ function tratarEvento(ev) {
       break;
     case "semaforo":
       renderMiniSemaforo(ev.acesas || 0, ev.fase || "vermelho");
+      atualizarRelogioLargada(ev);
       break;
   }
 }
@@ -373,6 +398,17 @@ function renderMiniSemaforo(acesas, fase) {
   if (verde) verde.classList.toggle("on", fase === "verde");
 }
 
+// Durante a contagem, o display "Tempo" vira o número da regressiva (o servidor
+// é a fonte da verdade: cada evento "semaforo" traz restante_ms e o número).
+function atualizarRelogioLargada(ev) {
+  if (estadoSessao !== "largada") return;
+  const el = document.getElementById("disp-tempo");
+  if (!el) return;
+  if (ev.fase === "verde") { el.textContent = fmtClock(0); return; }
+  const s = Math.ceil((ev.restante_ms || 0) / 1000);
+  el.textContent = s > 0 ? String(s) : "0";
+}
+
 function renderSessao(s) {
   const cs = document.getElementById("card-sessao");
   if (cs) cs.textContent = s.estado || "—";
@@ -386,9 +422,11 @@ function renderSessao(s) {
   // estado da sessão → botão principal de ação
   estadoSessao = s.estado || "parado";
   sessaoAtiva = !!(s.id && !["parado", "finalizado"].includes(estadoSessao));
+  sessaoPausada = !!s.pausada;
   atualizarBotaoPrincipal();
+  atualizarBotaoPausa();
   // mini-semáforo acompanha o estado (a sequência de largada pilota via evento)
-  if (estadoSessao === "largada") renderMiniSemaforo(5, "vermelho");
+  if (estadoSessao === "largada") renderMiniSemaforo(0, "vermelho");
   else if (["treino", "classificacao", "correndo"].includes(estadoSessao)) renderMiniSemaforo(0, "verde");
   else renderMiniSemaforo(0, "apagado");
   // base do cronômetro da sessão (tick local atualiza o display a cada 500 ms)
@@ -403,17 +441,24 @@ function renderSessao(s) {
 
 // cronômetro da sessão no display "Tempo" enquanto não há líder com voltas.
 // (Com voltas, o display mostra o total do líder — vide renderClassificacao.)
+// Formato com milésimos: M:SS.mmm (ou H:MM:SS.mmm se passar de 1 hora).
 function fmtClock(total_s) {
-  total_s = Math.max(0, Math.floor(total_s || 0));
-  const h = Math.floor(total_s / 3600);
-  const m = Math.floor((total_s % 3600) / 60);
-  const s = total_s % 60;
-  return `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+  total_s = Math.max(0, total_s || 0);
+  const total_ms = Math.floor(total_s * 1000);
+  const mmm = String(total_ms % 1000).padStart(3, "0");
+  let seg = Math.floor(total_ms / 1000);
+  const s = String(seg % 60).padStart(2, "0");
+  seg = Math.floor(seg / 60);
+  const m = seg % 60;
+  const h = Math.floor(seg / 60);
+  if (h > 0) return `${h}:${String(m).padStart(2, "0")}:${s}.${mmm}`;
+  return `${m}:${s}.${mmm}`;
 }
 let sessaoClock = null;
-setInterval(() => {
-  tickDecoderSilencio();
-  if (!sessaoClock || !sessaoClock.id) return;
+function tickRelogioSessao() {
+  if (!sessaoClock) return;
+  if (!sessaoClock.id) return;
+  if (sessaoClock.estado === "largada") return;   // regressiva vem dos eventos "semaforo"
   const el = document.getElementById("disp-tempo");
   if (!el) return;
   // intervalo: mostra a regressiva configurada (tem prioridade sobre o líder)
@@ -431,7 +476,9 @@ setInterval(() => {
   if (!sessaoClock.pausada && !sessaoClock.finalizada)
     t += (Date.now() - sessaoClock.recebidoEm) / 1000;
   el.textContent = fmtClock(t);
-}, 500);
+}
+setInterval(tickDecoderSilencio, 500);
+setInterval(tickRelogioSessao, 33);   // ~30 Hz: milésimos animando
 
 function renderStatus(st) {
   if (st) {
@@ -496,7 +543,7 @@ function renderClassificacao(ev) {
   const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
   set("disp-empista", emPista);
   set("disp-voltas", lider ? lider.voltas : 0);
-  set("disp-tempo", lider ? lider.tempo : "0:00:00");
+  set("disp-tempo", lider ? lider.tempo : "0:00.000");
   set("flag-primeiro", lider ? `1º: ${lider.nome.split(" ")[0]}` : "1º: —");
 
   // aba "Tempos"
@@ -523,14 +570,16 @@ function selecionarLinha(tr) {
 
 function iniciarSessaoConfigurada() {
   const tipo = document.getElementById("cfg-tipo").value;
-  if (tipo === "campeonato") { iniciarCampeonato(); return; }
+  if (tipo === "campeonato") { iniciarCampeonatoEscolhido(); return; }
   const criterio = document.getElementById("cfg-criterio").value;
   const duracao = parseFloat(document.getElementById("cfg-duracao").value) || 10;
   const tmin = parseFloat(document.getElementById("cfg-tempo-minimo").value) || 0;
+  const contador = parseInt(document.getElementById("cfg-contador").value, 10) || 10;
   api(`sessao/iniciar?tipo=${tipo}&tempo_minimo_s=${tmin}` +
-      `&duracao=${duracao}&criterio=${encodeURIComponent(criterio)}`).then(r => {
+      `&duracao=${duracao}&criterio=${encodeURIComponent(criterio)}` +
+      `&contador_s=${contador}`).then(r => {
     if (r.ok === false) { logMsg(`sessão: ${r.erro || "não iniciada"}`, "l-erro", "log-operador"); return; }
-    logMsg(`sessão iniciada (${tipo}, ${duracao} min)`, "l-sistema", "log-operador");
+    logMsg(`sessão iniciada (${tipo}, ${duracao} min, contador ${contador}s)`, "l-sistema", "log-operador");
     abrirOperador();
   });
 }
@@ -677,7 +726,17 @@ async function carregarCampeonatos() {
     ? lista.map(c => `<option value="${c.id}">${c.nome} — ${c.inscritos} inscritos</option>`).join("")
     : '<option value="">— nenhum campeonato —</option>';
   carregarCamposSyncCamp();
-  if (lista.length) abrirCampeonato();
+  if (lista.length) {
+    // seleção pedida pelo painel do operador (botão "Editar campeonato")
+    if (campSelecionarPendente
+        && lista.some(c => String(c.id) === String(campSelecionarPendente))) {
+      sel.value = campSelecionarPendente;
+    }
+    campSelecionarPendente = null;
+    abrirCampeonato();
+  } else {
+    campSelecionarPendente = null;
+  }
 }
 
 async function criarCampeonato() {
@@ -784,9 +843,10 @@ async function carregarGrids() {
     if (el) el.innerHTML = `<p class="hint">${r && r.erro ? r.erro : "erro ao carregar grids"}</p>`;
     return;
   }
-  const inpMax = document.getElementById("camp-chave-max");
+  // valores vigentes (somente leitura — vêm da criação ou da importação do CTAD)
+  const val = document.getElementById("camp-chave-max-valor");
+  if (val) val.textContent = r.max_por_chave;
   const inpInv = document.getElementById("camp-chave-inv");
-  if (inpMax) inpMax.value = r.max_por_chave;
   if (inpInv) inpInv.checked = !!r.inverter_bateria;
   renderGrids(r);
 }
@@ -821,16 +881,20 @@ function renderGrids(r) {
   }).join("");
 }
 
-async function salvarChaves() {
+// Inverte a ordem da bateria seguinte (salva na hora; o nº máximo por chave
+// não é editado aqui — vem da criação do campeonato ou da importação do CTAD).
+async function salvarInversaoChaves() {
   if (!campAtual) { logMsg("campeonato: crie/selecione um campeonato", "l-aviso", "log-operador"); return; }
-  const max = document.getElementById("camp-chave-max").value || 10;
   const inv = document.getElementById("camp-chave-inv").checked ? 1 : 0;
-  const r = await api(`campeonatos/${campAtual}/chaves?max_por_chave=${max}&inverter_bateria=${inv}`, "POST");
+  const r = await api(`campeonatos/${campAtual}/chaves?inverter_bateria=${inv}`, "POST");
   if (r && r.ok !== false) {
-    logMsg(`campeonato: chaves atualizadas (máx ${max} por chave)`, "l-admin", "log-operador");
+    logMsg(`inversão da bateria seguinte: ${inv ? "ligada" : "desligada"}`,
+           "l-admin", "log-operador");
     renderGrids(r);
   } else {
-    logMsg(`campeonato: ${r && r.erro ? r.erro : "erro ao salvar chaves"}`, "l-erro", "log-operador");
+    logMsg(`campeonato: ${r && r.erro ? r.erro : "erro ao salvar a inversão"}`,
+           "l-erro", "log-operador");
+    carregarGrids();
   }
 }
 
@@ -1280,6 +1344,49 @@ function ajustesSom() {
   };
 }
 
+function atualizarVozes() {
+  carregarSom();
+  logMsg("lista de vozes atualizada", "l-sistema", "log-operador");
+}
+
+async function baixarVozNeural() {
+  const btn = document.getElementById("som-baixar-voz");
+  const st = document.getElementById("som-voz-status");
+  let livres = [];
+  try {
+    const r = await api("vozes", "GET");
+    livres = (r.modelos || []).filter(m => !m.instalado);
+  } catch (e) {}
+  if (!livres.length) { carregarSom(); return; }
+  const alvo = livres[0].id;
+  const rotulo = livres[0].rotulo;
+  if (!confirm("Baixar a voz neural " + rotulo + "?\n\n" +
+      "O download acontece uma unica vez e depois o locutor funciona " +
+      "offline, sem internet na pista.")) return;
+  const original = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = "baixando... (pode levar alguns minutos)";
+  if (st) st.textContent = "baixando " + alvo + "...";
+  try {
+    const r = await api("vozes/instalar?modelo=" + encodeURIComponent(alvo),
+                        "POST", "", "");
+    if (r.ok) {
+      logMsg("voz neural instalada: " + r.modelo, "l-admin", "log-operador");
+      alert("Voz neural '" + r.modelo + "' instalada e em uso.\n\n" +
+            "Clique em Testar voz para ouvir.");
+    } else {
+      logMsg("voz neural: " + (r.erro || "falha no download"), "l-erro", "log-operador");
+      alert("Nao foi possivel baixar: " + (r.erro || "erro"));
+    }
+  } catch (e) {
+    logMsg("voz neural: " + e, "l-erro", "log-operador");
+    alert("Falha ao baixar: " + e);
+  }
+  btn.disabled = false;
+  btn.textContent = original;
+  carregarSom();
+}
+
 async function carregarSom() {
   const r = await api("som", "GET");
   const sel = document.getElementById("som-voz");
@@ -1289,7 +1396,9 @@ async function carregarSom() {
     vozes.forEach(v => {
       const o = document.createElement("option");
       o.value = v.id;
-      o.textContent = `${v.nome}${v.idiomas ? ` (${v.idiomas})` : ""}`;
+      // 🧠 marca as vozes neurais offline (Piper)
+      o.textContent = (v.fonte === "piper" ? "🧠 " : "") +
+        `${v.nome}${v.idiomas ? ` (${v.idiomas})` : ""}`;
       if (v.id === r.voz_id) o.selected = true;
       sel.appendChild(o);
     });
@@ -1301,10 +1410,35 @@ async function carregarSom() {
   rotuloVolume();
   rotuloVelocidade();
   const st = document.getElementById("som-status");
-  st.textContent = r.tts_ativo ? "TTS ativo (voz real)" : "TTS indisponível (modo log/bipes)";
+  const nomeBackend = { piper: "neural offline (Piper)", sapi: "SAPI do Windows",
+                         log: "modo log/bipes" }[r.backend] || r.backend || "—";
+  st.textContent = r.tts_ativo ? `TTS ativo — ${nomeBackend}` : "TTS indisponível (modo log/bipes)";
+  const nPiper = vozes.filter(v => v.fonte === "piper").length;
   const ptbr = vozes.filter(v => (v.idiomas || "").toLowerCase().startsWith("pt")).length;
-  if (ptbr) st.textContent += ` · ${ptbr} voz(es) pt-BR`;
-  st.style.color = r.tts_ativo ? "var(--accent-green)" : "var(--accent-gold)";
+  st.textContent += nPiper ? ` · ${nPiper} voz(es) neural(is)` : "";
+  st.textContent += ptbr ? ` · ${ptbr} voz(es) pt-BR` : "";
+  st.style.color = r.tts_ativo
+    ? (r.backend === "piper" ? "var(--accent-green)" : "var(--accent-gold)")
+    : "var(--accent-red)";
+  // dica sobre a voz escolhida + estado do download
+  const dica = document.getElementById("som-voz-dica");
+  if (dica) {
+    const atual = vozes.find(v => v.id === r.voz_id);
+    dica.innerHTML = atual && atual.fonte === "piper"
+      ? "A voz <b>neural</b> roda offline, direto no computador — sem internet na pista."
+      : "As vozes SAPI/OneCore soam mais “robotizadas”. Instale uma voz <b>neural</b> (🧠) para ter entonação.";
+  }
+  const bs = document.getElementById("som-voz-status");
+  const bb = document.getElementById("som-baixar-voz");
+  if (r.piper_disponivel) {
+    if (bs) bs.innerHTML = nPiper
+      ? `${nPiper} modelo(s) neural(is) em <code>dados/vozes</code>.`
+      : "Nenhum modelo neural instalado — baixe um para ter voz natural (≈60 MB).";
+    if (bb) bb.style.display = nPiper ? "none" : "";
+  } else {
+    if (bs) bs.innerHTML = "Para usar voz neural, instale o pacote <code>piper-tts</code> (requirements.txt).";
+    if (bb) bb.style.display = "none";
+  }
   const op = r.opcoes || {};
   document.getElementById("som-intervalo").value = op.intervalo_posicoes ?? 0;
   document.getElementById("som-a-cada-voltas").value = op.anunciar_a_cada_voltas ?? 0;
@@ -1314,6 +1448,8 @@ async function carregarSom() {
     op.anunciar_recorde_pessoal !== false;
   document.getElementById("som-anunciar-rec-pista").checked =
     op.anunciar_recorde_pista !== false;
+  document.getElementById("som-passagem").checked = op.som_passagem !== false;
+  document.getElementById("som-lider").checked = op.som_lider !== false;
   const audios = {};
   (r.audios || []).forEach(a => { audios[a.chave] = a.arquivo; });
   document.getElementById("som-frases").innerHTML = (r.frases || []).map(f => {
@@ -1393,11 +1529,29 @@ async function ouvirFrase(chave) {
 
 async function testarVoz() {
   const r = await api("som/ouvir", "POST", "", {
-    texto: "Atenção pilotos, preparem-se para a largada! Três, dois, um, vai!",
+    texto: "Atenção pilotos, preparem-se para a largada!",
     ...ajustesSom(),
   });
   const prev = document.getElementById("som-preview");
   if (r.ok && prev) prev.innerHTML = `🔊 Teste de voz — <b>${_esc(r.texto)}</b>`;
+}
+
+async function testarSomPassagem() {
+  const r = await api("som/testar_passagem", "POST");
+  if (r.ok) {
+    logMsg("Teste do bip de passagem executado", "l-sistema", "log-operador");
+  } else {
+    alert("Não foi possível testar: " + (r.erro || "erro"));
+  }
+}
+
+async function testarSomLider() {
+  const r = await api("som/testar_lider", "POST");
+  if (r.ok) {
+    logMsg("Teste do bip do líder executado", "l-sistema", "log-operador");
+  } else {
+    alert("Não foi possível testar: " + (r.erro || "erro"));
+  }
 }
 
 async function salvarSom() {
@@ -1416,6 +1570,8 @@ async function salvarSom() {
     anunciar_volta: document.getElementById("som-anunciar-volta").checked,
     anunciar_recorde_pessoal: document.getElementById("som-anunciar-rec-pessoal").checked,
     anunciar_recorde_pista: document.getElementById("som-anunciar-rec-pista").checked,
+    som_passagem: document.getElementById("som-passagem").checked,
+    som_lider: document.getElementById("som-lider").checked,
   };
   const r = await api("som/salvar", "POST", "", { frases, habilitados, ...ajustesSom(), ...opcoes });
   if (r.ok) {
@@ -1446,7 +1602,7 @@ function adminSecao(btn, id) {
   if (titulo) titulo.textContent = btn ? btn.textContent.replace(/Fase\s*\d+/i, "").trim() : "Admin";
   if (id === "a-config") carregarAparenciaForm();
   if (id === "a-upload") atualizarSync();
-  if (id === "a-camp") carregarCampeonatos();
+  if (id === "a-camp") { carregarCampeonatos(); carregarPlanoCampeonato(); }
   if (id === "a-pilotos") { carregarPilotos(); carregarCamposSyncCamp(); }
   if (id === "a-voz") carregarSom();
   if (id === "a-sobre") verificarVersao();
@@ -1535,7 +1691,7 @@ const BUSCA_ACOES = [
     ir: () => iniciarSessao("treino") },
   { chave: "classificacao", icone: "⏱", rotulo: "Iniciar classificação", chaves: "iniciar classificacao qualy tomada tempo",
     ir: () => iniciarSessao("classificacao") },
-  { chave: "corrida", icone: "🏆", rotulo: "Iniciar corrida", chaves: "iniciar corrida final",
+  { chave: "corrida", icone: "🏆", rotulo: " Preparar para Largada!", chaves: "iniciar corrida final",
     ir: () => iniciarSessao("corrida") },
   { chave: "proxima-etapa", icone: "⏭", rotulo: "Próxima etapa (campeonato)", chaves: "proxima etapa avancar campeonato",
     ir: () => proximaEtapa() },
@@ -1557,9 +1713,8 @@ function buscaIr(tipo, valor) {
   if (tipo === "config") { adminIr(valor); return; }
   if (tipo === "sessao") { adminIr("a-voltas"); abrirSessao(valor); return; }
   if (tipo === "campeonato") {
+    campSelecionarPendente = String(valor);
     adminIr("a-camp");
-    const sel = document.getElementById("camp-select");
-    if (sel) { sel.value = String(valor); abrirCampeonato(); }
     return;
   }
   if (tipo === "bateria") {
@@ -1787,6 +1942,13 @@ window.addEventListener("pagehide", () => {
 
 // ---------------------------------------------------------------- Aparência (Admin → Configurações)
 const AP_KEY = "kchrono_aparencia";
+//: wallpaper que já vem configurado de fábrica — usado quando o operador
+// ainda não escolheu nenhum (assim toda instalação/janela nova já entra com imagem).
+const WALLPAPER_PADRAO = "/imagens/wallpaper.jpg";
+//: URL vigente: a escolhida pelo operador ou, na falta dela, a padrão.
+function wallpaperAtual(a) {
+  return (a && a.wallpaper) || WALLPAPER_PADRAO;
+}
 function carregarAparencia() {
   try { return JSON.parse(localStorage.getItem(AP_KEY)) || {}; }
   catch (e) { return {}; }
@@ -1798,7 +1960,7 @@ function aplicarAparencia() {
   const a = carregarAparencia();
   const alpha = 1 - Math.min(80, Math.max(0, Number(a.transparencia) || 0)) / 100;
   document.documentElement.style.setProperty("--card-alpha", alpha.toFixed(2));
-  const url = a.wallpaper || "";
+  const url = wallpaperAtual(a);
   document.querySelectorAll(".corpo, #operador .conteudo").forEach(el => {
     el.classList.toggle("papel-parede", !!url);
     el.style.backgroundImage = url ? `url("${url}")` : "";
@@ -1811,16 +1973,26 @@ function carregarAparenciaForm() {
   if (range) range.value = t;
   const txt = document.getElementById("cfg-transparencia-txt");
   if (txt) txt.textContent = `${t}%`;
+  // o campo mostra a URL em uso (a padrão, quando nada foi escolhido)
   const url = document.getElementById("cfg-wallpaper-url");
-  if (url && a.wallpaper && !a.wallpaper.startsWith("data:")) url.value = a.wallpaper;
+  if (url) {
+    if (a.wallpaper && !a.wallpaper.startsWith("data:")) url.value = a.wallpaper;
+    else if (!a.wallpaper) url.value = WALLPAPER_PADRAO;
+    else url.value = "";
+  }
   renderWallpaperPrev();
 }
 function renderWallpaperPrev() {
   const prev = document.getElementById("cfg-wallpaper-prev");
   if (!prev) return;
   const a = carregarAparencia();
-  prev.innerHTML = a.wallpaper
-    ? `<img src="${a.wallpaper}" alt="wallpaper atual" style="max-width:100%;border-radius:8px;border:1px solid var(--border-card)">`
+  const url = wallpaperAtual(a);
+  prev.innerHTML = url
+    ? `<img src="${url}" alt="wallpaper atual" style="max-width:100%;border-radius:8px;border:1px solid var(--border-card)">
+       <p class="hint" style="margin-top:6px">${
+         a.wallpaper ? "wallpaper salvo <b>neste navegador</b>"
+                     : `wallpaper <b>padrão</b> — logo do arquivo <code>${WALLPAPER_PADRAO}</code>
+                        (nenhuma escolha salva neste navegador)`}</p>`
     : `<span class="hint">sem wallpaper — fundo padrão</span>`;
 }
 function definirWallpaperURL() {
@@ -1848,7 +2020,7 @@ function removerWallpaper() {
   delete a.wallpaper;
   salvarAparencia(a); aplicarAparencia(); renderWallpaperPrev();
   const url = document.getElementById("cfg-wallpaper-url");
-  if (url) url.value = "";
+  if (url) url.value = WALLPAPER_PADRAO;   // volta a valer o padrão
 }
 function mudarTransparencia(v) {
   const t = Math.min(80, Math.max(0, parseInt(v, 10) || 0));
@@ -1984,23 +2156,83 @@ function baixarRelatorio(tipo) {
 // ---------------------------------------------------------------- campeonato (plano de etapas)
 let planoCamp = null;
 function tipoSessaoMudou() {
-  const bloco = document.getElementById("cfg-camp-plano");
-  const dur = document.getElementById("cfg-camp-dur");
+  const escolha = document.getElementById("cfg-camp-escolha");
   const tipo = document.getElementById("cfg-tipo").value;
   const camp = tipo === "campeonato";
-  if (bloco) bloco.style.display = camp ? "block" : "none";
-  if (dur) dur.style.display = camp ? "block" : "none";
-  if (camp) carregarPlanoCampeonato();
+  if (escolha) escolha.style.display = camp ? "block" : "none";
+  if (camp) carregarCampeonatosOperador();
   atualizarBotaoPrincipal();
+}
+
+// ---------------------------------------------------------------- escolha do campeonato (painel do operador)
+// O painel do operador apenas PERGUNTA qual campeonato rodar. Criar/editar levam
+// ao menu Campeonatos (Admin → 🏆 Campeonatos), onde fica a configuração completa.
+let campSelecionarPendente = null;
+
+async function carregarCampeonatosOperador() {
+  const sel = document.getElementById("cfg-camp-select");
+  if (!sel) return;
+  let lista = [];
+  try { const r = await api("campeonatos", "GET"); lista = r.campeonatos || []; } catch (e) {}
+  sel.innerHTML = lista.length
+    ? lista.map(c => `<option value="${c.id}">${_esc(c.nome)} — ${c.inscritos} inscrito(s)</option>`).join("")
+    : '<option value="">— nenhum campeonato —</option>';
+  const aviso = document.getElementById("cfg-camp-aviso");
+  if (aviso) aviso.style.display = lista.length ? "none" : "block";
+  atualizarEscolhaCampeonato();
+}
+
+// Habilita "Editar" e "Iniciar" só quando há um campeonato escolhido.
+function atualizarEscolhaCampeonato() {
+  const sel = document.getElementById("cfg-camp-select");
+  const tem = !!(sel && sel.value);
+  const btnIni = document.getElementById("cfg-camp-iniciar");
+  const btnEd = document.getElementById("cfg-camp-editar");
+  if (btnIni) btnIni.disabled = !tem;
+  if (btnEd) btnEd.disabled = !tem;
+}
+
+// Vai ao menu Campeonatos com o formulário de criação em foco.
+function menuCriarCampeonato() {
+  adminIr("a-camp");
+  const nome = document.getElementById("camp-nome");
+  if (nome) { try { nome.focus(); } catch (e) {} }
+}
+
+// Vai ao menu Campeonatos já com o campeonato escolhido carregado para editar.
+function menuEditarCampeonato() {
+  const sel = document.getElementById("cfg-camp-select");
+  campSelecionarPendente = (sel && sel.value) ? sel.value : null;
+  adminIr("a-camp");
+}
+
+// Inicia a sequência do campeonato escolhido no painel do operador.
+async function iniciarCampeonatoEscolhido() {
+  const sel = document.getElementById("cfg-camp-select");
+  const id = sel ? sel.value : "";
+  if (!id) { logMsg("campeonato: escolha um campeonato", "l-aviso", "log-operador"); return; }
+  const nome = sel.options[sel.selectedIndex] ? sel.options[sel.selectedIndex].textContent : id;
+  if (!confirm(`Iniciar o campeonato "${nome}"?\n\nA sequência de etapas configurada em ` +
+      `🏆 Campeonatos vai começar agora.`)) return;
+  const tmin = parseFloat((document.getElementById("cfg-tempo-minimo") || {}).value) || 0;
+  const r = await api(`campeonato/iniciar?tempo_minimo_s=${tmin}&campeonato_id=${encodeURIComponent(id)}`);
+  if (r.ok) {
+    logMsg(`campeonato iniciado — ${r.etapa.rotulo}`, "l-sistema", "log-operador");
+    abrirOperador();
+  } else {
+    alert(r.erro || "erro ao iniciar o campeonato");
+  }
 }
 
 // Botão principal de ação: rótulo e comportamento seguem o tipo de sessão.
 // Treino/classificação saem contando direto (sem largada); corrida pede largada.
 let sessaoAtiva = false, estadoSessao = "parado";
+//: true quando o cronômetro da sessão está pausado (alimenta o botão Pausar/Retomar)
+let sessaoPausada = false;
 const ROTULO_ACAO = {
   treino: "▶ Iniciar treino",
   classificacao: "▶ Iniciar classificação",
-  corrida: "▶ Iniciar corrida",
+  corrida: "▶ Preparar para Largada!",
 };
 function atualizarBotaoPrincipal() {
   const btn = document.getElementById("btn-acao-principal");
@@ -2130,32 +2362,6 @@ async function buscarCampeonatoCTAD() {
          "l-sistema", "log-operador");
 }
 
-async function iniciarCampeonato() {
-  const tmin = parseFloat(document.getElementById("cfg-tempo-minimo").value) || 0;
-  await salvarPlanoCampeonato();
-  // se há chave do CTAD, confirma as regras antes de começar
-  const chaveEl = document.getElementById("camp-chave-ctad");
-  const chave = chaveEl.value.trim();
-  if (chave) {
-    const r = await api(`campeonato/ctad?chave=${encodeURIComponent(chave)}`, "GET");
-    if (!r.ok) {
-      if (!confirm(`Não encontrei o campeonato "${chave}" no CTAD (${r.erro || "erro"}).` +
-          "\n\nIniciar mesmo assim SEM vínculo com o site?")) return;
-      chaveEl.value = "";
-      logMsg("campeonato: iniciado sem vínculo com o CTAD", "l-aviso", "log-operador");
-    } else {
-      if (!confirm(`Iniciar o campeonato "${r.nome}"?\n\n` +
-          `Regras do site: ${r.pilotosPorChave ?? "—"} pilotos por chave, ` +
-          `inversão ${r.inverterSegundaBateria ? "ligada" : "desligada"}, ` +
-          `${r.numeroProvas ?? "—"} provas.`)) return;
-      logMsg(`campeonato vinculado ao CTAD: "${r.nome}"`, "l-sistema", "log-operador");
-    }
-  }
-  const r = await api(`campeonato/iniciar?tempo_minimo_s=${tmin}`);
-  if (r.ok) { logMsg(`campeonato iniciado — ${r.etapa.rotulo}`, "l-sistema", "log-operador"); abrirOperador(); }
-  else alert(r.erro || "erro ao iniciar o campeonato");
-}
-
 // ---------------------------------------------------------------- campeonato em andamento
 let ultimoEstadoCamp = null;
 function renderEstadoCampeonato(est) {
@@ -2182,6 +2388,7 @@ function renderEstadoCampeonato(est) {
   cards.forEach((c, i) => c.classList.toggle("atual", i === est.indice));
   el.innerHTML = `
     <div class="camp-etapa-atual">
+      ${est.campeonato_nome ? `<span class="camp-etapa-num">🏆 ${_esc(est.campeonato_nome)}</span>` : ""}
       <span class="camp-etapa-num">Etapa ${est.numero} de ${est.total}</span>
       <b>${_esc(nome)}</b>
       ${tipo === "intervalo" ? '<span class="prev">intervalo</span>' : ""}
@@ -2337,6 +2544,7 @@ previewNome();
 aplicarAparencia();
 carregarIdioma();
 atualizarBotaoPrincipal();
+atualizarBotaoPausa();
 carregarAutoConectar();
 carregarVozContagem();
 carregarTelaoTela();

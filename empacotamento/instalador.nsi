@@ -12,10 +12,8 @@
 
 !define VERSAO "1.0.0"
 !define APP "KChrono"
-!define FABRICANTE "KChrono / CTAD"
+!define FABRICANTE "KChrono"
 !define EXE "dist\KChrono.exe"
-!define CTAD_EXE "CTAD-Upload-Auto.exe"
-!define CTAD_ZIP "CTAD-Upload-Auto-v1.2.4.zip"
 
 Name "${APP} ${VERSAO}"
 OutFile "KChrono-Setup.exe"
@@ -31,8 +29,6 @@ SetCompressor /SOLID lzma
 
 ; ==================== Variáveis de configuração ====================
 Var /GLOBAL TELEMETRIA_DIR
-Var /GLOBAL CTAD_DIR
-Var /GLOBAL INSTALAR_CTAD
 Var /GLOBAL INSTALAR_AUTO
 
 !insertmacro MUI_PAGE_WELCOME
@@ -45,6 +41,12 @@ Var /GLOBAL INSTALAR_AUTO
 
 ; ==================== Instalação ====================
 Section "KChrono" SecPrincipal
+  ; BLINDAGEM: fecha o KChrono se estiver rodando (atualização por cima).
+  ; Sem isso, o File abaixo falha com "arquivo em uso" quando o app está aberto.
+  nsExec::ExecToStack 'taskkill /IM KChrono.exe /T /F'
+  Pop $0
+  Sleep 800
+
   SetOutPath "$INSTDIR"
   File "${EXE}"
   WriteRegStr HKLM "Software\${APP}" "InstallDir" "$INSTDIR"
@@ -72,32 +74,6 @@ Section "KChrono" SecPrincipal
   CreateDirectory "$TELEMETRIA_DIR"
 SectionEnd
 
-Section "CTAD-Upload-Auto" SecCTAD
-  StrCpy $INSTALAR_CTAD 1
-  StrCpy $CTAD_DIR "$PROGRAMFILES64\CTAD-Upload-Auto"
-  ${If} $INSTALAR_CTAD == 1
-    SetOutPath "$CTAD_DIR"
-    !define CTAD_ZIP_PATH "..\..\CTAD\downloads\${CTAD_ZIP}"
-    ${If} ${FileExists} "${CTAD_ZIP_PATH}"
-      File "${CTAD_ZIP_PATH}"
-      nsExec::ExecToStack 'powershell -ExecutionPolicy Bypass -NoProfile -Command "try { Expand-Archive -Path \'$CTAD_DIR\${CTAD_ZIP}\' -DestinationPath \'$CTAD_DIR\' -Force } catch { exit 1 }"'
-      Pop $0
-      ${If} $0 != 0
-        MessageBox MB_ICONEXCLAMATION "Falha ao extrair CTAD-Upload-Auto."
-        Delete "$CTAD_DIR\${CTAD_ZIP}"
-        Abort
-      ${EndIf}
-      Delete "$CTAD_DIR\${CTAD_ZIP}"
-      WriteRegStr HKLM "Software\${APP}" "CTADDir" "$CTAD_DIR"
-      CreateDirectory "$SMPROGRAMS\CTAD-Upload-Auto"
-      CreateShortcut "$SMPROGRAMS\CTAD-Upload-Auto\CTAD-Upload-Auto.lnk" "$CTAD_DIR\${CTAD_EXE}"
-      CreateShortcut "$DESKTOP\CTAD-Upload-Auto.lnk" "$CTAD_DIR\${CTAD_EXE}"
-    ${Else}
-      MessageBox MB_OK "Arquivo CTAD-Upload-Auto-v1.2.4.zip nao encontrado ao lado do instalador. O CTAD nao sera instalado."
-    ${EndIf}
-  ${EndIf}
-SectionEnd
-
 Section "Iniciar com o Windows (Serviço)" SecAuto
   StrCpy $INSTALAR_AUTO 1
   ${If} $INSTALAR_AUTO == 1
@@ -117,16 +93,6 @@ Section "Uninstall"
   Delete "$DESKTOP\${APP}.lnk"
   Delete "$DESKTOP\${APP} (Telão).lnk"
   RMDir "$SMPROGRAMS\${APP}"
-
-  ReadRegStr $0 HKLM "Software\${APP}" "CTADDir"
-  ${If} $0 != ""
-    Delete "$0\${CTAD_EXE}"
-    Delete "$0\config.json"
-    RMDir "$0"
-    Delete "$SMPROGRAMS\CTAD-Upload-Auto\CTAD-Upload-Auto.lnk"
-    Delete "$DESKTOP\CTAD-Upload-Auto.lnk"
-    RMDir "$SMPROGRAMS\CTAD-Upload-Auto"
-  ${EndIf}
 
   DeleteRegKey HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${APP}"
   DeleteRegKey HKLM "Software\${APP}"

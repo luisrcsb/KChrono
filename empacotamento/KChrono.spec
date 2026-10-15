@@ -24,20 +24,44 @@ HIDDEN = [
     # voz (TTS)
     "pyttsx3", "pyttsx3.drivers", "pyttsx3.drivers.sapi5",
     "comtypes", "comtypes.client", "win32com", "win32com.client",
+    # voz neural offline (Piper + onnxruntime) — o pacote embarca o
+    # espeak-ng-data e os binários do onnxruntime, que precisam ir junto.
+    "piper", "piper.voice", "piper.config",
+    "onnxruntime", "onnxruntime.capi", "onnxruntime.capi.onnxruntime_pybind11_state",
     # pywebview (janela nativa)
     "webview", "webview.platforms", "webview.platforms.edgechromium",
     "webview.platforms.gtk", "webview.platforms.qt", "webview.platforms.cocoa",
     "webview.dom", "webview.localization",
 ]
 
+#: dados/binários dos motores neurais (espeak-ng-data do piper, DLLs do
+#: onnxruntime). Fica vazio se os pacotes não estiverem instalados — o app
+#: segue funcionando com o SAPI do Windows.
+def _coletar(mod: str):
+    try:
+        from PyInstaller.utils.hooks import collect_all
+        dados, binarios, ocultos = collect_all(mod)
+        return dados, binarios, list(ocultos)
+    except Exception:
+        return [], [], []
+
+
+_DADOS_VOZ: list = []
+_BIN_VOZ: list = []
+for _mod in ("piper", "onnxruntime"):
+    _d, _b, _o = _coletar(_mod)
+    _DADOS_VOZ += _d
+    _BIN_VOZ += _b
+    HIDDEN += _o
+
 a = Analysis(
     [os.path.join(SPECPATH, "kchrono_launcher.py")],
     pathex=[RAIZ],
-    binaries=[],
+    binaries=_BIN_VOZ,
     datas=[
         (os.path.join(RAIZ, "interface"), "interface"),
         (os.path.join(RAIZ, "imagens"), "imagens"),
-    ],
+    ] + _DADOS_VOZ,
     hiddenimports=HIDDEN,
     hookspath=[],
     hooksconfig={},

@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>KChrono — Precision Timing System</title>
-<link rel="stylesheet" href="/static/estilo.css?v=1.8">
+<link rel="stylesheet" href="/static/estilo.css?v=2.1">
 <link rel="icon" href="/imagens/KCHRONO-LOGO.png">
 <script src="/static/chart.umd.min.js"></script>
 </head>
@@ -81,7 +81,7 @@
       </div>
       <div class="display-digital">
         <div class="cel"><div class="rot">Em pista</div><div class="val" id="disp-empista">0</div></div>
-        <div class="cel"><div class="rot">Tempo</div><div class="val" id="disp-tempo">0:00:00</div></div>
+        <div class="cel"><div class="rot">Tempo</div><div class="val" id="disp-tempo">0:00.000</div></div>
         <div class="cel"><div class="rot">Voltas</div><div class="val" id="disp-voltas">0</div></div>
       </div>
     </div>
@@ -114,44 +114,23 @@
         <div><label>Tempo mínimo de volta (s)</label><input id="cfg-tempo-minimo" value="3"></div>
       </div>
 
-      <div id="cfg-camp-dur" style="display:none;margin-top:14px">
-        <h3 style="margin-bottom:8px">Durações do campeonato (min) — escolha uma vez</h3>
+      <div id="cfg-camp-escolha" style="display:none;margin-top:14px">
+        <h3 style="margin-bottom:8px">Campeonato</h3>
         <div class="form-sessao centro">
-          <div><label>Treino</label>
-            <input id="camp-d-treino" type="number" min="0" value="10" onchange="salvarDuracoesCamp()"></div>
-          <div><label>Classificação</label>
-            <input id="camp-d-class" type="number" min="0" value="10" onchange="salvarDuracoesCamp()"></div>
-          <div><label>Corrida</label>
-            <input id="camp-d-corr" type="number" min="0" value="20" onchange="salvarDuracoesCamp()"></div>
-          <div><label>Intervalo</label>
-            <input id="camp-d-int" type="number" min="0" value="5" onchange="salvarDuracoesCamp()"></div>
-        </div>
-      </div>
-
-      <div id="cfg-camp-plano" style="display:none;margin-top:16px">
-        <div style="display:flex; align-items:end; gap:14px; margin-bottom:8px">
-          <h3 style="margin:0">Sequência do campeonato</h3>
-          <div><label>Nº de provas</label>
-            <input id="camp-num-provas" type="number" min="1" max="20" value="1"
-                   style="width:80px" onchange="remontarPlanoCampeonato()"></div>
-        </div>
-        <div class="plano-linha" id="camp-plano-lista"></div>
-        <p class="hint">Etapa atual: <b id="camp-etapa-atual">—</b>
-          · Total previsto: <b id="camp-plano-total">—</b></p>
-
-        <h3 style="margin:14px 0 8px">Regras vindas do CTAD <span style="font-weight:400;font-size:12px;color:var(--text-muted)">(opcional)</span></h3>
-        <div class="form-sessao">
-          <div><label>Chave do campeonato no site</label>
-            <input id="camp-chave-ctad" placeholder="ex.: camp_kr_2026"></div>
+          <div><label>Escolher campeonato</label>
+            <select id="cfg-camp-select" style="min-width:260px" onchange="atualizarEscolhaCampeonato()"></select></div>
           <div><label>&nbsp;</label>
-            <button class="btn-slide" onclick="buscarCampeonatoCTAD()">🔍 Buscar no CTAD</button></div>
+            <button class="btn-slide" onclick="menuCriarCampeonato()">➕ Criar campeonato</button></div>
+          <div><label>&nbsp;</label>
+            <button class="btn-slide" id="cfg-camp-editar" onclick="menuEditarCampeonato()" disabled>✏️ Editar campeonato</button></div>
         </div>
-        <div id="camp-ctad-preview" style="margin-top:10px"></div>
-
-        <div class="acoes">
-          <button class="btn-slide" onclick="salvarPlanoCampeonato()">💾 Salvar plano</button>
-          <button class="btn-slide" onclick="iniciarCampeonato()">🏆 Iniciar campeonato</button>
+        <p class="hint" id="cfg-camp-aviso" style="display:none;margin-top:10px">
+          Nenhum campeonato cadastrado ainda — clique em <b>Criar campeonato</b> para montar o primeiro.</p>
+        <div class="acoes" style="margin-top:12px">
+          <button class="destaque" id="cfg-camp-iniciar" onclick="iniciarCampeonatoEscolhido()" disabled>🏆 Iniciar campeonato</button>
         </div>
+        <p class="hint" style="margin-top:6px">Criar e editar abrem o menu <b>🏆 Campeonatos</b>, onde ficam as
+          regras, os inscritos, as chaves, as durações e a sequência das etapas.</p>
       </div>
     </div>
 
@@ -172,8 +151,7 @@
     <!-- controles (o botão principal muda com o tipo: treino/classificação/corrida) -->
     <div class="acoes">
       <button class="destaque" id="btn-acao-principal" onclick="acaoPrincipal()">▶ Iniciar treino</button>
-      <button onclick="pausar(true)">⏸ Pausar</button>
-      <button onclick="pausar(false)">⏵ Retomar</button>
+      <button id="btn-pausar" onclick="alternarPausa()" disabled>⏸ Pausar</button>
       <button onclick="finalizar()">⏹ Finalizar</button>
       <button class="perigo" style="margin-left:auto" onclick="marcarGato()">🚫 Marcar "gato"</button>
       <button class="perigo" onclick="apagarVolta()">🗑 Apagar volta</button>
@@ -484,6 +462,12 @@
               <div><label>Voz instalada</label>
                 <select id="som-voz" onchange="testarVoz()"></select></div>
             </div>
+            <p class="hint" id="som-voz-dica" style="margin-top:8px"></p>
+            <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:10px">
+              <button class="btn-slide" id="som-baixar-voz" onclick="baixarVozNeural()">⬇ Baixar voz neural</button>
+              <button class="btn-slide" onclick="atualizarVozes()">🔄 Atualizar lista</button>
+            </div>
+            <p class="hint" id="som-voz-status" style="margin-top:6px"></p>
             <div class="frase-input">
               <span class="rot">Volume</span>
               <input type="range" id="som-volume" min="0" max="100" value="80"
@@ -500,10 +484,11 @@
               <button class="btn-slide" onclick="testarVoz()">🔊 Testar voz</button>
               <button class="btn-slide" onclick="salvarSom()">💾 Salvar preferências</button>
             </div>
-            <p class="hint">Status: <b id="som-status">—</b>. Usa o <b>SAPI do Windows</b> (offline),
-              incluindo as vozes <b>OneCore</b> — além de <i>Maria</i> (feminina), a voz
-              <i>Daniel</i> (masculina) em pt-BR. Sem voz disponível, o sistema usa bipes e
-              registra as falas no log. O <b>pyttsx3</b> é usado apenas como reserva.</p>
+            <p class="hint">Locutor <b>neural offline</b> (Piper) quando há um modelo instalado —
+              roda no próprio computador, sem internet, com entonação natural. Como reserva, o
+              <b>SAPI do Windows</b> (offline), incluindo as vozes <b>OneCore</b> — <i>Maria</i>
+              (feminina) e <i>Daniel</b> (masculina) em pt-BR. Sem voz disponível, o sistema usa
+              bipes e registra as falas no log. O <b>pyttsx3</b> é reserva de último caso.</p>
           </div>
           <div class="card">
             <h3>Como vai sair</h3>
@@ -541,6 +526,16 @@
             <div class="frase-input">
               <label class="chk-linha"><input type="checkbox" id="som-anunciar-rec-pista" checked>
                 Anunciar quando bate o recorde da pista</label>
+            </div>
+            <div class="frase-input">
+              <label class="chk-linha"><input type="checkbox" id="som-passagem" checked>
+                Bip de passagem (cada piloto)</label>
+              <button class="btn-mini" onclick="testarSomPassagem()" title="Ouvir bip de passagem">▶ Ouvir</button>
+            </div>
+            <div class="frase-input">
+              <label class="chk-linha"><input type="checkbox" id="som-lider" checked>
+                Bip especial do líder (alto-baixo-alto)</label>
+              <button class="btn-mini" onclick="testarSomLider()" title="Ouvir bip do líder">▶ Ouvir</button>
             </div>
             <div style="display:flex; gap:8px; margin-top:12px; flex-wrap:wrap">
               <button class="btn-slide" onclick="salvarSom()">💾 Salvar preferências</button>
@@ -790,6 +785,43 @@
           </div>
         </div>
 
+        <div class="admin-secao-tit">Sequência &amp; durações das etapas</div>
+        <div class="card" id="cfg-camp-plano">
+          <div class="form-sessao centro">
+            <div><label>Treino (min)</label>
+              <input id="camp-d-treino" type="number" min="0" value="10" onchange="salvarDuracoesCamp()"></div>
+            <div><label>Classificação (min)</label>
+              <input id="camp-d-class" type="number" min="0" value="10" onchange="salvarDuracoesCamp()"></div>
+            <div><label>Corrida (min)</label>
+              <input id="camp-d-corr" type="number" min="0" value="20" onchange="salvarDuracoesCamp()"></div>
+            <div><label>Intervalo (min)</label>
+              <input id="camp-d-int" type="number" min="0" value="5" onchange="salvarDuracoesCamp()"></div>
+          </div>
+          <div style="display:flex; align-items:end; gap:14px; margin:14px 0 8px">
+            <div><label>Nº de provas (etapas)</label>
+              <input id="camp-num-provas" type="number" min="1" max="20" value="1"
+                     style="width:80px" onchange="remontarPlanoCampeonato()"></div>
+          </div>
+          <div class="plano-linha" id="camp-plano-lista"></div>
+          <p class="hint">Etapa atual: <b id="camp-etapa-atual">—</b>
+            · Total previsto: <b id="camp-plano-total">—</b></p>
+
+          <h3 style="margin:14px 0 8px">Regras vindas do CTAD <span style="font-weight:400;font-size:12px;color:var(--text-muted)">(opcional)</span></h3>
+          <div class="form-sessao">
+            <div><label>Chave do campeonato no site</label>
+              <input id="camp-chave-ctad" placeholder="ex.: camp_kr_2026"></div>
+            <div><label>&nbsp;</label>
+              <button class="btn-slide" onclick="buscarCampeonatoCTAD()">🔍 Buscar no CTAD</button></div>
+          </div>
+          <div id="camp-ctad-preview" style="margin-top:10px"></div>
+
+          <div class="acoes">
+            <button class="btn-slide" onclick="salvarPlanoCampeonato()">💾 Salvar plano</button>
+          </div>
+          <p class="hint">Estas durações e a sequência valem para o <b>campeonato iniciado</b> no painel do
+            operador (aqui você configura; lá você escolhe qual campeonato rodar e inicia).</p>
+        </div>
+
         <div class="admin-secao-tit">Inscritos (<span id="camp-inscritos-n">0</span>)</div>
         <div class="card"><div class="tabela-wrap">
           <table class="admin-tabela" id="tabela-inscritos">
@@ -810,11 +842,13 @@
 
         <div class="admin-secao-tit">Grids &amp; chaves (diretiva CTAD)</div>
         <div class="card">
+          <p class="hint">Máximo por chave: <b id="camp-chave-max-valor">—</b>
+            · Inverter a bateria seguinte:
+            <input type="checkbox" id="camp-chave-inv" onchange="salvarInversaoChaves()"
+                   title="Inverte a ordem de largada da bateria seguinte (vem da diretiva do CTAD)">
+            <span class="hint">— definido na criação do campeonato ou na importação do CTAD</span></p>
           <div class="acoes">
-            <div><label>Nº máximo por chave</label><input id="camp-chave-max" value="10" style="width:80px"></div>
-            <div><label>Inverter bateria seguinte</label><input type="checkbox" id="camp-chave-inv"></div>
-            <button class="destaque" onclick="salvarChaves()">💾 Salvar</button>
-            <button onclick="carregarGrids()">🏁 Ver grids</button>
+            <button class="destaque" onclick="carregarGrids()">🏁 Ver grids</button>
           </div>
           <p class="hint">A grade de cada prova é dividida em <b>Chave A, B, C…</b> sempre que o
             número de pilotos passa do limite. A Chave A é o grupo mais rápido (semeadura por
@@ -839,10 +873,12 @@
         <div class="grid g2">
           <div class="card">
             <h3>Wallpaper da área principal</h3>
-            <p class="hint">Imagem de fundo da área de conteúdo. Fica salva neste navegador.</p>
+            <p class="hint">Imagem de fundo da área de conteúdo. O app <b>já vem com um wallpaper
+              padrão</b> (<code>/imagens/wallpaper.jpg</code>); ao escolher outro aqui, a escolha
+              fica salva <b>neste navegador</b>.</p>
             <div class="form-sessao" style="margin-top:12px">
               <div><label>URL da imagem</label>
-                <input id="cfg-wallpaper-url" placeholder="https://… ou /imagens/…"></div>
+                <input id="cfg-wallpaper-url" placeholder="/imagens/wallpaper.jpg (padrão)"></div>
             </div>
             <div class="acoes" style="margin-top:12px">
               <button class="btn-slide" onclick="definirWallpaperURL()">🖼 Aplicar URL</button>
@@ -927,6 +963,6 @@
   </div>
 </div>
 
-<script src="/static/app.js?v=2.0"></script>
+<script src="/static/app.js?v=2.2"></script>
 </body>
 </html>

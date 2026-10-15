@@ -145,7 +145,7 @@ function gRenderSessao(s) {
   gSessao = s;
   document.getElementById("g-estado").textContent = s.estado || "sem sessão";
   gCrono = { base: s.tempo_s || 0, ref: performance.now(),
-             correndo: (s.estado === "correndo" && !s.pausada) };
+             correndo: (["treino", "classificacao", "correndo"].includes(s.estado) && !s.pausada) };
   gPintarCrono(gCrono.base);
 }
 
@@ -158,7 +158,7 @@ function gPintarCrono(t) {
 setInterval(() => {
   if (!gCrono.correndo) return;
   gPintarCrono(gCrono.base + (performance.now() - gCrono.ref) / 1000);
-}, 100);
+}, 33);   // ~30 Hz: milésimos animando
 
 // ---------------------------------------------------------------- classificação
 function gRenderClassificacao(linhas) {

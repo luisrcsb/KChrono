@@ -20,7 +20,6 @@ function atualizarClockViaStatus() {
     if (s && s.sessao) definirClock(s.sessao.tempo_s, s.sessao.pausada, s.sessao.estado);
   }).catch(() => {});
 }
-let largadaClock = null;
 let graficoRitmo = null, graficoPosicoes = null, trackLoop = null;
 let tabAtual = "tv-class";
 
@@ -99,6 +98,10 @@ function tratarEvento(ev) {
       if (tabAtual === "tv-posicoes") desenharPosicoes();
       if (tabAtual === "tv-track") desenharTrack();
       break;
+    case "semaforo":
+      // linha do tempo da largada comandada pelo servidor (ms)
+      renderSemaforo(ev.acesas || 0, ev.fase || "vermelho", ev.numero || null);
+      break;
   }
 }
 
@@ -134,69 +137,53 @@ function renderSessao(s) {
 }
 
 function iniciarContagem() {
-  pararContagem();
+  // A linha do tempo (luzes, números, bipes e voz) é comandada pelo servidor
+  // pelos eventos "semaforo" — ver tratarEvento. Aqui só preparamos a tela.
   const contagem = document.getElementById("contagem");
   const subtitulo = document.getElementById("subtitulo-largada");
-  const luzes = [...document.querySelectorAll("#tela-largada .luz")];
   contagem.classList.remove("vai");
   contagem.textContent = "ATENÇÃO, PILOTOS!";
   subtitulo.textContent = "preparem-se para a largada…";
-  luzes.forEach(l => { l.classList.remove("on"); l.style.background = "#181f33"; });
-  beep(660, 0.18, 0.2);
-  falar("Atenção pilotos, preparem-se para a largada!");
-
-  const DUR_FRASE = 3200;
-  const tLuzes = DUR_FRASE;
-  const luzDur = luzes.map(() => 600 + Math.random() * 600);
-  const tFimLuzes = tLuzes + luzDur.reduce((a, b) => a + b, 0);
-  const tContagem = tFimLuzes + 400;
-  const tFim = tContagem + 5000 + 2500;
-
-  const t0 = performance.now();
-  let luzAcesa = -1, numAtual = null;
-
-  function tick() {
-    const t = performance.now() - t0;
-    if (t >= tLuzes && t < tFimLuzes) {
-      let acc = tLuzes;
-      for (let i = 0; i < luzes.length; i++) {
-        const fim = acc + luzDur[i];
-        const acesa = t >= acc && t < fim;
-        if (acesa && luzAcesa !== i) { luzAcesa = i; beep(520, 0.09, 0.18); }
-        luzes[i].classList.toggle("on", acesa);
-        luzes[i].style.background = acesa ? luzes[i].style.color : "#181f33";
-        acc = fim;
-      }
-    } else if (t >= tFimLuzes) {
-      luzes.forEach(l => { l.classList.remove("on"); l.style.background = "#181f33"; });
-    }
-    if (t >= tContagem) {
-      const n = 5 - Math.floor((t - tContagem) / 1000);
-      if (n > 0 && n !== numAtual) {
-        numAtual = n;
-        contagem.textContent = n;
-        subtitulo.textContent = "";
-        beep(600, 0.08, 0.15);
-        falar(String(n));
-      }
-      if (n <= 0 && numAtual !== 0) {
-        numAtual = 0;
-        contagem.textContent = "VAI!";
-        contagem.classList.add("vai");
-        beep(880, 0.5, 0.3);
-        falar("Vai!");
-      }
-    }
-    if (t < tFim) largadaClock = requestAnimationFrame(tick);
-  }
-  largadaClock = requestAnimationFrame(tick);
+  renderSemaforo(0, "vermelho", null);
 }
 
 function pararContagem() {
-  if (largadaClock) cancelAnimationFrame(largadaClock);
-  largadaClock = null;
-  const luzes = document.querySelectorAll("#tela-largada .luz");
-  luzes.forEach(l => { l.classList.remove("on"); l.style.background = "#181f33"; });
+  renderSemaforo(0, "apagado", null);
+}
+
+// Semáforo do telão: 5 luzes vermelhas (acendem uma a uma na contagem) + verde.
+// Sincronizado por construção — os valores vêm dos eventos "semaforo" do servidor.
+function renderSemaforo(acesas, fase, numero) {
+  const contagem = document.getElementById("contagem");
+  const subtitulo = document.getElementById("subtitulo-largada");
+  const vermelhas = [...document.querySelectorAll("#tela-largada .luz.vermelha")];
+  const verde = document.querySelector("#tela-largada .luz.verde");
+  vermelhas.forEach((l, i) => {
+    const on = fase === "vermelho" && i < acesas;
+    l.classList.toggle("on", on);
+    l.style.background = on ? (l.style.color || "#e63946") : "#181f33";
+  });
+  if (verde) {
+    const on = fase === "verde";
+    verde.classList.toggle("on", on);
+    verde.style.background = on ? (verde.style.color || "#2ec4b6") : "#181f33";
+  }
+  if (!contagem) return;
+  if (fase === "verde") {
+    contagem.textContent = "";
+    contagem.classList.add("vai");
+    if (subtitulo) subtitulo.textContent = "";
+  } else if (numero) {
+    contagem.textContent = String(numero);
+    contagem.classList.remove("vai");
+    if (subtitulo) subtitulo.textContent = "preparem-se para a largada…";
+  } else if (fase === "vermelho") {
+    contagem.textContent = "ATENÇÃO, PILOTOS!";
+    contagem.classList.remove("vai");
+  } else {
+    contagem.textContent = "";
+    contagem.classList.remove("vai");
+  }
 }
 
 // ---------------------------------------------------------------- abas
@@ -430,15 +417,13 @@ function desenharTrack() {
 }
 
 // race time: base do servidor + contagem local (congela na pausa/fim)
+// Formato com milésimos: M:SS.mmm (mesmo fmtTempo usado nas voltas).
 setInterval(() => {
   if (clockBaseS == null) return;
   let s = clockBaseS;
   if (!clockPausada && !clockFim) s += (Date.now() - clockEm) / 1000;
-  const min = Math.floor(s / 60), seg = Math.floor(s % 60);
-  const cs = Math.floor((s % 1) * 100);
-  document.getElementById("t-race").textContent =
-    `${String(min).padStart(2, "0")}:${String(seg).padStart(2, "0")}:${String(cs).padStart(2, "0")}`;
-}, 250);
+  document.getElementById("t-race").textContent = fmtTempo(s);
+}, 33);   // ~30 Hz: milésimos animando
 
 // ESC fecha a janela do telão (via app; no navegador, tenta fechar a aba)
 document.addEventListener("keydown", (e) => {

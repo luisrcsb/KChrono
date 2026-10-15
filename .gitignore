@@ -21,3 +21,5 @@ empacotamento/stage/
 # sistema
 .DS_Store
 Thumbs.db
+# backups locais (ex.: servidor/estado.py.bak)
+*.bak

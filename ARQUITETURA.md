@@ -193,6 +193,7 @@ o sync mapeia para o banco do CTAD.
 | **5. Campeonatos** | grid builder, varredura RF, drop rounds, bônus pole/melhor volta | ✅ motor validado + UI no Admin |
 | **6. Outros decodificadores** | EASYLAP (pronto s/ hardware), LapWiz (só captura), LapZ/GiroZ/RiCino (roadmap) | 🟡 parcial |
 | **7. Empacotamento** | instaladores Windows/Linux + autoupdate | 🟡 arquivos prontos, nunca executados |
+| **8. Locutor neural** | voz natural offline (Piper pt-BR) + download pelo Admin | ✅ implementada (14/10/2026 — Piper ativo, SAPI como reserva) |
 
 ---
 

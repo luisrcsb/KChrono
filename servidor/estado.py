@@ -9,6 +9,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import math
 import os
 import time
 from typing import Dict, List, Optional
@@ -73,6 +74,10 @@ class EstadoApp:
         #: regressiva de intervalo (campeonato): {"dur_s", "rotulo", "indice"}
         self._regressiva: Optional[Dict] = None
         self._task_regressiva: Optional[asyncio.Task] = None
+        #: contagem regressiva da largada (precisão em ms) — None quando parada:
+        #: {"dur_ms": int, "inicio_us": int, "restante_ms": int, "ativa": bool}
+        self._largada: Optional[Dict] = None
+        self._task_largada: Optional[asyncio.Task] = None
         self.parametros: Dict = {"duracao": 10, "criterio": "tempo",
                                  "tempo_minimo_volta_s": 3}
         self.som = ModuloSom(ativo=True)
@@ -132,19 +137,26 @@ class EstadoApp:
         if fila in self._filas:
             self._filas.remove(fila)
 
-    def publicar(self, tipo: str, dados: Dict):
+    def publicar(self, tipo: str, dados: Dict, registrar: bool = True):
         # "tipo"/"ts" são o canal e o carimbo do evento — dados nunca os
         # sobrescrevem (ex.: iniciar sessão manda "tipo": "treino" nos dados,
         # que antes apagava o "tipo": "sessao" e o frontend descartava o evento).
         limpos = {k: v for k, v in (dados or {}).items() if k not in ("tipo", "ts")}
         evento = {"tipo": tipo, "ts": time.strftime("%H:%M:%S"), **limpos}
-        self.eventos.append(evento)
-        del self.eventos[:-200]
+        # eventos efêmeros (ex.: "semaforo", ~10/s na largada) vão só para os
+        # clientes ao vivo — não poluem o log "Recente" nem o snapshot.
+        if registrar:
+            self.eventos.append(evento)
+            del self.eventos[:-200]
         for fila in list(self._filas):
             try:
                 fila.put_nowait(evento)
             except asyncio.QueueFull:
                 pass
+
+    def _publicar_semaforo(self, dados: Dict):
+        """Publica o estado do semáforo sem registrar no log Recente."""
+        self.publicar("semaforo", dados, registrar=False)
 
     # ---------------------------------------------------------------- decoder
     def _on_rejeicao(self, transponder: int, tempo_us: int, passing_number):
@@ -227,6 +239,25 @@ class EstadoApp:
         salvar_config(cfg)
         self.config = cfg
         return {"ok": True, "ativa": bool(ativa)}
+
+    def contador_s(self) -> int:
+        """Segundos da contagem regressiva antes da largada (Configurações)."""
+        try:
+            return max(0, min(120, int(self.config.get("contador_s", 10))))
+        except (TypeError, ValueError):
+            return 10
+
+    def definir_contador_s(self, contador_s: int) -> Dict:
+        """Salva o tempo do contador regressivo (0-120 s) em config.json."""
+        try:
+            valor = max(0, min(120, int(contador_s)))
+        except (TypeError, ValueError):
+            raise ValueError("contador inválido — informe 0 a 120 segundos")
+        cfg = carregar_config()
+        cfg["contador_s"] = valor
+        salvar_config(cfg)
+        self.config = cfg
+        return {"ok": True, "contador_s": valor}
 
     def telao_tela(self) -> Dict:
         """Monitor escolhido para o telão (Configurações → Telão)."""
@@ -427,6 +458,7 @@ class EstadoApp:
 
         # rejeições (ghost lap) são tratadas pelo callback on_rejeicao
         volta = self.motor.processar_passing(passing)
+        self._som_passagem(passing)
         if volta:
             self.contadores["passings_validos"] += 1
             self.publicar("volta", {
@@ -435,6 +467,25 @@ class EstadoApp:
             self.publicar("classificacao", {"linhas": self._classificacao()})
             self.publicar("voltas", self.dados_voltas())
             self._anunciar_volta(volta)
+
+    def _som_passagem(self, passing):
+        """Bip a cada passagem; o líder da sessão tem um bip especial."""
+        if not self.motor:
+            return
+        eh_lider = False
+        if self.som.habilitado("lider"):
+            try:
+                # o motor já resolveu/cacheou transponder -> piloto na passagem
+                piloto_id = self.motor._mapa_transponders.get(passing.transponder)
+                linhas = self.motor.classificacao()
+                if piloto_id is not None and linhas and piloto_id == linhas[0].piloto_id:
+                    eh_lider = True
+            except Exception:
+                eh_lider = False
+        if eh_lider:
+            self.som.bip_lider()
+        else:
+            self.som.bip_passagem()
 
     def _piloto_nome(self, piloto_id: int) -> str:
         piloto = self.banco.buscar_piloto(piloto_id)
@@ -565,12 +616,13 @@ class EstadoApp:
         self._pausado_total_us = 0
         self.pausado = False
         self._cancelar_regressiva()
+        self._cancelar_largada()
         # recordes para a locução (base = histórico já gravado) e anúncio periódico
         self._recorde_pista_us = self.banco.melhor_volta_pista_us()
         self._recorde_pessoal = self.banco.melhores_por_piloto()
         self._ultima_leitura_voltas = 0
         self._iniciar_anuncios()
-        self.publicar("sessao", {"estado": "iniciada", "tipo": tipo})
+        self.publicar("sessao", {"estado": self.motor.estado.value, "tipo": tipo})
         return True
 
     def _resolver_transponder(self, transponder: int):
@@ -676,6 +728,12 @@ class EstadoApp:
     def pausar(self, pausar: bool) -> bool:
         if not self.motor:
             return False
+        # pausa durante a contagem regressiva: encerra a largada (o motor segue
+        # armado, então "Largar" pode ser disparado de novo)
+        if pausar and self._largada and self._largada.get("ativa"):
+            self._cancelar_largada()
+            self._publicar_semaforo({"fase": "vermelho", "acesas": 0, "numero": None,
+                                     "restante_ms": 0, "total_ms": 0})
         # congela/retoma o cronômetro da sessão junto com a pausa
         agora = agora_monotonic_us()
         if pausar and not self.pausado:
@@ -715,6 +773,185 @@ class EstadoApp:
             self._task_regressiva.cancel()
         self._task_regressiva = None
 
+    def _cancelar_largada(self):
+        """Encerra a contagem regressiva da largada, se houver."""
+        self._largada = None
+        if self._task_largada and not self._task_largada.done():
+            self._task_largada.cancel()
+        self._task_largada = None
+
+    def iniciar_largada(self, contador_s=None, contador_ms=None) -> Dict:
+        """Inicia a contagem regressiva (ou larga direto quando o tempo é 0).
+
+        O tempo vem de ``contador_ms``, de ``contador_s`` ou das Configurações.
+        A linha do tempo (luzes, números, bipes e voz) é comandada pelo loop
+        preciso ``_loop_largada_preciso`` e publicada como eventos ``semaforo``.
+        """
+        if not self.motor or self.motor.estado.value != "largada":
+            raise ValueError("não é possível largar sem uma corrida armada")
+        if self._largada and self._largada.get("ativa"):
+            raise ValueError("a contagem da largada já está rodando")
+
+        if contador_ms is not None:
+            dur_ms = max(0, min(120_000, int(contador_ms)))
+        elif contador_s is not None:
+            dur_ms = max(0, min(120_000, int(contador_s) * 1000))
+        else:
+            dur_ms = self.contador_s() * 1000
+
+        self._cancelar_largada()
+
+        self._largada = {
+            "dur_ms": dur_ms,
+            "inicio_us": 0,
+            "restante_ms": dur_ms,
+            "ativa": True,
+        }
+        # publica já o estado inicial (telão/operador não "piscam" até o loop)
+        self._publicar_semaforo({"fase": "vermelho", "acesas": 0, "numero": None,
+                                 "restante_ms": dur_ms, "total_ms": dur_ms,
+                                 "decorrido_ms": 0})
+
+        if dur_ms == 0:
+            self._disparar_largada_precisa()
+            return {"ok": True, "contador_s": 0, "contador_ms": 0, "imediata": True}
+
+        self._task_largada = asyncio.create_task(self._loop_largada_preciso())
+        return {"ok": True, "contador_s": dur_ms // 1000,
+                "contador_ms": dur_ms, "imediata": False}
+
+    def _resumo_largada(self) -> Dict:
+        if not self._largada:
+            return {"restante": 0, "restante_ms": 0, "total": 0, "total_ms": 0}
+        return {
+            "restante": int(self._largada.get("restante_ms", 0) // 1000),
+            "restante_ms": int(self._largada.get("restante_ms", 0)),
+            "total": int(self._largada.get("dur_ms", 0) // 1000),
+            "total_ms": int(self._largada.get("dur_ms", 0)),
+        }
+
+    @staticmethod
+    def _eventos_largada(total_ms: int):
+        """Eventos (ms relativo ao início, ação) da narração dos 5 s finais.
+
+        Cada número falado acende uma luz vermelha a mais (5→1 = 1→5 luzes);
+        se a contagem for menor que 5 s, só os números que couberem são narrados.
+        """
+        eventos = []
+        for n in range(5, 0, -1):
+            t = total_ms - n * 1000
+            if t >= 0:
+                eventos.append((t, f"narracao_{n}"))
+        return eventos
+
+    @staticmethod
+    def _calcular_luzes_acesas_ms(decorrido_ms: float, total_ms: int) -> int:
+        """Quantas luzes vermelhas devem estar acesas (0..5).
+
+        Acendem uma a uma nos 5 segundos finais (5 → 1 = 1 → 5 luzes).
+        """
+        restante_ms = total_ms - decorrido_ms
+        if restante_ms <= 0 or restante_ms > 5000:
+            return 0
+        return max(1, min(5, 6 - int(math.ceil(restante_ms / 1000.0))))
+
+    @staticmethod
+    def _fase_atual_largada(decorrido_ms: float, total_ms: int) -> str:
+        return "verde" if decorrido_ms >= total_ms else "vermelho"
+
+    def _executar_acao_largada(self, acao: str, restante_ms: float, total_ms: int):
+        """Toca o áudio de um evento da contagem (a luz é publicada pelo loop)."""
+        if not acao.startswith("narracao_"):
+            return
+        try:
+            n = int(acao.split("_", 1)[1])
+        except (IndexError, ValueError):
+            return
+        # bip de marcação sempre toca; a narração só com a voz de contagem ligada
+        self.som.bip_contagem()
+        if self.voz_contagem_ativa():
+            self.som.falar("contagem", n=n)
+
+    async def _loop_largada_preciso(self):
+        """Linha do tempo da largada com precisão de milissegundos.
+
+        Não usa ``sleep(1)`` (que acumula drift): recalcula o tempo decorrido a
+        cada iteração e dorme apenas até o próximo evento (máx. 100 ms, para o
+        relógio da interface acompanhar).
+        """
+        cfg = self._largada
+        if not cfg:
+            return
+        total_ms = int(cfg["dur_ms"])
+        inicio_us = agora_monotonic_us()
+        cfg["inicio_us"] = inicio_us
+        eventos = self._eventos_largada(total_ms)
+        idx = 0
+        try:
+            while self._largada is cfg and cfg.get("ativa"):
+                decorrido_ms = (agora_monotonic_us() - inicio_us) / 1000.0
+                restante_ms = max(0.0, total_ms - decorrido_ms)
+                cfg["restante_ms"] = int(restante_ms)
+
+                # dispara (com o áudio) os eventos cujo tempo já chegou
+                while idx < len(eventos) and decorrido_ms >= eventos[idx][0]:
+                    self._executar_acao_largada(eventos[idx][1], restante_ms, total_ms)
+                    idx += 1
+
+                if decorrido_ms >= total_ms:
+                    self._disparar_largada_precisa()
+                    return
+
+                numero = None
+                if restante_ms > 0:
+                    n = int(math.ceil(restante_ms / 1000.0))
+                    if n <= 5:
+                        numero = n
+                self._publicar_semaforo({
+                    "fase": self._fase_atual_largada(decorrido_ms, total_ms),
+                    "acesas": self._calcular_luzes_acesas_ms(decorrido_ms, total_ms),
+                    "numero": numero,
+                    "restante_ms": int(restante_ms),
+                    "total_ms": total_ms,
+                    "decorrido_ms": int(decorrido_ms),
+                })
+
+                if idx < len(eventos):
+                    espera_ms = min(100.0, max(1.0, eventos[idx][0] - decorrido_ms))
+                else:
+                    espera_ms = 100.0
+                await asyncio.sleep(espera_ms / 1000.0)
+        except asyncio.CancelledError:
+            raise
+        except Exception as e:
+            log.warning("loop da largada encerrado: %s", e)
+
+    def _disparar_largada_precisa(self):
+        """Larga no instante exato: fase verde + bip forte (sem "Vai!")."""
+        self._largada = None
+        self._task_largada = None
+        ok = False
+        if self.motor and self.motor.estado.value == "largada":
+            try:
+                self.motor.largada()
+                ok = True
+            except RuntimeError as e:
+                log.warning("largada recusada pelo motor: %s", e)
+        if not ok:
+            self._publicar_semaforo({"fase": "vermelho", "acesas": 5, "numero": None,
+                                     "restante_ms": 0, "total_ms": 0})
+            return
+        self.inicio_sessao_us = agora_monotonic_us()
+        self._tempo_final_s = None
+        self._pausa_inicio_us = None
+        self._pausado_total_us = 0
+        self.pausado = False
+        # bip forte e alto no verde — sinal sonoro da largada (sem locução)
+        self.som.bip_largada()
+        self.publicar("sessao", {"estado": "correndo"})
+        self._publicar_semaforo({"fase": "verde", "acesas": 0, "numero": None,
+                                 "restante_ms": 0, "total_ms": 0})
+
     async def _loop_regressiva(self, indice: int, proxima_rotulo: str):
         """Avisa o fim do intervalo (avanço continua manual)."""
         try:
@@ -751,6 +988,7 @@ class EstadoApp:
         self._tempo_final_s = self.tempo_sessao_s()
         self._pausa_inicio_us = None
         self._cancelar_regressiva()
+        self._cancelar_largada()
         if self._task_posicoes and not self._task_posicoes.done():
             self._task_posicoes.cancel()
         self._task_posicoes = None
@@ -1055,7 +1293,16 @@ class EstadoApp:
                    anunciar_a_cada_voltas=None,
                    anunciar_recorde_pessoal=None,
                    anunciar_recorde_pista=None,
+                   som_passagem=None, som_lider=None,
                    habilitados: Optional[Dict] = None) -> Dict:
+        # os checkboxes dedicados de bip também ligam/desligam a chave do ModuloSom
+        if som_passagem is not None or som_lider is not None:
+            base = dict(habilitados) if habilitados else dict(self.som.habilitados)
+            if som_passagem is not None:
+                base["passagem"] = bool(som_passagem)
+            if som_lider is not None:
+                base["lider"] = bool(som_lider)
+            habilitados = base
         if frases:
             self.som.definir_frases(frases)
         if habilitados is not None:
@@ -1088,6 +1335,10 @@ class EstadoApp:
             som_cfg["anunciar_recorde_pessoal"] = bool(anunciar_recorde_pessoal)
         if anunciar_recorde_pista is not None:
             som_cfg["anunciar_recorde_pista"] = bool(anunciar_recorde_pista)
+        if som_passagem is not None:
+            som_cfg["som_passagem"] = bool(som_passagem)
+        if som_lider is not None:
+            som_cfg["som_lider"] = bool(som_lider)
         cfg["som"] = som_cfg
         salvar_config(cfg)
         self.config = cfg

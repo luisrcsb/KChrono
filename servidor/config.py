@@ -28,6 +28,7 @@ CONFIG_MODELO = {
     "decoder_auto": True,         # tenta conectar em loop ao abrir o app
     "telao_tela": 1,                # monitor do telão 2ª tela (0 = principal)
     "voz_contagem": True,           # voz na contagem regressiva/largada
+    "contador_s": 10,               # segundos da contagem antes da largada
 }
 
 

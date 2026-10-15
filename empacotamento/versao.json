@@ -2,7 +2,7 @@
   "versao": "1.0.0",
   "canal": "estavel",
   "url_base": "",
-  "notas": "Versão 1.0.0 — KChrono nativo: driver MyLaps P3, motor de corrida, interface web (operador/telão/admin), Central de Voltas, sincronização CTAD (Firebase kchrono), voz TTS (SAPI/OneCore), gráficos Chart.js, campeonatos (grid builder, espectro RF, drop rounds, bônus), drivers EASYLAP-USB / SKYRC LapWiz, i18n pt-BR/en-US. App nativo com pywebview (WebView2 no Windows, WebKitGTK no Linux) — NÃO abre navegador. Inclui CTAD-Upload-Auto v1.2.4.",
+  "notas": "Versão 1.0.0 — KChrono nativo: driver MyLaps P3, motor de corrida, interface web (operador/telão/admin), Central de Voltas, sincronização CTAD (Firebase kchrono), voz TTS (SAPI/OneCore), gráficos Chart.js, campeonatos (grid builder, espectro RF, drop rounds, bônus), drivers EASYLAP-USB / SKYRC LapWiz, i18n pt-BR/en-US. App nativo com pywebview (WebView2 no Windows, WebKitGTK no Linux) — NÃO abre navegador.",
   "arquivos": {
     "windows": "KChrono-Setup.exe",
     "linux": "kchrono-linux-1.0.0.tar.gz"

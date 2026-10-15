@@ -33,6 +33,25 @@ app.mount("/imagens", StaticFiles(directory=DIR_IMAGENS), name="imagens")
 app.mount("/static", StaticFiles(directory=DIR_INTERFACE), name="static")
 
 
+@app.middleware("http")
+async def _sem_cache_na_interface(request: Request, call_next):
+    """Impede o WebView2 de servir HTML/JS/CSS antigos do cache.
+
+    A janela nativa usa perfil persistente (``private_mode=False``); sem isso,
+    após uma atualização o app continuava exibindo a interface anterior.
+    Só as páginas/arquivos da interface recebem ``no-store`` — as APIs seguem
+    normais.
+    """
+    resp = await call_next(request)
+    caminho = request.url.path
+    if (caminho.startswith("/static") or caminho.startswith("/imagens")
+            or caminho in ("/", "/telao", "/gerente")):
+        resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+        resp.headers["Pragma"] = "no-cache"
+        resp.headers["Expires"] = "0"
+    return resp
+
+
 @app.on_event("startup")
 async def _auto_conectar_sync():
     """Reconecta o sync no boot (thread separada — nunca trava a subida)."""
@@ -148,11 +167,54 @@ async def api_som_anunciar():
     return estado.anunciar_posicoes()
 
 
+@app.post("/api/som/testar_passagem")
+async def api_som_testar_passagem():
+    """Pré-escuta do bip de passagem."""
+    estado.som.bip_passagem()
+    return {"ok": True}
+
+
+@app.post("/api/som/testar_lider")
+async def api_som_testar_lider():
+    """Pré-escuta do bip do líder."""
+    estado.som.bip_lider()
+    return {"ok": True}
+
+
+# ----- vozes neurais offline (Piper) -----
+@app.get("/api/vozes")
+async def api_vozes():
+    """Modelos neurais disponíveis para baixar + os já instalados."""
+    return estado.vozes_info()
+
+
+@app.post("/api/vozes/instalar")
+async def api_instalar_voz(modelo: str = Query("pt_BR-faber-medium")):
+    """Baixa um modelo neural (Piper) para dados/vozes e passa a usá-lo."""
+    try:
+        return await estado.instalar_voz_neural(modelo)
+    except ValueError as e:
+        return {"ok": False, "erro": str(e)}
+
+
+@app.delete("/api/vozes/{modelo}")
+async def api_remover_voz(modelo: str):
+    try:
+        return estado.remover_voz_neural(modelo)
+    except ValueError as e:
+        return {"ok": False, "erro": str(e)}
+
+
 @app.post("/api/som/falar")
 async def api_som_falar(dados: dict = Body(default={})):
+    """Fala um texto livre ou uma frase cadastrada (com placeholders)."""
     try:
-        return estado.anunciar_texto(dados.get("texto"), dados.get("chave"))
-    except ValueError as e:
+        # o resto do corpo vira placeholders: {nome}, {tempo}, {n}...
+        extra = {k: v for k, v in (dados or {}).items()
+                 if k not in ("texto", "chave")}
+        return estado.anunciar_texto(dados.get("texto"), dados.get("chave"),
+                                     **extra)
+    except (ValueError, TypeError) as e:
         return {"ok": False, "erro": str(e)}
 
 
@@ -217,13 +279,37 @@ async def api_som_audio_remover(chave: str = Query(...)):
 
 @app.post("/api/sessao/iniciar")
 async def api_iniciar(tipo: str = Query("treino"), tempo_minimo_s: float = Query(0),
-                      duracao: float = Query(10), criterio: str = Query("tempo")):
+                      duracao: float = Query(10), criterio: str = Query("tempo"),
+                      contador_s: Optional[int] = Query(None)):
+    if contador_s is not None:
+        estado.definir_contador_s(contador_s)
     return {"ok": estado.iniciar_sessao(tipo, tempo_minimo_s, duracao, criterio)}
 
 
+@app.get("/api/sessao/contador")
+async def api_contador():
+    """Segundos da contagem antes da largada."""
+    return {"contador_s": estado.contador_s(),
+            "voz_contagem": estado.voz_contagem_ativa(),
+            "rodando": bool(estado._largada and estado._largada.get("ativa")),
+            **(estado._resumo_largada() if estado._largada else {"restante": 0})}
+
+
+@app.post("/api/sessao/contador")
+async def api_contador_definir(contador_s: int = Query(...)):
+    try:
+        return estado.definir_contador_s(contador_s)
+    except ValueError as e:
+        return {"ok": False, "erro": str(e)}
+
+
 @app.post("/api/sessao/largada")
-async def api_largada():
-    return {"ok": estado.largada()}
+async def api_largada(contador_s: Optional[int] = Query(None)):
+    """Começa a contagem regressiva (ou larga direto com contador 0)."""
+    try:
+        return estado.iniciar_largada(contador_s)
+    except ValueError as e:
+        return {"ok": False, "erro": str(e)}
 
 
 @app.post("/api/sessao/marcar-gato")
@@ -379,9 +465,10 @@ async def api_salvar_duracoes(treino: int = Query(10), classificacao: int = Quer
 
 
 @app.post("/api/campeonato/iniciar")
-async def api_iniciar_campeonato(tempo_minimo_s: float = Query(0)):
+async def api_iniciar_campeonato(tempo_minimo_s: float = Query(0),
+                                 campeonato_id: Optional[int] = Query(None)):
     try:
-        return estado.iniciar_campeonato(tempo_minimo_s)
+        return estado.iniciar_campeonato(tempo_minimo_s, campeonato_id=campeonato_id)
     except ValueError as e:
         return {"ok": False, "erro": str(e)}
 
@@ -820,8 +907,13 @@ async def gerente_iniciar(tipo: str = Query("treino"),
 
 
 @app.post("/api/gerente/sessao/largada")
-async def gerente_largada(sessao: dict = Depends(exigir_gerente)):
-    return {"ok": estado.largada()}
+async def gerente_largada(contador_s: Optional[int] = Query(None),
+                          sessao: dict = Depends(exigir_gerente)):
+    """Começa a contagem regressiva (mesma linha do tempo do operador)."""
+    try:
+        return estado.iniciar_largada(contador_s)
+    except ValueError as e:
+        return {"ok": False, "erro": str(e)}
 
 
 @app.post("/api/gerente/sessao/pausar")

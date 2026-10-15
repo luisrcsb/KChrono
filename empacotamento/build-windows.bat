@@ -21,14 +21,7 @@ echo [3/5] Compilando KChrono.exe (pode demorar alguns minutos)...
 python -m PyInstaller --clean --noconfirm KChrono.spec || goto :erro
 
 echo.
-echo [4/5] Copiando CTAD-Upload-Auto para o instalador...
-if exist "..\..\CTAD\downloads\CTAD-Upload-Auto-v1.2.4.zip" (
-    copy "..\..\CTAD\downloads\CTAD-Upload-Auto-v1.2.4.zip" "CTAD-Upload-Auto-v1.2.4.zip"
-    echo   CTAD-Upload-Auto-v1.2.4.zip copiado.
-) else (
-    echo AVISO: CTAD-Upload-Auto-v1.2.4.zip nao encontrado em ..\..\CTAD\downloads\
-)
-
+echo [4/5] Build completo!
 echo.
 echo [5/5] Pronto!
 echo   Executavel: %cd%\dist\KChrono.exe
@@ -38,7 +31,7 @@ echo.
 echo Para gerar o instalador NSIS:
 echo   1. Instale o NSIS (https://nsis.sourceforge.io/)
 echo   2. Compile instalador.nsi no NSIS (makensis instalador.nsi)
-echo   3. O CTAD-Upload-Auto-v1.2.4.zip ja esta na pasta empacotamento\
+echo.
 pause
 exit /b 0
 

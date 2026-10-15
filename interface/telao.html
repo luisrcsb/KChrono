@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>KChrono — Telão</title>
-<link rel="stylesheet" href="/static/telao.css">
+<link rel="stylesheet" href="/static/telao.css?v=2.1">
 <link rel="icon" href="/imagens/KCHRONO-LOGO.png">
 <script src="/static/chart.umd.min.js"></script>
 </head>
@@ -17,11 +17,12 @@
     <small id="subtitulo-largada">preparar…</small>
   </div>
   <div class="semaforo">
-    <div class="luz" style="color:#e63946"></div>
-    <div class="luz" style="color:#e63946"></div>
-    <div class="luz" style="color:#e63946"></div>
-    <div class="luz" style="color:#e63946"></div>
-    <div class="luz" style="color:#2ec4b6"></div>
+    <div class="luz vermelha" style="color:#e63946"></div>
+    <div class="luz vermelha" style="color:#e63946"></div>
+    <div class="luz vermelha" style="color:#e63946"></div>
+    <div class="luz vermelha" style="color:#e63946"></div>
+    <div class="luz vermelha" style="color:#e63946"></div>
+    <div class="luz verde" style="color:#2ec4b6"></div>
   </div>
   <div class="contagem" id="contagem"></div>
 </div>
@@ -40,7 +41,7 @@
   <div class="bandeira-banner" id="bandeira-banner" hidden></div>
 
   <div class="displays">
-    <div class="display"><div class="rot">Race Time</div><div class="val" id="t-race">00:00:00</div></div>
+    <div class="display"><div class="rot">Race Time</div><div class="val" id="t-race">0:00.000</div></div>
     <div class="display verde"><div class="rot">Voltas do líder</div><div class="val" id="t-laps">0</div></div>
     <div class="display verde"><div class="rot">Record da sessão</div><div class="val" id="t-record">—</div></div>
   </div>
@@ -78,6 +79,6 @@
   </div>
 </div>
 
-<script src="/static/telao.js"></script>
+<script src="/static/telao.js?v=2.2"></script>
 </body>
 </html>

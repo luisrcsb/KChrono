@@ -15,7 +15,7 @@ Integra com o hardware MyLaps/AMB já em uso na pista e sincroniza com o CTAD.
 | **1.5 — Núcleo hard** | relógio alta precisão · ring buffer · filtro ghost lap · log | ✅ **Concluída** (11/10/2026 — µs validado, drift, descarte seguro, ghost lap auditado) |
 | **2 — Interface operador** | menu persistente + painel completo + telão + som/voz + QR Gestão Remota | ✅ **Concluída** (menu/corpó, sessão por abertura, wallpaper) |
 | **3 — Sync Firebase** | fila offline, payload, auto-upload, dedup — projeto `kchrono` | ✅ **Ligada e validada** (13/10/2026 — login superuser + escrita/leitura no banco novo; falta sessão real) |
-| **4 — Telão real** | voz TTS, gráficos Chart.js, track view, estimativas | ✅ **Implementada** (11/10/2026 — Maria pt-BR ativa, gráficos offline) |
+| **4 — Telão real** | voz TTS, gráficos Chart.js, track view, estimativas | ✅ **Implementada** (14/10/2026 — locutor **neural offline** (Piper pt-BR) como padrão, SAPI como reserva) |
 | **5 — Campeonatos** | grid builder, espectro RF, drop rounds, bônus, ranking | ✅ **Implementada** (11/10/2026 — motor validado + UI no Admin) |
 | 6 — Drivers extras | EASYLAP-USB, SKYRC LapWiz (BLE), LapZ/GiroZ/RiCino | 🟡 **Parcial** (EASYLAP pronto s/ hardware · LapWiz só captura · demais roadmap) |
 | 7 — Empacotamento | app nativo pywebview + instaladores Windows/Linux + autoupdate | ✅ **Funcional** (13/10/2026 — `KChrono.exe` testado: janela nativa, `/api/sync/status` 200, modo instalado usa `%APPDATA%\KChrono`; `KChrono-Setup.exe` ~64 MB compilado no NSIS com CTAD; falta teste de pista real) |
@@ -104,6 +104,36 @@ Cria dois comandos:
 - `kchrono-app` — **app nativo com janela** (WebKitGTK)
 
 Requisitos de sistema: `libwebkit2gtk-4.1-0` (Ubuntu/Debian), `webkit2gtk4.1` (Fedora), `webkit2gtk-4.1` (Arch).
+
+## 🔊 Locutor: voz neural offline (Piper)
+
+A locução usa, nesta ordem:
+
+1. **Piper (neural, offline)** — voz natural em pt-BR, roda no próprio
+   computador, **sem internet** (ideal para pista). É o padrão quando há um
+   modelo instalado.
+2. **SAPI do Windows / OneCore** — `Maria` e `Daniel` (vozes mais "robotizadas").
+3. **modo log/bipes** — se nada estiver disponível.
+
+Os modelos ficam em `dados/vozes/*.onnx` (**fora do executável** — não o
+incham e não se perdem ao atualizar). Instale pelo
+**Admin → 🔊 Voz & Som → ⬇ Baixar voz neural** (≈60 MB, uma única vez) ou na mão:
+
+```bash
+pip install piper-tts          # já está no requirements.txt
+curl -L -o dados/vozes/pt_BR-faber-medium.onnx \
+  https://huggingface.co/rhasspy/piper-voices/resolve/main/pt/pt_BR/faber/medium/pt_BR-faber-medium.onnx
+curl -L -o dados/vozes/pt_BR-faber-medium.onnx.json \
+  https://huggingface.co/rhasspy/piper-voices/resolve/main/pt/pt_BR/faber/medium/pt_BR-faber-medium.onnx.json
+```
+
+A voz neural é adotada automaticamente na primeira execução (a escolha do
+operador sempre vale depois). Velocidade e volume continuam nos controles do
+Admin; a entonação vem do próprio modelo.
+
+> O `edge-tts` (Azure, online) tem código pronto em `nucleo/voz.py` mas está
+> **inativo**: a Microsoft passou a barrar o handshake (HTTP 403) e ele
+> dependeria de internet na pista.
 
 ### Executar o app nativo (já empacotado)
 
