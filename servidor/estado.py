@@ -118,6 +118,9 @@ class EstadoApp:
         # Gerente de pista: restaura o check-in salvo em config.json
         self._carregar_checkin()
 
+        # migra o plano do campeonato salvo no formato antigo (classificação por prova)
+        self._migrar_plano_campeonato()
+
         # piloto de demonstração — só semeia em banco vazio, para não duplicar
         # nem "roubar" o transponder quando o usuário renomeia o piloto demo.
         if not self.banco.listar_pilotos():
@@ -1709,27 +1712,52 @@ class EstadoApp:
                 "treino_min": cfg.get("treino_min", 10),
                 "classificacao_min": cfg.get("classificacao_min", 10),
                 "corrida_min": cfg.get("corrida_min", 20),
-                "intervalo_min": cfg.get("intervalo_min", 5)}
+                "intervalo_min": cfg.get("intervalo_min", 5),
+                "class_3voltas": bool(cfg.get("class_3voltas", True))}
 
     @staticmethod
     def _etapas_para_provas(n_provas: int, d_treino: int = 10,
                             d_class: int = 10, d_corr: int = 20,
                             d_int: int = 5) -> list:
-        """Um treino na abertura, depois classificação + corrida por prova."""
-        etapas = [{"etapa": "treino", "rotulo": "Treino", "duracao": d_treino}]
+        """Um treino + uma classificação na abertura, depois uma corrida por etapa."""
+        etapas = [
+            {"etapa": "treino", "rotulo": "Treino", "duracao": d_treino},
+            {"etapa": "intervalo", "rotulo": "Intervalo", "duracao": d_int},
+            {"etapa": "classificacao", "rotulo": "Classificação", "duracao": d_class},
+        ]
         for p in range(1, n_provas + 1):
             suf = f" P{p}" if n_provas > 1 else ""
             etapas += [
-                {"etapa": "intervalo", "rotulo": "Intervalo", "duracao": d_int},
-                {"etapa": "classificacao", "rotulo": f"Classificação{suf}", "duracao": d_class},
                 {"etapa": "intervalo", "rotulo": "Intervalo", "duracao": d_int},
                 {"etapa": "corrida", "rotulo": f"Corrida{suf}", "duracao": d_corr},
             ]
         return etapas
 
+    def _migrar_plano_campeonato(self) -> None:
+        """Converte o plano salvo no formato antigo (uma classificação por prova)
+        para o novo: um treino + uma classificação, depois uma corrida por etapa.
+
+        A sequência na UI é somente-leitura, então regenerá-la preserva as
+        durações e o nº de provas escolhidos pelo usuário.
+        """
+        cfg = self.config.get("campeonato_plano") or {}
+        etapas = cfg.get("etapas") or []
+        classifs = [e for e in etapas if (e or {}).get("etapa") == "classificacao"]
+        if len(classifs) <= 1:
+            return  # já está no formato novo (ou o plano está vazio)
+        n = max(1, int(cfg.get("numero_provas") or 1))
+        novo = self._etapas_para_provas(
+            n, int(cfg.get("treino_min", 10)), int(cfg.get("classificacao_min", 10)),
+            int(cfg.get("corrida_min", 20)), int(cfg.get("intervalo_min", 5)))
+        geral = carregar_config()
+        geral.setdefault("campeonato_plano", {})["etapas"] = novo
+        salvar_config(geral)
+        self.config = geral
+        log.info("plano do campeonato migrado para o formato novo (%d corrida(s))", n)
+
     def montar_plano_campeonato(self, numero_provas: int = 1, treino=None,
                                 classificacao=None, corrida=None,
-                                intervalo=None) -> Dict:
+                                intervalo=None, class_3voltas=None) -> Dict:
         """Remonta a sequência: durações escolhidas 1 vez + nº de provas."""
         try:
             n_provas = max(1, min(int(numero_provas), 20))
@@ -1755,7 +1783,9 @@ class EstadoApp:
                                                d_corr, d_int),
             "numero_provas": n_provas, "treino_min": d_treino,
             "classificacao_min": d_class, "corrida_min": d_corr,
-            "intervalo_min": d_int}
+            "intervalo_min": d_int,
+            "class_3voltas": (bool(class_3voltas) if class_3voltas is not None
+                              else bool(anterior.get("class_3voltas", True)))}
         salvar_config(cfg)
         self.config = cfg
         self.publicar("campeonato", {"msg": f"sequência remontada: {n_provas} prova(s)"})
@@ -1770,13 +1800,27 @@ class EstadoApp:
         cfg = carregar_config()
         anterior = cfg.get("campeonato_plano") or {}
         for chave in ("numero_provas", "treino_min", "classificacao_min",
-                      "corrida_min", "intervalo_min"):
+                      "corrida_min", "intervalo_min", "class_3voltas"):
             if chave in anterior:
                 cfg["campeonato_plano"][chave] = anterior[chave]
         cfg["campeonato_plano"]["etapas"] = limpo
         salvar_config(cfg)
         self.config = cfg
         self.publicar("campeonato", {"msg": "plano do campeonato salvo"})
+        return {"ok": True, **self.campeonato_plano()}
+
+    def definir_class_regra(self, class_3voltas: bool) -> Dict:
+        """Define como a classificação monta o grid das corridas.
+
+        * ``True``  -> média das 3 melhores voltas **consecutivas** (padrão);
+        * ``False`` -> melhor volta única.
+        """
+        cfg = carregar_config()
+        cfg.setdefault("campeonato_plano", {})["class_3voltas"] = bool(class_3voltas)
+        salvar_config(cfg)
+        self.config = cfg
+        regra = "3 melhores voltas (média)" if class_3voltas else "melhor volta"
+        self.publicar("campeonato", {"msg": f"classificação: grid pela {regra}"})
         return {"ok": True, **self.campeonato_plano()}
 
     def iniciar_campeonato(self, tempo_minimo_s: float = 0,
@@ -1944,15 +1988,18 @@ class EstadoApp:
         maxc = self._max_por_chave(camp)
         inverter = bool(camp["inverter_bateria"])
 
-        # prova 1: ordem do treino (última sessão de treino finalizada), se houver
-        treino_voltas = None
-        sess = self.banco.ultima_sessao("treino")
+        # prova 1: ordem da classificação (última sessão de classificação finalizada)
+        class_voltas = None
+        sess = self.banco.ultima_sessao("classificacao")
         if sess:
             ids = {p.piloto_id for p in inscritos}
             vpp = {pid: v for pid, v in self.banco.voltas_por_piloto(sess["id"]).items()
                    if pid in ids}
             if vpp:
-                treino_voltas = vpp
+                class_voltas = vpp
+
+        # regra do grid: média das 3 melhores voltas consecutivas (padrão) ou melhor volta
+        n_melhores = 3 if self.campeonato_plano().get("class_3voltas", True) else 1
 
         # provas seguintes: classificação das etapas já lançadas (posição importada)
         resultados_por_prova = []
@@ -1968,8 +2015,8 @@ class EstadoApp:
         grids = montar_grids_campeonato(
             inscritos, self._max_por_chave(camp),
             resultados_por_prova=resultados_por_prova or None,
-            treino_voltas=treino_voltas, inverter_seguinte=inverter,
-            n_provas=int(camp["numero_provas"] or 1))
+            class_voltas=class_voltas, inverter_seguinte=inverter,
+            n_provas=int(camp["numero_provas"] or 1), n_melhores=n_melhores)
 
         return {"ok": True, "campeonato_id": campeonato_id, "nome": camp["nome"],
                 "max_por_chave": self._max_por_chave(camp),

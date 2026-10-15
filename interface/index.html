@@ -805,6 +805,10 @@
             <div><label>Nº de provas (etapas)</label>
               <input id="camp-num-provas" type="number" min="1" max="20" value="1"
                      style="width:80px" onchange="remontarPlanoCampeonato()"></div>
+            <label class="chk-linha" style="font-size:12.5px; padding-bottom:10px"
+                   title="Classificação define o grid das corridas pela média das 3 melhores voltas consecutivas (desmarcado: melhor volta)">
+              <input type="checkbox" id="camp-class-3voltas" checked onchange="salvarClassRegra()">
+              classificação: 3 melhores voltas (média)</label>
           </div>
           <div class="plano-linha" id="camp-plano-lista"></div>
           <p class="hint">Etapa atual: <b id="camp-etapa-atual">—</b>
@@ -857,8 +861,9 @@
           <p class="hint">A grade de cada prova é dividida em <b>Chave A, B, C…</b> sempre que o
             número de pilotos passa do limite. A Chave A é o grupo mais rápido (semeadura por
             desempenho); ninguém corre sozinho — uma chave com 1 piloto é absorvida pela anterior.
-            O critério da prova 1 é o <b>treino</b> (média das 3 melhores voltas consecutivas);
-            as provas seguintes usam o resultado da anterior, opcionalmente <b>invertido</b>.</p>
+            O critério da corrida 1 é a <b>classificação</b> (média das 3 melhores voltas
+            consecutivas — ou a melhor volta, se a opção estiver desmarcada); as corridas
+            seguintes usam o resultado da anterior, opcionalmente <b>invertido</b>.</p>
           <div id="camp-grids"></div>
         </div>
 
@@ -967,6 +972,6 @@
   </div>
 </div>
 
-<script src="/static/app.js?v=2.3"></script>
+<script src="/static/app.js?v=2.4"></script>
 </body>
 </html>

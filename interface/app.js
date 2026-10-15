@@ -2307,6 +2307,15 @@ async function salvarDuracoesCamp() {
   renderPlanoCampeonato();
   logMsg("durações do campeonato salvas", "l-sistema", "log-operador");
 }
+async function salvarClassRegra() {
+  const c = document.getElementById("camp-class-3voltas");
+  const r = await api(`campeonato/regras?class_3voltas=${c && c.checked ? 1 : 0}`);
+  if (!r.ok) { alert(r.erro || "erro ao salvar a regra da classificação"); return; }
+  planoCamp = r;
+  renderPlanoCampeonato();
+  logMsg(`classificação: grid pela ${r.class_3voltas ? "média das 3 melhores voltas" : "melhor volta"}`,
+         "l-admin", "log-operador");
+}
 function renderPlanoCampeonato() {
   const t = document.getElementById("camp-plano-lista");
   if (!t || !planoCamp) return;
@@ -2317,6 +2326,8 @@ function renderPlanoCampeonato() {
   d("camp-d-class", planoCamp.classificacao_min ?? 10);
   d("camp-d-corr", planoCamp.corrida_min ?? 20);
   d("camp-d-int", planoCamp.intervalo_min ?? 5);
+  const c3 = document.getElementById("camp-class-3voltas");
+  if (c3) c3.checked = planoCamp.class_3voltas !== false;
   // sequência somente-leitura (vem das durações acima + nº de provas)
   t.innerHTML = planoCamp.etapas.map((e, i) =>
     `${i ? '<div class="plano-seta">→</div>' : ""}

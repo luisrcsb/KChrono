@@ -240,13 +240,15 @@ def ordenar_por_resultado(resultado: List[Dict], inverter: bool = False) -> List
 
 def montar_grids_campeonato(inscritos: List[PilotoCamp], max_por_chave: int,
                             resultados_por_prova: Optional[List[List[Dict]]] = None,
-                            treino_voltas: Optional[Dict[int, List[float]]] = None,
+                            class_voltas: Optional[Dict[int, List[float]]] = None,
                             inverter_seguinte: bool = False,
-                            n_provas: Optional[int] = None) -> List[Dict]:
+                            n_provas: Optional[int] = None,
+                            n_melhores: int = 3) -> List[Dict]:
     """Monta uma grade (dividida em chaves) por prova.
 
-    * Prova 1  -> ordem do **treino** (3 melhores voltas consecutivas) quando
-      ``treino_voltas`` é informado; caso contrário, ordem dos inscritos ("Padrão").
+    * Prova 1  -> ordem da **classificação** (``class_voltas``): média das
+      ``n_melhores`` melhores voltas **consecutivas** (``n_melhores=1`` => melhor
+      volta única). Sem ``class_voltas``, ordem dos inscritos ("Padrão").
     * Provas 2+ -> resultado da prova anterior (``resultados_por_prova``),
       opcionalmente invertido (``inverter_seguinte``).
 
@@ -254,17 +256,19 @@ def montar_grids_campeonato(inscritos: List[PilotoCamp], max_por_chave: int,
     """
     por_id = {p.piloto_id: p for p in inscritos}
     provas = n_provas or ((len(resultados_por_prova) + 1) if resultados_por_prova else 1)
+    n_melhores = max(1, int(n_melhores or 1))
     grids: List[Dict] = []
 
     for g in range(provas):
         if g == 0:
-            if treino_voltas:
-                ordem = ordenar_por_treino(treino_voltas)
+            if class_voltas:
+                ordem = ordenar_por_treino(class_voltas, n_melhores)
                 pos = {pid: i for i, (pid, _) in enumerate(ordem)}
                 ordenados = [p for p in inscritos if p.piloto_id in pos]
                 ordenados.sort(key=lambda p: pos[p.piloto_id])
                 base = ordenados + [p for p in inscritos if p.piloto_id not in pos]
-                criterio = "Treino"
+                criterio = (f"Classificação ({n_melhores} voltas)" if n_melhores > 1
+                            else "Classificação (melhor volta)")
             else:
                 base = list(inscritos)
                 criterio = "Padrão"

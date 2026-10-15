@@ -443,11 +443,12 @@ async def api_montar_campeonato_plano(provas: int = Query(1),
                                       treino: Optional[int] = Query(None),
                                       classificacao: Optional[int] = Query(None),
                                       corrida: Optional[int] = Query(None),
-                                      intervalo: Optional[int] = Query(None)):
-    """Remonta a sequência (treino → classif → corrida) pelo nº de provas."""
+                                      intervalo: Optional[int] = Query(None),
+                                      class_3voltas: Optional[bool] = Query(None)):
+    """Remonta a sequência (treino → classificação → corridas) pelo nº de provas."""
     try:
         return estado.montar_plano_campeonato(provas, treino, classificacao,
-                                              corrida, intervalo)
+                                              corrida, intervalo, class_3voltas)
     except ValueError as e:
         return {"ok": False, "erro": str(e)}
 
@@ -462,6 +463,12 @@ async def api_salvar_duracoes(treino: int = Query(10), classificacao: int = Quer
             treino, classificacao, corrida, intervalo)
     except ValueError as e:
         return {"ok": False, "erro": str(e)}
+
+
+@app.post("/api/campeonato/regras")
+async def api_campeonato_regras(class_3voltas: bool = Query(True)):
+    """Regra do grid: classificação pelas 3 melhores voltas (média) ou melhor volta."""
+    return estado.definir_class_regra(class_3voltas)
 
 
 @app.post("/api/campeonato/iniciar")
