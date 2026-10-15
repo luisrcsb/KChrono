@@ -109,6 +109,7 @@ label.btn-slide{line-height:1.4}
 .flag.volta-rapida{background:rgba(230,57,70,.18); color:var(--accent-red);
   border-color:rgba(230,57,70,.5); opacity:.35; transition:opacity .3s}
 .flag.volta-rapida.pisca{opacity:1; animation:piscar .7s infinite}
+.btn-regressiva-piscar{animation:piscar 1s infinite; animation-direction:alternate}
 @keyframes piscar{50%{opacity:.3}}
 .form-sessao{display:grid; grid-template-columns:repeat(auto-fit,minmax(165px,1fr)); gap:14px 20px; align-items:end}
 .form-sessao label{display:block; font-size:10.5px; color:var(--text-muted); margin-bottom:5px;

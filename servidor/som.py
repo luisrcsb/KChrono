@@ -254,12 +254,32 @@ class ModuloSom:
     def retomada(self):
         self.falar("retomada")
 
-    def finalizada(self, tipo: str = ""):
-        """Anuncia o fim da sessão com a frase própria do tipo.
+    def _beep(self, freq: int, ms: float):
+        """Tone puro em thread daemon (já usado pelos bipes de passagem/leader)."""
+        import winsound
+        try:
+            winsound.Beep(freq, int(ms))
+        except Exception:
+            pass
 
-        Treino -> "Treino finalizado."; classificação -> "Classificação
-        finalizada."; demais (corrida/intervalo) -> "Sessão finalizada."
+    def _beep_pattern(self, long_freq: int = 500, long_ms: int = 500,
+                      short_freq: int = 1200, short_ms: int = 100, n: int = 5):
+        """Toca 1 bip longo + N bips curtos e altos, em thread daemon."""
+        threading.Thread(target=lambda: self._beep(long_freq, long_ms), daemon=True).start()
+        for _ in range(n):
+            threading.Thread(target=lambda: self._beep(short_freq, short_ms), daemon=True).start()
+        # pequeno atraso para os bips iniciarem antes da fala
+        threading.Event().wait(0.2)
+
+    def finalizada(self, tipo: str = ""):
+        """Anuncia o fim da sessão com padrão de bips + frase própria do tipo.
+
+        Padrão sonoro: 1 bip longo + 5 bips curtos e altos.
+        Depois fala a frase correspondente ao tipo da sessão.
         """
+        # padrão de bips: 1 longo + 5 curtos
+        self._beep_pattern(500, 500, 1200, 100, 5)
+        # frase final
         if tipo == "treino":
             self.falar("treino_finalizado")
         elif tipo == "classificacao":

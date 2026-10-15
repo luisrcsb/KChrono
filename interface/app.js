@@ -396,6 +396,9 @@ function renderMiniSemaforo(acesas, fase) {
   const verde = box.querySelector(".mluz.verde");
   vermelhas.forEach((l, i) => l.classList.toggle("on", fase === "vermelho" && i < acesas));
   if (verde) verde.classList.toggle("on", fase === "verde");
+  // botão Largada piscar vermelho durante a contagem regressiva (semáforo vermelho)
+  const btn = document.getElementById("btn-acao-principal");
+  if (btn) btn.classList.toggle("btn-regressiva-piscar", fase === "vermelho");
 }
 
 // Durante a contagem, o display "Tempo" vira o número da regressiva (o servidor
