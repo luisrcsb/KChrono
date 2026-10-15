@@ -1779,7 +1779,8 @@ class EstadoApp:
         self.publicar("campeonato", {"msg": "plano do campeonato salvo"})
         return {"ok": True, **self.campeonato_plano()}
 
-    def iniciar_campeonato(self, tempo_minimo_s: float = 0) -> Dict:
+    def iniciar_campeonato(self, tempo_minimo_s: float = 0,
+                           campeonato_id: Optional[int] = None) -> Dict:
         """Inicia a sequência do campeonato pela primeira etapa (Treino)."""
         plano = self.campeonato_plano()
         etapas = plano["etapas"]
@@ -1790,8 +1791,16 @@ class EstadoApp:
         if not self.iniciar_sessao(tipo, tempo_minimo_s=tempo_minimo_s,
                                    duracao=primeira["duracao"], criterio="tempo"):
             raise ValueError("já existe uma sessão em andamento")
+        nome_camp = None
+        if campeonato_id is not None:
+            try:
+                nome_camp = (self.banco.campeonato(campeonato_id) or {}).get("nome")
+            except Exception:
+                nome_camp = None
         self.campeonato_ativo = {"plano": plano, "indice": indice,
-                                 "tempo_minimo_s": tempo_minimo_s}
+                                 "tempo_minimo_s": tempo_minimo_s,
+                                 "campeonato_id": campeonato_id,
+                                 "campeonato_nome": nome_camp}
         self.publicar("campeonato", {"msg": f"campeonato iniciado — {primeira['rotulo']}",
                                      "estado": self.campeonato_estado()})
         return {"ok": True, "etapa": primeira, "plano": plano, **self.campeonato_estado()}
@@ -1805,6 +1814,8 @@ class EstadoApp:
         i = ativo["indice"]
         return {"ativo": True, "indice": i, "etapa": etapas[i],
                 "numero": i + 1, "total": len(etapas),
+                "campeonato_id": ativo.get("campeonato_id"),
+                "campeonato_nome": ativo.get("campeonato_nome"),
                 "proxima": etapas[i + 1] if i + 1 < len(etapas) else None,
                 "plano": ativo["plano"]}
 
