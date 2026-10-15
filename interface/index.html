@@ -98,7 +98,11 @@
             <option value="campeonato">Campeonato</option>
           </select></div>
         <div><label>Critério</label>
-          <select id="cfg-criterio"><option>Tempo</option><option>Voltas</option></select></div>
+          <select id="cfg-criterio" onchange="criterioMudou()">
+            <option value="Tempo">Tempo</option>
+            <option value="Voltas">Voltas</option>
+            <option value="livre">Tempo livre (sem limite)</option>
+          </select></div>
         <div><label>Duração (min/voltas)</label><input id="cfg-duracao" value="10"></div>
         <div><label>Contador regressivo (s)</label><input id="cfg-contador" value="10"></div>
         <div><label class="chk-linha" style="font-size:12.5px" title="Locução na contagem regressiva e na largada">
@@ -963,6 +967,6 @@
   </div>
 </div>
 
-<script src="/static/app.js?v=2.2"></script>
+<script src="/static/app.js?v=2.3"></script>
 </body>
 </html>

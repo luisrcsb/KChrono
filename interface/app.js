@@ -2161,7 +2161,26 @@ function tipoSessaoMudou() {
   const camp = tipo === "campeonato";
   if (escolha) escolha.style.display = camp ? "block" : "none";
   if (camp) carregarCampeonatosOperador();
+  // Treino livre por padrão: tempo corre pra cima, sem limite.
+  // (Ao sair do treino, volta para "Tempo" se estava em livre.)
+  const crit = document.getElementById("cfg-criterio");
+  if (crit && !camp) {
+    const livre = crit.value.toLowerCase().startsWith("livre");
+    if (tipo === "treino" && !livre) crit.value = "livre";
+    else if (tipo !== "treino" && livre) crit.value = "Tempo";
+  }
+  criterioMudou();
   atualizarBotaoPrincipal();
+}
+
+// "Tempo livre" não usa duração (sem limite): desabilita o campo.
+function criterioMudou() {
+  const sel = document.getElementById("cfg-criterio");
+  const dur = document.getElementById("cfg-duracao");
+  if (!sel || !dur) return;
+  const livre = sel.value.toLowerCase().startsWith("livre");
+  dur.disabled = livre;
+  dur.title = livre ? "tempo livre: sem limite de duração" : "";
 }
 
 // ---------------------------------------------------------------- escolha do campeonato (painel do operador)
@@ -2544,6 +2563,7 @@ previewNome();
 aplicarAparencia();
 carregarIdioma();
 atualizarBotaoPrincipal();
+tipoSessaoMudou();   // treino começa em "Tempo livre" (conta pra cima, sem limite)
 atualizarBotaoPausa();
 carregarAutoConectar();
 carregarVozContagem();
