@@ -1019,9 +1019,23 @@ class EstadoApp:
         self._pausa_inicio_us = None
         self._cancelar_regressiva()
         self._cancelar_largada()
-        # anúncio de fim de sessão: o tipo vem do motor (Treino/Classificação/Corrida)
+        # dados para o anúncio de fim de sessão
+        classificacao = self._classificacao()  # lista de dicts com posicao/nome
+        # tipo de sessão para o anúncio
         tipo_motor = (self.motor.tipo or "").value if self.motor and self.motor.tipo else ""
-        self.som.finalizada(tipo_motor)
+        # monta a ordem do grid a partir da classificação (posicao 1 = Pole)
+        grid_ordenado = [c["posicao"] for c in classificacao] if classificacao else []
+        # verifica se deve inverter o grid (salvo em config.do campeonato)
+        inverter_grid = bool(self.config.get("inverter_grid", False))
+        # resultados da corrida (mesma estrutura da classificação, usada para anúncio)
+        resultados = classificacao[:] if classificacao else []
+        # anúncio de fim de sessão com bips + frases + grid/resultados
+        self.som.finalizada(
+            tipo_motor,
+            grid_ordenado=grid_ordenado,
+            grid_invertido=inverter_grid,
+            resultados=resultados,
+        )
         # auto-upload (Fase 3): enfileira a sessão completa para o CTAD
         if self.config.get("auto_upload") and self.sincronizador.configurado:
             try:

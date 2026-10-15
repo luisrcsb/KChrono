@@ -271,11 +271,18 @@ class ModuloSom:
         # pequeno atraso para os bips iniciarem antes da fala
         threading.Event().wait(0.2)
 
-    def finalizada(self, tipo: str = ""):
+    def finalizada(self, tipo: str = "", grid_ordenado: Optional[List[int]] = None,
+               grid_invertido: bool = False, resultados: Optional[List[Dict]] = None):
         """Anuncia o fim da sessão com padrão de bips + frase própria do tipo.
-
+        
         Padrão sonoro: 1 bip longo + 5 bips curtos e altos.
         Depois fala a frase correspondente ao tipo da sessão.
+        
+        * ``grid_ordenado`` : lista de posições (1-based) já ordenadas da Pole.
+          Ex.: [1, 2, 3, ...] ou [3, 1, 2] se houver inversão.
+        * ``grid_invertido`` : se True, a ordem exibida é invertida (último vira Pole).
+        * ``resultados`` : lista de dicts com 'posicao' e 'nome' para anunciar
+          o resultado da corrida: "O 1º lugar é de [nome], 2º [nome], etc."
         """
         # padrão de bips: 1 longo + 5 curtos
         self._beep_pattern(500, 500, 1200, 100, 5)
@@ -286,6 +293,60 @@ class ModuloSom:
             self.falar("classificacao_finalizada")
         else:
             self.falar("finalizada")
+        # anúncios suplementares
+        if grid_ordenado is not None:
+            self._annunciar_grid(grid_ordenado, invertido=grid_invertido)
+        if resultados is not None:
+            self._annuncian_resultados(resultados)
+
+    def _posicao_por_extenso(self, n: int) -> str:
+        """Retorna '1º', '2º', '3º', '4º', etc."""
+        if 10 <= n % 100 <= 20:
+            suffix = "º"
+        else:
+            suffix = {1: "º", 2: "º", 3: "º"}.get(n % 10, "º")
+        return f"{n}{suffix}"
+
+    def _annunciar_grid(self, grid_ordenado: List[int], invertido: bool = False):
+        """Anuncia a ordem do grid da Pole para trás.
+        
+        Se invertido=True, a ordem exibida fica ao contrário (último é Pole).
+        A fala segue o padrão: "Pole position, [nº], [nº], ..." ou similar.
+        """
+        if invertido:
+            grid_ordenado = list(reversed(grid_ordenado))
+        # monta a frase: "Pole position, 2º lugar, 3º lugar, ..."
+        partes = []
+        for i, pos in enumerate(grid_ordenado, 1):
+            if i == 1:
+                partes.append("Pole position")
+            else:
+                partes.append(f"{self._posicao_por_extenso(pos)} lugar")
+        if partes:
+            frase = ", ".join(partes) + "."
+            self.falar(frase)
+
+    def _annuncian_resultados(self, resultados: List[Dict]):
+        """Anuncia o resultado da corrida: 'O 1º lugar é de [piloto], 2º [piloto], etc.'"""
+        if not resultados:
+            return
+        partes = []
+        for r in resultados:
+            pos = r.get("posicao", 0)
+            nome = r.get("nome", "Desconhecido")
+            if pos == 1:
+                partes.append(f"O 1º lugar é de {nome}")
+            else:
+                partes.append(f"{self._posicao_por_extenso(pos)} lugar é de {nome}")
+        if partes:
+            # une as partes com vírgula e 'e' final
+            if len(partes) == 1:
+                frase = partes[0] + "."
+            else:
+                ultima = partes[-1]
+                resto = ", ".join(partes[:-1])
+                frase = f"{resto} e {ultima}."
+            self.falar(frase)
 
     def ghost_lap(self):
         self.falar("ghost_lap")
