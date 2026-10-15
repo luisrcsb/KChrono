@@ -8,16 +8,19 @@ let estadoAtual = "parado";
 let ultimaLinhas = [];
 let ultimasVoltas = { pilotos: [], parametros: { duracao: 10, criterio: "tempo" } };
 // cronômetro da sessão: base do servidor + contagem local (como no operador)
-let clockBaseS = null, clockEm = 0, clockPausada = false, clockFim = false;
-function definirClock(tempo_s, pausada, estado) {
+// clockRestanteS != null => corrida por tempo: o relógio conta REGRESSIVO.
+let clockBaseS = null, clockRestanteS = null, clockEm = 0, clockPausada = false, clockFim = false;
+function definirClock(tempo_s, pausada, estado, restante_s) {
   clockBaseS = (typeof tempo_s === "number" ? tempo_s : null);
+  clockRestanteS = (typeof restante_s === "number" ? restante_s : null);
   clockEm = Date.now();
   clockPausada = !!pausada;
   clockFim = estado === "finalizado";
 }
 function atualizarClockViaStatus() {
   fetch("/api/status").then(r => r.json()).then(s => {
-    if (s && s.sessao) definirClock(s.sessao.tempo_s, s.sessao.pausada, s.sessao.estado);
+    if (s && s.sessao) definirClock(s.sessao.tempo_s, s.sessao.pausada, s.sessao.estado,
+                                   s.sessao.restante_s);
   }).catch(() => {});
 }
 let graficoRitmo = null, graficoPosicoes = null, trackLoop = null;
@@ -68,7 +71,8 @@ function conectarWS() {
 
 function tratarEvento(ev) {
   if (ev.tipo === "snapshot") {
-    if (ev.sessao) definirClock(ev.sessao.tempo_s, ev.sessao.pausada, ev.sessao.estado);
+    if (ev.sessao) definirClock(ev.sessao.tempo_s, ev.sessao.pausada, ev.sessao.estado,
+                                ev.sessao.restante_s);
     if (ev.sessao && ev.sessao.parametros) ultimasVoltas.parametros = ev.sessao.parametros;
     renderSessao(ev.sessao);
     renderClassificacao(ev.classificacao || []);
@@ -416,13 +420,22 @@ function desenharTrack() {
   });
 }
 
-// race time: base do servidor + contagem local (congela na pausa/fim)
+// race time: base do servidor + contagem local (congela na pausa/fim).
+// Corrida por tempo (clockRestanteS != null): conta REGRESSIVO ate 0.
 // Formato com milésimos: M:SS.mmm (mesmo fmtTempo usado nas voltas).
 setInterval(() => {
+  const el = document.getElementById("t-race");
+  if (!el) return;
+  if (clockRestanteS != null) {
+    let r = clockRestanteS;
+    if (!clockPausada) r = Math.max(0, r - (Date.now() - clockEm) / 1000);
+    el.textContent = fmtTempo(r);
+    return;
+  }
   if (clockBaseS == null) return;
   let s = clockBaseS;
   if (!clockPausada && !clockFim) s += (Date.now() - clockEm) / 1000;
-  document.getElementById("t-race").textContent = fmtTempo(s);
+  el.textContent = fmtTempo(s);
 }, 33);   // ~30 Hz: milésimos animando
 
 // ESC fecha a janela do telão (via app; no navegador, tenta fechar a aba)

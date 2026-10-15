@@ -119,6 +119,9 @@ function gTratar(ev) {
     case "sessao":
       gRenderSessao({ ...(gSessao || {}), estado: ev.estado, pausada: ev.pausada });
       if (ev.classificacao) gRenderClassificacao(ev.classificacao);
+      // re-busca o snapshot real (tempo_s/restante_s) — evita base defasada
+      fetch("/api/status").then(r => r.json())
+        .then(d => { if (d && d.sessao) gRenderSessao(d.sessao); }).catch(() => {});
       break;
     case "volta":
       gToast(`volta #${ev.numero} — ${ev.nome}: ${ev.tempo}s`, "ok"); break;
@@ -130,7 +133,7 @@ function gTratar(ev) {
 }
 
 // ---------------------------------------------------------------- sessão
-let gCrono = { base: 0, ref: performance.now(), correndo: false };
+let gCrono = { base: 0, restante: null, ref: performance.now(), correndo: false };
 
 function gRenderDecoder(d) {
   if (!d) return;
@@ -144,9 +147,11 @@ function gRenderSessao(s) {
   if (!s) return;
   gSessao = s;
   document.getElementById("g-estado").textContent = s.estado || "sem sessão";
-  gCrono = { base: s.tempo_s || 0, ref: performance.now(),
+  gCrono = { base: s.tempo_s || 0,
+             restante: (typeof s.restante_s === "number" ? s.restante_s : null),
+             ref: performance.now(),
              correndo: (["treino", "classificacao", "correndo"].includes(s.estado) && !s.pausada) };
-  gPintarCrono(gCrono.base);
+  gPintarCrono(gCrono.restante != null ? gCrono.restante : gCrono.base);
 }
 
 function gPintarCrono(t) {
@@ -157,7 +162,11 @@ function gPintarCrono(t) {
 
 setInterval(() => {
   if (!gCrono.correndo) return;
-  gPintarCrono(gCrono.base + (performance.now() - gCrono.ref) / 1000);
+  const decorrido = (performance.now() - gCrono.ref) / 1000;
+  const t = gCrono.restante != null
+    ? Math.max(0, gCrono.restante - decorrido)   // corrida por tempo: regressiva
+    : gCrono.base + decorrido;
+  gPintarCrono(t);
 }, 33);   // ~30 Hz: milésimos animando
 
 // ---------------------------------------------------------------- classificação

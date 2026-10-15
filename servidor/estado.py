@@ -767,6 +767,33 @@ class EstadoApp:
             return float(self._regressiva["dur_s"])
         return max(0.0, float(self._regressiva["dur_s"]) - decorrido)
 
+    def criterio_por_tempo(self) -> bool:
+        """True quando a sessão atual é por tempo (duração), não por voltas."""
+        crit = str(self.parametros.get("criterio") or "").strip().lower()
+        return crit.startswith("tempo")
+
+    def restante_sessao_s(self) -> Optional[float]:
+        """Regressiva do cronômetro da sessão (None quando o relógio conta pra cima).
+
+        · intervalo do campeonato  → tempo restante do intervalo;
+        · sessão/corrida por tempo → duração (min) menos o tempo já decorrido;
+        · por voltas ou finalizada → None (o display segue contando pra cima).
+        """
+        if self._regressiva:
+            return self.restante_intervalo_s()
+        if not self.criterio_por_tempo() or self._tempo_final_s is not None:
+            return None
+        try:
+            dur_min = float(self.parametros.get("duracao") or 0)
+        except (TypeError, ValueError):
+            return None
+        if dur_min <= 0:
+            return None
+        decorrido = self.tempo_sessao_s()
+        if decorrido is None:
+            return None
+        return max(0.0, dur_min * 60.0 - decorrido)
+
     def _cancelar_regressiva(self):
         self._regressiva = None
         if self._task_regressiva and not self._task_regressiva.done():
@@ -2158,7 +2185,8 @@ class EstadoApp:
                         "segundos_sem_dados": sem_dados_s},
             "sessao": {"id": self.sessao_id, "estado": motor_estado,
                        "pausada": self.pausado, "tempo_s": tempo_sessao,
-                       "restante_s": self.restante_intervalo_s(),
+                       "restante_s": self.restante_sessao_s(),
+                       "regressiva": self.restante_sessao_s() is not None,
                        "parametros": self.parametros},
             "pista": self.estado_pista(),
             "contadores": self.contadores,

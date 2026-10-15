@@ -36,7 +36,6 @@ FRASES_TTS = {
     "vai": "Vai!",
     "treino_iniciado": "Treino iniciado. Boa prática a todos!",
     "classificacao_iniciada": "Classificação iniciada. Cada piloto tem seu tempo.",
-    "corrida_iniciada": "Corrida iniciada. Boa sorte a todos!",
     "pausada": "Sessão pausada.",
     "retomada": "Sessão retomada.",
     "finalizada": "Sessão finalizada. Confiram a classificação.",
@@ -59,7 +58,6 @@ ROTULOS = [
     ("contagem", "Contagem do semáforo"),
     ("treino_iniciado", "Treino iniciado"),
     ("classificacao_iniciada", "Classificação"),
-    ("corrida_iniciada", "Corrida iniciada"),
     ("pausada", "Pausada"),
     ("retomada", "Retomada"),
     ("finalizada", "Finalizada"),
@@ -235,9 +233,13 @@ class ModuloSom:
         _beep_async(1200, 900)
 
     def iniciada(self, tipo: str):
+        # Na corrida NÃO falamos "Corrida iniciada. Boa sorte a todos!":
+        # o anúncio de abertura é a locução da largada ("Atenção pilotos,
+        # preparem-se para a largada!"), disparada logo em seguida por
+        # anunciar_largada() no fluxo de "Preparar para a Largada".
         if tipo == "corrida":
-            self.falar("corrida_iniciada")
-        elif tipo == "classificacao":
+            return
+        if tipo == "classificacao":
             self.falar("classificacao_iniciada")
         else:
             self.falar("treino_iniciado")
