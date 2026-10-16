@@ -54,6 +54,16 @@ for _mod in ("piper", "onnxruntime"):
     _BIN_VOZ += _b
     HIDDEN += _o
 
+# Modelos neurais (pt_BR-*.onnx + .json) — embarcados para o exe já nascer
+# com a voz neural pronta (copiados p/ APPDATA na 1ª execução por _semear_modelos).
+_VOZES_NURAIS: list = []
+_pasta_vozes = os.path.join(RAIZ, "dados", "vozes")
+if os.path.isdir(_pasta_vozes):
+    for _arq in sorted(os.listdir(_pasta_vozes)):
+        if _arq.endswith((".onnx", ".onnx.json")):
+            _VOZES_NURAIS.append((os.path.join(_pasta_vozes, _arq),
+                                  os.path.join("dados", "vozes")))
+
 a = Analysis(
     [os.path.join(SPECPATH, "kchrono_launcher.py")],
     pathex=[RAIZ],
@@ -61,7 +71,7 @@ a = Analysis(
     datas=[
         (os.path.join(RAIZ, "interface"), "interface"),
         (os.path.join(RAIZ, "imagens"), "imagens"),
-    ] + _DADOS_VOZ,
+    ] + _DADOS_VOZ + _VOZES_NURAIS,
     hiddenimports=HIDDEN,
     hookspath=[],
     hooksconfig={},

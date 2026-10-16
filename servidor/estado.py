@@ -529,6 +529,8 @@ class EstadoApp:
         if self._recorde_pista_us is None or volta.tempo_us < self._recorde_pista_us:
             self._recorde_pista_us = volta.tempo_us
             self._recorde_pessoal[volta.piloto_id] = volta.tempo_us
+            # bip da MENOR VOLTA (7 bipes) — toca antes da locução do recorde
+            self.som.bip_menor_volta()
             if cfg.get("anunciar_recorde_pista"):
                 self.som.falar("recorde_pista", nome=nome, tempo=tempo)
                 self.publicar("volta", {"piloto_id": volta.piloto_id,
@@ -543,8 +545,10 @@ class EstadoApp:
                                             "recorde": "pessoal", "tempo": tempo})
 
         # leitura de posições a cada N voltas do líder (ex.: a cada 10 voltas)
+        # — somente quando o anúncio "durante" está liberado p/ este tipo
+        # de sessão (NUNCA no treino)
         cada = int(cfg.get("anunciar_a_cada_voltas") or 0)
-        if cada > 0 and self.motor:
+        if cada > 0 and self.motor and self._posicoes_durante_ok():
             lider = max((l.voltas for l in self.motor.classificacao()), default=0)
             if lider and lider % cada == 0 and lider != self._ultima_leitura_voltas:
                 self._ultima_leitura_voltas = lider
@@ -642,10 +646,44 @@ class EstadoApp:
         if self._task_posicoes is None or self._task_posicoes.done():
             self._task_posicoes = asyncio.create_task(self._loop_posicoes())
 
+    def _posicoes_durante_ok(self) -> bool:
+        """Pode anunciar posições DURANTE a sessão?
+
+        Regra de ouro: no TREINO nunca. Em classificação/corrida, depende do
+        checkbox "durante" correspondente (Admin → Voz & Som).
+        """
+        if not self.motor:
+            return False
+        if self.motor.tipo == TipoSessao.TREINO:
+            return False
+        cfg = self._cfg_som()
+        if self.motor.tipo == TipoSessao.CLASSIFICACAO:
+            return bool(cfg.get("anunciar_posicoes_classificacao_durante", True))
+        # corrida (e fases de campeonato, que correm como corrida)
+        return bool(cfg.get("anunciar_posicoes_corrida_durante", True))
+
+    def _posicoes_depois_ok(self, tipo: str) -> bool:
+        """Pode anunciar posições DEPOIS que a sessão termina?
+
+        No treino nunca; nos demais, só com o checkbox "depois" ligado
+        (padrão DESLIGADO — "não anunciar ao final" salvo configurar).
+        """
+        if tipo == "treino":
+            return False
+        cfg = self._cfg_som()
+        if tipo == "classificacao":
+            return bool(cfg.get("anunciar_posicoes_classificacao_depois", False))
+        return bool(cfg.get("anunciar_posicoes_corrida_depois", False))
+
     async def _loop_posicoes(self):
         proximo = None
         try:
             while self.motor and self.motor.estado.value not in ("parado", "finalizado"):
+                # treino: nunca; demais: só com o checkbox "durante" ligado
+                if not self._posicoes_durante_ok():
+                    proximo = None
+                    await asyncio.sleep(2)
+                    continue
                 intervalo = float(self._cfg_som().get("intervalo_posicoes") or 0)
                 if intervalo <= 0:
                     proximo = None
@@ -665,8 +703,12 @@ class EstadoApp:
         except Exception as e:
             log.warning("loop de anúncios de posição encerrado: %s", e)
 
-    def _anunciar_posicoes(self) -> int:
+    def _anunciar_posicoes(self, manual: bool = False) -> int:
         if not self.motor:
+            return 0
+        # anúncio automático respeita a regra por tipo de sessão;
+        # o botão manual do Admin (manual=True) fala sempre que pedido
+        if not manual and not self._posicoes_durante_ok():
             return 0
         linhas = [l for l in self.motor.classificacao() if l.voltas > 0]
         if not linhas:
@@ -681,7 +723,7 @@ class EstadoApp:
         """Leitura de posição sob demanda (botão do Admin)."""
         if not self.motor:
             return {"ok": False, "erro": "nenhuma sessão ativa"}
-        n = self._anunciar_posicoes()
+        n = self._anunciar_posicoes(manual=True)
         if not n:
             return {"ok": False, "erro": "ainda não há voltas para anunciar"}
         return {"ok": True, "pilotadas": n}
@@ -1023,12 +1065,17 @@ class EstadoApp:
         classificacao = self._classificacao()  # lista de dicts com posicao/nome
         # tipo de sessão para o anúncio
         tipo_motor = (self.motor.tipo or "").value if self.motor and self.motor.tipo else ""
-        # monta a ordem do grid a partir da classificação (posicao 1 = Pole)
-        grid_ordenado = [c["posicao"] for c in classificacao] if classificacao else []
-        # verifica se deve inverter o grid (salvo em config.do campeonato)
+        # anúncio de fim de sessão: bips + frase sempre; posições (grid e
+        # resultados) SÓ se o checkbox "depois" do tipo de sessão estiver
+        # ligado — no treino, nunca
         inverter_grid = bool(self.config.get("inverter_grid", False))
-        # resultados da corrida (mesma estrutura da classificação, usada para anúncio)
-        resultados = classificacao[:] if classificacao else []
+        grid_ordenado = None
+        resultados = None
+        if self._posicoes_depois_ok(tipo_motor):
+            # monta a ordem do grid a partir da classificação (posicao 1 = Pole)
+            grid_ordenado = [c["posicao"] for c in classificacao] if classificacao else None
+            # resultados da corrida (mesma estrutura da classificação)
+            resultados = classificacao[:] if classificacao else None
         # anúncio de fim de sessão com bips + frases + grid/resultados
         self.som.finalizada(
             tipo_motor,
@@ -1336,15 +1383,27 @@ class EstadoApp:
                    anunciar_a_cada_voltas=None,
                    anunciar_recorde_pessoal=None,
                    anunciar_recorde_pista=None,
+                   anunciar_posicoes_classificacao_durante=None,
+                   anunciar_posicoes_classificacao_depois=None,
+                   anunciar_posicoes_corrida_durante=None,
+                   anunciar_posicoes_corrida_depois=None,
                    som_passagem=None, som_lider=None,
+                   som_menor_volta=None, bip_luz=None, bip_vai=None,
                    habilitados: Optional[Dict] = None) -> Dict:
         # os checkboxes dedicados de bip também ligam/desligam a chave do ModuloSom
-        if som_passagem is not None or som_lider is not None:
+        if any(v is not None for v in (som_passagem, som_lider,
+                                       som_menor_volta, bip_luz, bip_vai)):
             base = dict(habilitados) if habilitados else dict(self.som.habilitados)
             if som_passagem is not None:
                 base["passagem"] = bool(som_passagem)
             if som_lider is not None:
                 base["lider"] = bool(som_lider)
+            if som_menor_volta is not None:
+                base["menor_volta"] = bool(som_menor_volta)
+            if bip_luz is not None:
+                base["bip_luz"] = bool(bip_luz)
+            if bip_vai is not None:
+                base["bip_vai"] = bool(bip_vai)
             habilitados = base
         if frases:
             self.som.definir_frases(frases)
@@ -1378,10 +1437,29 @@ class EstadoApp:
             som_cfg["anunciar_recorde_pessoal"] = bool(anunciar_recorde_pessoal)
         if anunciar_recorde_pista is not None:
             som_cfg["anunciar_recorde_pista"] = bool(anunciar_recorde_pista)
+        # anúncio de posições por tipo de sessão (durante/depois)
+        if anunciar_posicoes_classificacao_durante is not None:
+            som_cfg["anunciar_posicoes_classificacao_durante"] = \
+                bool(anunciar_posicoes_classificacao_durante)
+        if anunciar_posicoes_classificacao_depois is not None:
+            som_cfg["anunciar_posicoes_classificacao_depois"] = \
+                bool(anunciar_posicoes_classificacao_depois)
+        if anunciar_posicoes_corrida_durante is not None:
+            som_cfg["anunciar_posicoes_corrida_durante"] = \
+                bool(anunciar_posicoes_corrida_durante)
+        if anunciar_posicoes_corrida_depois is not None:
+            som_cfg["anunciar_posicoes_corrida_depois"] = \
+                bool(anunciar_posicoes_corrida_depois)
         if som_passagem is not None:
             som_cfg["som_passagem"] = bool(som_passagem)
         if som_lider is not None:
             som_cfg["som_lider"] = bool(som_lider)
+        if som_menor_volta is not None:
+            som_cfg["som_menor_volta"] = bool(som_menor_volta)
+        if bip_luz is not None:
+            som_cfg["bip_luz"] = bool(bip_luz)
+        if bip_vai is not None:
+            som_cfg["bip_vai"] = bool(bip_vai)
         cfg["som"] = som_cfg
         salvar_config(cfg)
         self.config = cfg

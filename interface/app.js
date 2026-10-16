@@ -1453,6 +1453,19 @@ async function carregarSom() {
     op.anunciar_recorde_pista !== false;
   document.getElementById("som-passagem").checked = op.som_passagem !== false;
   document.getElementById("som-lider").checked = op.som_lider !== false;
+  document.getElementById("som-menor-volta").checked = op.som_menor_volta !== false;
+  document.getElementById("bip-luz").checked = op.bip_luz !== false;
+  document.getElementById("bip-vai").checked = op.bip_vai !== false;
+  // anúncio de posições por tipo de sessão (durante/depois)
+  document.getElementById("som-pos-class-durante").checked =
+    op.anunciar_posicoes_classificacao_durante !== false;
+  document.getElementById("som-pos-class-depois").checked =
+    op.anunciar_posicoes_classificacao_depois === true;
+  document.getElementById("som-pos-corrida-durante").checked =
+    op.anunciar_posicoes_corrida_durante !== false;
+  document.getElementById("som-pos-corrida-depois").checked =
+    op.anunciar_posicoes_corrida_depois === true;
+  carregarVozContagem();   // checkbox "voz na contagem" mora nesta seção agora
   const audios = {};
   (r.audios || []).forEach(a => { audios[a.chave] = a.arquivo; });
   document.getElementById("som-frases").innerHTML = (r.frases || []).map(f => {
@@ -1557,6 +1570,24 @@ async function testarSomLider() {
   }
 }
 
+async function testarMenorVolta() {
+  const r = await api("som/testar_menor_volta", "POST");
+  if (r.ok) logMsg("Teste do bip da menor volta executado", "l-sistema", "log-operador");
+  else alert("Não foi possível testar: " + (r.erro || "erro"));
+}
+
+async function testarBipLuz() {
+  const r = await api("som/testar_luz", "POST");
+  if (r.ok) logMsg("Teste do bipe da luz executado", "l-sistema", "log-operador");
+  else alert("Não foi possível testar: " + (r.erro || "erro"));
+}
+
+async function testarBipVai() {
+  const r = await api("som/testar_vai", "POST");
+  if (r.ok) logMsg("Teste do bipe do verde executado", "l-sistema", "log-operador");
+  else alert("Não foi possível testar: " + (r.erro || "erro"));
+}
+
 async function salvarSom() {
   const frases = {};
   document.querySelectorAll("#som-frases input[id^='frase-']").forEach(inp => {
@@ -1575,6 +1606,17 @@ async function salvarSom() {
     anunciar_recorde_pista: document.getElementById("som-anunciar-rec-pista").checked,
     som_passagem: document.getElementById("som-passagem").checked,
     som_lider: document.getElementById("som-lider").checked,
+    som_menor_volta: document.getElementById("som-menor-volta").checked,
+    bip_luz: document.getElementById("bip-luz").checked,
+    bip_vai: document.getElementById("bip-vai").checked,
+    anunciar_posicoes_classificacao_durante:
+      document.getElementById("som-pos-class-durante").checked,
+    anunciar_posicoes_classificacao_depois:
+      document.getElementById("som-pos-class-depois").checked,
+    anunciar_posicoes_corrida_durante:
+      document.getElementById("som-pos-corrida-durante").checked,
+    anunciar_posicoes_corrida_depois:
+      document.getElementById("som-pos-corrida-depois").checked,
   };
   const r = await api("som/salvar", "POST", "", { frases, habilitados, ...ajustesSom(), ...opcoes });
   if (r.ok) {

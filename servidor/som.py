@@ -82,15 +82,23 @@ EXEMPLOS = {"{n}": "3", "{nome}": "Piloto", "{tempo}": "9,12",
 
 #: Opções de locução automática (intervalos/eventos), editadas no Admin.
 OPCOES_SOM_PADRAO = {
-    "intervalo_posicoes": 0,       # segundos entre leituras de posição (0 = desligado)
-    "posicoes_topo": 3,            # quantos pilotos ler em cada anúncio
-    "anunciar_volta": False,       # fala cada volta (nome + tempo)
-    "anunciar_a_cada_voltas": 0,   # lê as posições a cada N voltas do líder (0 = desligado)
+    "intervalo_posicoes": 0,        # segundos entre leituras de posição (0 = desligado)
+    "posicoes_topo": 3,              # quantos pilotos ler em cada anúncio
+    "anunciar_volta": False,         # fala cada volta (nome + tempo)
+    "anunciar_a_cada_voltas": 5,    # lê as posições a cada N voltas do líder (0 = desligado)
     "anunciar_recorde_pessoal": True,
     "anunciar_recorde_pista": True,
+    # Controle por tipo de sessão (checkboxes Admin → Voz & Som)
+    "anunciar_posicoes_classificacao_durante": True,   # durante a classificação
+    "anunciar_posicoes_classificacao_depois": False,    # ao final da classificação
+    "anunciar_posicoes_corrida_durante": True,          # durante a corrida
+    "anunciar_posicoes_corrida_depois": False,          # ao final da corrida
     # Sons de passagem
-    "som_passagem": True,          # bip a cada passagem
-    "som_lider": True,             # bip especial do líder
+    "som_passagem": True,            # bip a cada passagem
+    "som_lider": True,               # bip especial do líder
+    "som_menor_volta": True,         # 7 bipes da menor volta / recorde
+    "bip_luz": True,                 # bipe a cada luz acesa na contagem
+    "bip_vai": True,                 # bipe longo no verde (largada)
 }
 
 
@@ -203,9 +211,43 @@ class ModuloSom:
         _beep_async(600, 55)
         _beep_async(1200, 55)
 
+    def bip_menor_volta(self):
+        """Bip para marcar a menor volta: 7 bipes super curtos e agudos, subindo e descendo o tom."""
+        if not self.habilitado("menor_volta"):
+            return
+        self._padrao_menor_volta()
+
+    def _padrao_menor_volta(self):
+        # Padrão: 7 bipes com frequências alternando agudo/grave, 30ms cada
+        # (1500/800/1500/700/1500/600/1500 Hz) — sem gate, usado pelos testes
+        _beep_async(1500, 30)  # 1º - agudo
+        _beep_async(800, 30)   # 2º - grave
+        _beep_async(1500, 30)  # 3º - agudo
+        _beep_async(700, 30)   # 4º - médio-grave
+        _beep_async(1500, 30)  # 5º - agudo
+        _beep_async(600, 30)   # 6º - grave
+        _beep_async(1500, 30)  # 7º - agudo (fechamento)
+
+    def testar_bip_menor_volta(self):
+        """Pré-escuta do bip de menor volta (Admin) — toca mesmo desligado."""
+        self._padrao_menor_volta()
+        return True
+
     def bip_contagem(self):
-        """Bip curto de marcação de cada número da contagem (600Hz, 80ms)."""
+        """Bip de cada luz/numero da contagem (600Hz, 80ms)."""
+        if not self.habilitado("bip_luz"):
+            return
         _beep_async(600, 80)
+
+    def testar_bip_luz(self):
+        """Pré-escuta do bipe da luz da contagem (Admin) — toca mesmo desligado."""
+        _beep_async(600, 80)
+        return True
+
+    def testar_bip_vai(self):
+        """Pré-escuta do bipe do verde (Admin) — toca mesmo desligado."""
+        _beep_async(1200, 900)
+        return True
 
     def testar_som_passagem(self):
         """Pré-escuta do bip de passagem (Admin)."""
@@ -234,6 +276,8 @@ class ModuloSom:
 
     def bip_largada(self):
         """Bip forte no verde — sinal sonoro da largada (sem locução)."""
+        if not self.habilitado("bip_vai"):
+            return
         _beep_async(1200, 900)
 
     def iniciada(self, tipo: str):
@@ -293,7 +337,10 @@ class ModuloSom:
             self.falar("classificacao_finalizada")
         else:
             self.falar("finalizada")
-        # anúncios suplementares
+        # anúncios suplementares — posições/grid só quando o chamador liberou
+        # (None = desligado). No treino NUNCA, por garantia extra:
+        if tipo == "treino":
+            return
         if grid_ordenado is not None:
             self._annunciar_grid(grid_ordenado, invertido=grid_invertido)
         if resultados is not None:

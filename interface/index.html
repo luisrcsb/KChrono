@@ -51,7 +51,7 @@
       <img id="side-qr-img" alt="QR Code de Gestão Remota" style="display:none">
       <div class="side-qr-info" id="side-qr-info">gerando…</div>
     </div>
-    <div class="admin-rodape"><span id="ws-status">Desconectado do servidor</span><br>KChrono v1.0.0<br>por Raphael Belowodski</div>
+    <div class="admin-rodape"><span id="ws-status">Desconectado do servidor</span><br>KChrono v1.0.3<br>por Raphael Belowodski</div>
   </aside>
   <div class="corpo">
 
@@ -105,9 +105,6 @@
           </select></div>
         <div><label>Duração (min/voltas)</label><input id="cfg-duracao" value="10"></div>
         <div><label>Contador regressivo (s)</label><input id="cfg-contador" value="10"></div>
-        <div><label class="chk-linha" style="font-size:12.5px" title="Locução na contagem regressiva e na largada">
-          <input type="checkbox" id="cfg-voz-contagem" checked onchange="salvarVozContagem()"> voz na contagem
-        </label></div>
         <div><label>Aviso de saída (s)</label><input id="cfg-aviso-saida" value="30"></div>
         <div><label>Tempo para terminar (s)</label><input id="cfg-terminar" value="30"></div>
         <div><label>Tempo entre carros (s)</label><input id="cfg-entre-carros" value="2"></div>
@@ -498,15 +495,52 @@
             <h3>Como vai sair</h3>
             <div id="som-preview" class="som-preview">Clique em <b>▶ Ouvir</b> numa frase para
               escutá-la exatamente como será falada na corrida.</div>
-            <h3 style="margin-top:16px">Bipes do semáforo</h3>
-            <div class="switch"><span class="ck on">✓</span> Bipe a cada luz acesa</div>
-            <div class="switch"><span class="ck on">✓</span> Bipe na contagem regressiva</div>
-            <div class="switch"><span class="ck on">✓</span> Bipe longo no "VAI!"</div>
-            <p class="hint">Os bipes tocam no próprio telão (WebAudio) — funcionam em qualquer dispositivo.</p>
+            <h3 style="margin-top:16px">Semáforo & largada</h3>
+            <div class="frase-input">
+              <label class="chk-linha" title="bipe a cada luz vermelha acesa na contagem">
+                <input type="checkbox" id="bip-luz" checked> Bipe a cada luz acesa</label>
+              <button class="btn-mini" onclick="testarBipLuz()" title="Ouvir bipe da luz">▶ Ouvir</button>
+            </div>
+            <div class="frase-input">
+              <label class="chk-linha" title="locução dos números na contagem regressiva">
+                <input type="checkbox" id="cfg-voz-contagem" checked onchange="salvarVozContagem()">
+                Voz na contagem regressiva</label>
+              <button class="btn-mini" onclick="testarVoz()" title="Ouvir a voz">▶ Ouvir</button>
+            </div>
+            <div class="frase-input">
+              <label class="chk-linha" title="bipe longo quando acende o verde">
+                <input type="checkbox" id="bip-vai" checked> Bipe longo no verde (largada)</label>
+              <button class="btn-mini" onclick="testarBipVai()" title="Ouvir bipe do verde">▶ Ouvir</button>
+            </div>
+            <p class="hint">Os bipes são gerados no servidor — tocam no operador e no telão ao mesmo tempo.</p>
           </div>
         </div>
         <div class="admin-secao-tit">Frases faladas — edite, ouça (▶) ou troque por um áudio (📁)</div>
         <div class="card" id="som-frases"></div>
+
+        <div class="admin-secao-tit">Anúncio de posições por tipo de sessão</div>
+        <div class="card">
+          <div class="frase-input">
+            <span class="rot" style="min-width:120px">Treino</span>
+            <span class="hint">⛔ Nunca anuncia posições — regra fixa, sem checkbox.</span>
+          </div>
+          <div class="frase-input">
+            <span class="rot" style="min-width:120px">Classificação</span>
+            <label class="chk-linha"><input type="checkbox" id="som-pos-class-durante" checked>
+              Durante</label>
+            <label class="chk-linha"><input type="checkbox" id="som-pos-class-depois">
+              Depois (ao final)</label>
+          </div>
+          <div class="frase-input">
+            <span class="rot" style="min-width:120px">Corrida</span>
+            <label class="chk-linha"><input type="checkbox" id="som-pos-corrida-durante" checked>
+              Durante</label>
+            <label class="chk-linha"><input type="checkbox" id="som-pos-corrida-depois">
+              Depois (ao final)</label>
+          </div>
+          <p class="hint">"Durante" vale para a leitura por intervalo e a cada N voltas.
+            "Depois" libera a fala de grid/resultados quando a sessão termina (padrão: desligado).</p>
+        </div>
 
         <div class="admin-secao-tit">Anúncios automáticos</div>
         <div class="grid g2">
@@ -540,6 +574,11 @@
               <label class="chk-linha"><input type="checkbox" id="som-lider" checked>
                 Bip especial do líder (alto-baixo-alto)</label>
               <button class="btn-mini" onclick="testarSomLider()" title="Ouvir bip do líder">▶ Ouvir</button>
+            </div>
+            <div class="frase-input">
+              <label class="chk-linha"><input type="checkbox" id="som-menor-volta" checked>
+                Bip da menor volta / recorde (7 bipes)</label>
+              <button class="btn-mini" onclick="testarMenorVolta()" title="Ouvir bip da menor volta">▶ Ouvir</button>
             </div>
             <div style="display:flex; gap:8px; margin-top:12px; flex-wrap:wrap">
               <button class="btn-slide" onclick="salvarSom()">💾 Salvar preferências</button>
@@ -968,7 +1007,7 @@
   <div class="dir">
     <span id="rodape-sync">Sincronização CTAD: aguardando</span>
     <span class="pill novo">NOVIDADE</span>
-    <span>KChrono v1.0.0 · por <b>Raphael Belowodski</b></span>
+    <span>KChrono v1.0.3 · por <b>Raphael Belowodski</b></span>
   </div>
 </div>
 

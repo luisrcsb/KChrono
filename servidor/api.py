@@ -27,7 +27,7 @@ DIR_IMAGENS = DIR_PROJETO / "imagens"
 
 estado = EstadoApp()
 
-app = FastAPI(title="KChrono", version="1.0.0")
+app = FastAPI(title="KChrono", version="1.0.3")
 
 app.mount("/imagens", StaticFiles(directory=DIR_IMAGENS), name="imagens")
 app.mount("/static", StaticFiles(directory=DIR_INTERFACE), name="static")
@@ -178,6 +178,27 @@ async def api_som_testar_passagem():
 async def api_som_testar_lider():
     """Pré-escuta do bip do líder."""
     estado.som.bip_lider()
+    return {"ok": True}
+
+
+@app.post("/api/som/testar_menor_volta")
+async def api_som_testar_menor_volta():
+    """Pré-escuta dos 7 bipes da menor volta."""
+    estado.som.testar_bip_menor_volta()
+    return {"ok": True}
+
+
+@app.post("/api/som/testar_luz")
+async def api_som_testar_luz():
+    """Pré-escuta do bipe de cada luz da contagem."""
+    estado.som.testar_bip_luz()
+    return {"ok": True}
+
+
+@app.post("/api/som/testar_vai")
+async def api_som_testar_vai():
+    """Pré-escuta do bipe longo no verde (largada)."""
+    estado.som.testar_bip_vai()
     return {"ok": True}
 
 

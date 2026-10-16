@@ -18,10 +18,12 @@ retornar na hora, sem som nenhum.
 """
 from __future__ import annotations
 
+import glob
 import logging
 import os
 import queue
 import shutil
+import sys
 import tempfile
 import threading
 from typing import Dict, List, Optional
@@ -138,7 +140,52 @@ def dir_vozes() -> str:
         os.makedirs(d, exist_ok=True)
     except OSError as e:
         log.warning("não foi possível criar a pasta de vozes (%s)", e)
+    _semear_modelos(d)
     return d
+
+
+def _semear_modelos(destino: str):
+    """Garante que os modelos neurais existam na pasta de runtime.
+
+    No EXE empacotado a pasta é ``%APPDATA%\\KChrono\\dados\\vozes`` e fica
+    vazia numa instalação nova — daí a voz neural "nunca aparecer". Copia os
+    ``.onnx`` (+ .json) de, nesta ordem: recurso embutido no exe (``_MEIPASS``),
+    pasta ao lado do exe (portátil) e a ``dados/vozes`` do projeto-fonte.
+    Só copia se a pasta de destino estiver sem nenhum modelo.
+    """
+    try:
+        if glob.glob(os.path.join(destino, "*.onnx")):
+            return
+    except OSError:
+        return
+    candidatas = []
+    meipass = getattr(sys, "_MEIPASS", None)
+    if meipass:
+        candidatas.append(os.path.join(meipass, "dados", "vozes"))
+    exe = getattr(sys, "executable", "")
+    if exe:
+        candidatas.append(os.path.join(os.path.dirname(exe), "dados", "vozes"))
+    # fonte do projeto: <raiz>/nucleo/voz.py -> <raiz>/dados/vozes
+    candidatas.append(os.path.join(os.path.dirname(os.path.dirname(
+        os.path.abspath(__file__))), "dados", "vozes"))
+    for origem in candidatas:
+        try:
+            arquivos = sorted(glob.glob(os.path.join(origem, "*.onnx*")))
+        except OSError:
+            continue
+        if not arquivos:
+            continue
+        for arq in arquivos:
+            alvo = os.path.join(destino, os.path.basename(arq))
+            if os.path.isfile(alvo):
+                continue
+            try:
+                shutil.copy2(arq, alvo)
+                log.info("voz neural Piper semeada: %s", alvo)
+            except OSError as e:
+                log.warning("não foi possível copiar a voz %s (%s)", arq, e)
+        if glob.glob(os.path.join(destino, "*.onnx")):
+            return
 
 
 def listar_vozes_piper() -> List[Dict]:
