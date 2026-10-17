@@ -33,7 +33,7 @@ if ! command -v lb >/dev/null 2>&1; then
     echo "== instalando ferramentas do live-build"
     apt-get update
     apt-get install -y live-build debootstrap squashfs-tools xorriso \
-        dosfstools mtools systemd-container
+        dosfstools mtools cpio systemd-container
 fi
 
 cd "$RAIZ/iso"
