@@ -1,0 +1,43 @@
+KChrono no Linux — LEIA-ME
+===========================
+
+Arquivos
+--------
+  KChrono-<versao>-x86_64.AppImage   aplicativo completo (arquivo único)
+  (o instalador Windows KChrono-Setup.exe fica na pasta windows/ da release
+   e a ISO da live na pasta iso/)
+
+Como rodar (Debian 12+, Ubuntu 22.04+, Linux Mint 21+)
+------------------------------------------------------
+  1. copie o AppImage para onde quiser (ex.: /opt/kchrono/)
+  2. chmod +x KChrono-*.AppImage
+  3. ./KChrono-*.AppImage
+  A interface abre no navegador (Firefox/Chrome), sem janela nativa.
+  Na ISO do KChrono já existe atalho de menu — é só clicar.
+
+Dependências
+------------
+  * libfuse2 (a ISO já traz; em outras distros: sudo apt install libfuse2)
+  * Voz neural Piper: as vozes vão em ~/.local/share/KChrono/vozes —
+    baixe pelo Admin → Voz na 1ª execução (precisa de internet 1x).
+  * Cronômetro EASYLAP (serial): usuário no grupo dialout
+    (a ISO já configura; fora dela: sudo usermod -aG dialout $USER)
+  * LapWiz (Bluetooth): BlueZ ativo (a ISO já traz).
+
+Atualização
+-----------
+  Admin → Sobre → Atualizações → Verificar / Instalar agora: baixa o
+  AppImage novo, troca o arquivo e reabre sozinho.
+  Atenção: na live de pendrive a mídia é somente-leitura — atualize
+  depois de instalar no disco (ou baixe o AppImage novo manualmente).
+
+Encerrar
+--------
+  Ctrl+C no terminal, ou Admin → Sobre → "Sair do KChrono".
+
+ISO da live (KChrono-live-*.iso)
+--------------------------------
+  * Grave com Rufus (Windows) ou balenaEtcher (qualquer sistema).
+  * Boota direto no KChrono (usuário kchrono, login automático).
+  * No menu de boot também tem a opção "Install" — instala o Linux com
+    o KChrono já dentro no disco do notebook da pista.

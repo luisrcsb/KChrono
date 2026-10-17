@@ -1,10 +1,10 @@
 {
-  "versao": "1.0.4",
+  "versao": "1.0.5",
   "canal": "estavel",
   "url_base": "",
-  "notas": "Versão 1.0.4 — Simulador de transponder (reproduz corridas enviadas ao CTAD como passagens reais), voz neural Piper pré-instalada, anúncio de posições por tipo de sessão (nunca no treino), controles de voz/bips/frases centralizados no Admin → Voz & Som, login/senha do CTAD persistidos, novo sistema de atualização via GitHub Releases.",
+  "notas": "Versão 1.0.5 — KChrono agora sai também para Linux (AppImage) com ISO de pendrive pronta (Debian + Xfce + navegador, KChrono já instalado, boot e instalação no disco). Atualização automática em ambas as plataformas: no Windows instala em silêncio, no Linux troca o AppImage e reabre sozinho. Publicação por tag no GitHub com CI montando os três pacotes.",
   "arquivos": {
     "windows": "KChrono-Setup.exe",
-    "linux": "kchrono-linux.tar.gz"
+    "linux": "KChrono-1.0.5-x86_64.AppImage"
   }
 }

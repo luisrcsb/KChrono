@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=KChrono (Telão)
+Comment=Abre a tela grande do telão em uma janela do navegador
+Exec=/opt/kchrono/KChrono.AppImage --telao
+Icon=kchrono
+Terminal=false
+Categories=Utility;AudioVideo;Sports;
+StartupNotify=true

@@ -2,22 +2,34 @@
 
 Canal principal: **GitHub Releases** do repositório configurado em
 ``config.json → atualizacao_repo`` (formato ``usuario/repositorio``,
-público). A tag da release é a versão (ex.: ``v1.0.4``) e o asset
-``KChrono-Setup.exe`` é o instalador do Windows.
+público). A tag da release é a versão (ex.: ``v1.0.5``) e os assets são
+os pacotes gerados pela CI:
+
+* Windows → ``KChrono-Setup.exe`` (instalador NSIS)
+* Linux   → ``KChrono-<versao>-x86_64.AppImage`` (troca do AppImage)
+* ISO     → ``KChrono-live-<versao>-amd64.iso`` (pendrive; não é usada
+  pelo atualizador — é só o meio de instalar)
 
 Canal alternativo: uma pasta web qualquer publicando ``versao.json`` com
 ``"url_base"`` preenchido (formato antigo), para quem hospeda sem GitHub.
 
-Fluxo "Instalar agora": baixa o instalador para
-``%APPDATA%\\KChrono\\atualizacoes``, agenda o instalador em silêncio
-(NSIS ``/S`` — o NSIS reinstala no diretório gravado no registro) e
-encerra o app. Reabrir já é a versão nova; os dados (banco, config,
-vozes) ficam em %APPDATA% e não são tocados.
+Fluxo "Instalar agora":
+* Windows → baixa o instalador para ``%APPDATA%\\KChrono\\atualizacoes``,
+  agenda em silêncio (NSIS ``/S`` — o NSIS reinstala no diretório gravado
+  no registro) e encerra o app.
+* Linux   → baixa o AppImage novo, substitui o arquivo em execução
+  (``$APPIMAGE``), reabre sozinho aos ~8 s e encerra o atual.
 
-Publicação (uma vez por versão):
-    1. crie uma release no GitHub com tag ``v1.0.4`` e anexe o
-       ``KChrono-Setup.exe`` como asset;
-    2. no Admin → Sobre → Atualizações, informe ``usuario/repo``.
+Nos dois casos os dados (banco, config, vozes) ficam em
+%APPDATA% / ~/.local/share e não são tocados.
+
+Publicação (uma vez por versão, automatizada):
+    1. bump da versão em ``empacotamento/versao.json`` + tag ``vX.Y.Z``;
+    2. ``git push origin vX.Y.Z`` → a CI (.github/workflows/release.yml)
+       monta Windows, AppImage e ISO e anexa tudo na release da tag
+       (``python empacotar.py`` faz o mesmo localmente para a pasta
+       publicacao/);
+    3. no Admin → Sobre → Atualizações, informe ``usuario/repo`` uma vez.
 """
 from __future__ import annotations
 
@@ -74,6 +86,11 @@ def _repo() -> str:
         return ""
 
 
+def _chave_plataforma() -> str:
+    """Qual pacote da release serve para ESTA máquina (windows | linux)."""
+    return "windows" if sys.platform == "win32" else "linux"
+
+
 def manifesto_local() -> Dict:
     """versao.json embutido (canal 'pasta web' — define o url_base)."""
     caminhos = [dir_recursos() / "empacotamento" / "versao.json"]
@@ -101,7 +118,7 @@ def verificar() -> Dict:
 
 
 def _verificar_github(repo: str) -> Dict:
-    """Última release do GitHub: a tag é a versão, o .exe é o instalador."""
+    """Última release do GitHub: a tag é a versão, os assets são os pacotes."""
     url = f"https://api.github.com/repos/{repo}/releases/latest"
     req = urllib.request.Request(
         url, headers={"User-Agent": UA, "Accept": "application/vnd.github+json"})
@@ -111,8 +128,8 @@ def _verificar_github(repo: str) -> Dict:
     except urllib.error.HTTPError as e:
         if e.code == 404:
             return {"versao_atual": VERSAO_ATUAL, "disponivel": False, "erro":
-                    f"'{repo}' não tem releases — crie uma release anexando"
-                    " o KChrono-Setup.exe"}
+                    f"'{repo}' não tem releases — publique a tag vX.Y.Z e a CI"
+                    " anexa os pacotes"}
         return {"versao_atual": VERSAO_ATUAL, "disponivel": False,
                 "erro": f"GitHub respondeu HTTP {e.code}"}
     except Exception as e:
@@ -174,10 +191,14 @@ def _resolver_pacote(ver: Dict, chave: str) -> Optional[Dict]:
     return None
 
 
-def baixar(chave: str = "windows", destino: Optional[str] = None) -> Dict:
-    """Baixa o instalador da versão nova para ``%APPDATA%\\KChrono\\atualizacoes``."""
+def baixar(chave: Optional[str] = None, destino: Optional[str] = None) -> Dict:
+    """Baixa o pacote da versão nova em ``%APPDATA%\\KChrono\\atualizacoes``.
+
+    ``chave`` omitida → a plataforma da máquina (windows | linux).
+    """
     import requests
 
+    chave = chave or _chave_plataforma()
     ver = verificar()
     pac = _resolver_pacote(ver, chave)
     if not pac:
@@ -203,16 +224,29 @@ def baixar(chave: str = "windows", destino: Optional[str] = None) -> Dict:
 
 
 # ----------------------------------------------------------------------- instalar
-def instalar(chave: str = "windows", destino: Optional[str] = None) -> Dict:
-    """Baixa (se preciso) e executa o instalador em silêncio; fecha o app.
+def instalar(chave: Optional[str] = None, destino: Optional[str] = None) -> Dict:
+    """Baixa (se preciso) e aplica a atualização; encerra o app.
+
+    Windows → instalador NSIS em silêncio. Linux → troca do AppImage e
+    reabertura automática. Em ambos, os dados permanecem intactos.
+    """
+    chave = chave or _chave_plataforma()
+    if sys.platform == "win32":
+        return _instalar_windows(chave, destino)
+    if sys.platform.startswith("linux"):
+        return _instalar_linux(chave, destino)
+    return {"ok": False,
+            "erro": "atualização automática disponível apenas no Windows e no Linux"}
+
+
+def _instalar_windows(chave: str, destino: Optional[str]) -> Dict:
+    """Executa o instalador NSIS em silêncio e fecha o app.
 
     O instalador precisa dos arquivos liberados: ele é agendado com um
     pequeno atraso e o app se encerra em seguida. O NSIS reinstala no
     diretório anterior (gravado no registro pelo próprio instalador) e os
     dados em %APPDATA% permanecem intactos.
     """
-    if sys.platform != "win32":
-        return {"ok": False, "erro": "instalação automática disponível apenas no Windows"}
     import subprocess
 
     ver = verificar()
@@ -242,8 +276,57 @@ def instalar(chave: str = "windows", destino: Optional[str] = None) -> Dict:
             "acao": "instalador_agendado"}
 
 
+def _instalar_linux(chave: str, destino: Optional[str]) -> Dict:
+    """Substitui o AppImage em execução pelo novo e reabre o app.
+
+    Só funciona quando o app roda como AppImage (variável ``APPIMAGE``).
+    Na live de pendrive a mídia é somente-leitura (squashfs) — daí vem o
+    erro claro pedindo instalar no disco.
+    """
+    import shlex
+    import shutil
+    import subprocess
+
+    ver = verificar()
+    if not ver.get("disponivel"):
+        return {"ok": False, "erro": ver.get("erro") or "não há versão nova para instalar"}
+    b = baixar(chave, destino)
+    if not b.get("ok"):
+        return b
+
+    appimage = os.environ.get("APPIMAGE") or ""
+    if not appimage or not os.path.exists(appimage):
+        return {"ok": False,
+                "erro": "para atualizar no Linux rode pelo KChrono.AppImage"
+                        " (APPIMAGE ausente) — baixe o arquivo novo manualmente"}
+
+    novo = b["arquivo"]
+    try:
+        os.chmod(novo, 0o755)
+        temporario = appimage + ".novo"
+        shutil.copy2(novo, temporario)
+        os.chmod(temporario, 0o755)
+        os.replace(temporario, appimage)      # POSIX troca o arquivo em execução
+    except PermissionError:
+        return {"ok": False,
+                "erro": "mídia somente-leitura (live de pendrive) — instale no"
+                        " disco ou substitua o AppImage manualmente"}
+    except Exception as e:
+        return {"ok": False, "erro": f"falha ao substituir o AppImage: {e}"}
+
+    # reabre FORA do grupo de sinais deste processo (a porta precisa estar
+    # livre): este app encerra aos ~2 s e o novo sobe aos ~8 s
+    subprocess.Popen(
+        f"sleep 8; exec {shlex.quote(appimage)} >/dev/null 2>&1 &",
+        shell=True, start_new_session=True)
+    threading.Timer(2.0, _encerrar_app).start()
+    log.info("atualização linux: v%s em %s", b.get("versao"), appimage)
+    return {"ok": True, "arquivo": appimage, "versao": b.get("versao"),
+            "acao": "appimage_substituido"}
+
+
 def _encerrar_app():
-    """Fecha a janela nativa (pywebview) e garante o fim do processo."""
+    """Fecha a janela nativa (Windows) e garante o fim do processo."""
     try:
         import webview
         for janela in (getattr(webview, "windows", None) or []):
@@ -253,4 +336,13 @@ def _encerrar_app():
                 pass
     except Exception:
         pass
+    if os.name == "posix":
+        # modo navegador: derruba junto o servidor e o processo-filho do telão
+        def _matar_grupo():
+            try:
+                import signal
+                os.killpg(os.getpgid(0), signal.SIGTERM)
+            except Exception:
+                pass
+        threading.Timer(2.5, _matar_grupo).start()
     threading.Timer(3.0, lambda: os._exit(0)).start()

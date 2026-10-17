@@ -1,0 +1,3 @@
+# contexto mínimo da imagem de build (o código entra por bind mount)
+*
+!requirements.txt

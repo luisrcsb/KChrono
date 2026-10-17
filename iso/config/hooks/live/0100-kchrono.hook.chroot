@@ -1,0 +1,33 @@
+#!/bin/sh
+# KChrono — ajustes da live (roda no chroot durante o build).
+set -e
+echo "KChrono: preparando a live..."
+
+# O usuário da live (criado no 1º boot) precisa do grupo dialout pro
+# cronômetro serial (EASYLAP) e do bluetooth ativo pro LapWiz (BLE).
+mkdir -p /usr/local/sbin
+cat > /usr/local/sbin/kchrono-ajustes.sh <<'EOS'
+#!/bin/sh
+for u in user kchrono; do
+    usermod -aG dialout "$u" 2>/dev/null || true
+done
+systemctl start bluetooth.service 2>/dev/null || true
+EOS
+chmod 755 /usr/local/sbin/kchrono-ajustes.sh
+
+cat > /etc/systemd/system/kchrono-ajustes.service <<'EOS'
+[Unit]
+Description=Ajustes do KChrono (serial + bluetooth na live)
+After=live-config.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/kchrono-ajustes.sh
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
+EOS
+systemctl enable kchrono-ajustes.service 2>/dev/null || true
+
+echo "KChrono: ajustes instalados."

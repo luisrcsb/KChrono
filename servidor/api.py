@@ -27,7 +27,7 @@ DIR_IMAGENS = DIR_PROJETO / "imagens"
 
 estado = EstadoApp()
 
-app = FastAPI(title="KChrono", version="1.0.4")
+app = FastAPI(title="KChrono", version="1.0.5")
 
 app.mount("/imagens", StaticFiles(directory=DIR_IMAGENS), name="imagens")
 app.mount("/static", StaticFiles(directory=DIR_INTERFACE), name="static")
@@ -165,9 +165,9 @@ async def api_versao():
 
 
 @app.post("/api/versao/baixar")
-async def api_versao_baixar(chave: str = Query("windows")):
-    from atualizador import baixar
-    return await asyncio.to_thread(baixar, chave)
+async def api_versao_baixar(chave: Optional[str] = Query(None)):
+    from atualizador import _chave_plataforma, baixar
+    return await asyncio.to_thread(baixar, chave or _chave_plataforma())
 
 
 @app.post("/api/versao/repo")
@@ -183,9 +183,19 @@ async def api_versao_repo(repo: str = Query(...)):
 
 @app.post("/api/versao/instalar")
 async def api_versao_instalar():
-    """Baixa a versão nova, executa o instalador em silêncio e encerra o app."""
+    """Aplica a atualização: instalador NSIS em silêncio (Windows) ou
+    troca do AppImage com reabertura (Linux); encerra o app em seguida."""
     from atualizador import instalar
     return await asyncio.to_thread(instalar)
+
+
+@app.post("/api/app/sair")
+async def api_app_sair():
+    """Encerra o app (no modo navegador é o jeito de parar o servidor)."""
+    import threading
+    from atualizador import _encerrar_app
+    threading.Timer(1.0, _encerrar_app).start()
+    return {"ok": True}
 
 
 # ---------------------------------------------------------------- voz / som (Admin)

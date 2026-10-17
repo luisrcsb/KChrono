@@ -1,0 +1,153 @@
+# KChrono — build + release automática.
+#
+#   git tag v1.0.5 && git push origin v1.0.5
+#
+# A tag dispara:
+#   windows → KChrono-Setup.exe (PyInstaller onefile + NSIS)
+#   linux   → KChrono-<v>-x86_64.AppImage (container Ubuntu 22.04)
+#   iso     → KChrono-live-<v>-amd64.iso (live-build: Debian + Xfce + KChrono)
+#   publicar → anexa os três arquivos na release da tag
+#
+# workflow_dispatch roda os builds sem publicar release (pra testar).
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+env:
+  PYTHON_VERSION: "3.14"
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Dependências
+        run: pip install -r requirements.txt pyinstaller==6.22.3
+
+      - name: PyInstaller (onefile)
+        run: python empacotamento/build.py
+
+      - name: NSIS (instalador)
+        shell: pwsh
+        run: |
+          $m = "C:\Program Files (x86)\NSIS\makensis.exe"
+          if (-not (Test-Path $m)) {
+            choco install nsis -y --no-progress
+          }
+          & "$m" empacotamento\instalador.nsi
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+
+      - name: Pasta publicacao/windows
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force publicacao\windows | Out-Null
+          Copy-Item empacotamento\dist\KChrono.exe publicacao\windows\
+          Copy-Item empacotamento\KChrono-Setup.exe publicacao\windows\
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: publicacao-windows
+          path: publicacao/windows
+          if-no-files-found: error
+
+  linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Imagem de build (Ubuntu 22.04 + Python 3.12)
+        run: docker build -t kchrono-linux -f empacotamento/linux/Dockerfile .
+
+      - name: AppImage
+        run: >
+          docker run --rm -v "$PWD:/app" -w /app kchrono-linux
+          bash empacotamento/linux/build_appimage.sh
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: publicacao-linux
+          path: publicacao/linux
+          if-no-files-found: error
+
+  iso:
+    needs: [linux]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: publicacao-linux
+          path: publicacao/linux
+
+      - name: Ferramentas live-build
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y live-build debootstrap squashfs-tools \
+            xorriso dosfstools mtools systemd-container
+
+      - name: ISO da live (Debian + Xfce + KChrono)
+        run: |
+          mkdir -p iso/config/includes.live/opt/kchrono
+          cp publicacao/linux/*.AppImage iso/config/includes.live/opt/kchrono/KChrono.AppImage
+          sudo bash iso/montar_iso.sh
+
+      - name: Pasta publicacao/iso
+        run: |
+          mkdir -p publicacao/iso
+          VER=$(python3 -c "import json; print(json.load(open('empacotamento/versao.json'))['versao'])")
+          ISO=$(ls iso/build/*.iso | head -n 1)
+          cp "$ISO" "publicacao/iso/KChrono-live-${VER}-amd64.iso"
+          ls -lh publicacao/iso/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: publicacao-iso
+          path: publicacao/iso
+          if-no-files-found: error
+
+  publicar:
+    needs: [windows, linux, iso]
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: publicacao-windows
+          path: publicacao/windows
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: publicacao-linux
+          path: publicacao/linux
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: publicacao-iso
+          path: publicacao/iso
+
+      - name: Release com os três pacotes
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: |
+            publicacao/windows/*
+            publicacao/linux/*
+            publicacao/iso/*
+
+      - name: Artefato completo (cópia de segurança)
+        uses: actions/upload-artifact@v4
+        with:
+          name: publicacao-completa
+          path: publicacao

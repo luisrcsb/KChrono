@@ -1,8 +1,10 @@
-"""KChrono — ponto de entrada do executável empacotado (PyInstaller + pywebview).
+"""KChrono — ponto de entrada do executável empacotado (PyInstaller).
 
-Sobe o servidor local (FastAPI/uvicorn) em thread separada e abre janela nativa
-(WebView2 no Windows) carregando a interface web — **sem barra de endereço,
-abas ou chrome do navegador**.
+Windows: sobe o servidor local (FastAPI/uvicorn) em thread separada e abre
+janela NATIVA (WebView2) carregando a interface web — **sem barra de
+endereço, abas ou chrome do navegador**.
+Linux (AppImage): servidor no fundo + interface no PRÓPRIO navegador
+(xdg-open) — dispensa pywebview/WebKitGTK.
 
 Um processo = UMA janela (o pywebview trava ao criar a 2ª janela noutra
 thread). O telão abre num processo filho (``--sem-servidor``) com janela
@@ -25,7 +27,16 @@ import time
 import sys
 
 import uvicorn
-import webview
+
+try:
+    # pywebview só é usado no Windows; no Linux a "janela" é o navegador
+    import webview
+except Exception:            # sem GUI disponível — segue no modo navegador
+    webview = None
+
+#: Linux → a interface abre no PRÓPRIO navegador (xdg-open): dispensa
+#: pywebview/WebKitGTK, que é frágil de empacotar. Windows → janela nativa.
+MODO_NAVEGADOR = sys.platform != "win32"
 
 from servidor.api import app
 from nucleo.log import configurar_log
@@ -146,6 +157,24 @@ def _esperar_servidor(url: str, timeout: float = 15.0) -> bool:
     return False
 
 
+def _abrir_navegador(url: str) -> bool:
+    """Abre a interface no navegador padrão (modo navegador — Linux)."""
+    import shutil
+    import subprocess
+    for cmd in (["xdg-open", url], ["gio", "open", url],
+                ["x-www-browser", url], ["sensible-browser", url]):
+        if shutil.which(cmd[0]):
+            try:
+                subprocess.Popen(cmd, stdout=subprocess.DEVNULL,
+                                 stderr=subprocess.DEVNULL,
+                                 start_new_session=True)
+                return True
+            except Exception:
+                pass
+    print(f"  Abra manualmente no navegador: {url}")
+    return False
+
+
 def main() -> int:
     multiprocessing.freeze_support()
     configurar_log()
@@ -166,6 +195,14 @@ def main() -> int:
     # Monta URL final
     rota = "/telao" if args.telao else ("/gerente" if args.gerente else "/")
     url = f"http://{args.host}:{args.porta}{rota}"
+
+    # Modo navegador: uma 2ª execução não sobe outro servidor — só abre a
+    # interface da instância que já está rodando
+    if MODO_NAVEGADOR and not args.sem_servidor and \
+            _esperar_servidor(f"http://{args.host}:{args.porta}", timeout=1.0):
+        print(f"KChrono já está rodando — abrindo {url}")
+        _abrir_navegador(url)
+        return 0
 
     # Servidor local em background (o modo --sem-servidor usa o que já roda)
     pronto = threading.Event()
@@ -193,6 +230,17 @@ def main() -> int:
     if not _esperar_servidor(f"http://{args.host}:{args.porta}"):
         print("ERRO: servidor não respondeu a tempo.")
         return 1
+
+    if MODO_NAVEGADOR:
+        # Linux: servidor no fundo + interface no navegador (sem janela nativa)
+        _abrir_navegador(url)
+        print("  Interface no navegador — encerre pelo botão Sair (Admin → Sobre) ou Ctrl+C.")
+        try:
+            while True:
+                time.sleep(1)
+        except KeyboardInterrupt:
+            print("\nEncerrando...")
+        return 0
 
     # Caminho do ícone (embutido no exe pelo PyInstaller)
     import os

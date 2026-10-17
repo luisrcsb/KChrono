@@ -18,6 +18,9 @@ empacotamento/stage/
 *.exe
 *.zip
 *.tar.gz
+*.AppImage
+# saída do empacotador unificado (binários grandes — só na CI/release)
+publicacao/
 # sistema
 .DS_Store
 Thumbs.db

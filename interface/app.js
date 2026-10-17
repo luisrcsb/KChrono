@@ -2597,7 +2597,7 @@ async function salvarRepoAtualizacao() {
 async function baixarAtualizacao() {
   const st = document.getElementById("upd-status");
   if (st) st.textContent = "baixando a versão nova… pode levar um minuto";
-  const r = await api("versao/baixar?chave=windows", "POST");
+  const r = await api("versao/baixar", "POST");   // backend escolhe windows/linux
   if (r.ok) {
     if (st) st.innerHTML = `baixado: <b>${r.arquivo}</b> (v${r.versao} · ${r.tamanho_mb} MB)` +
       ` — use "Instalar agora"`;
@@ -2608,8 +2608,9 @@ async function baixarAtualizacao() {
 
 async function instalarAtualizacao() {
   const st = document.getElementById("upd-status");
-  if (!confirm("Instalar a versão nova agora?\n\nO KChrono baixa o instalador, encerra e " +
-    "atualiza em silêncio. Reabra o app em instantes — banco, config e vozes não são afetados.")) return;
+  if (!confirm("Instalar a versão nova agora?\n\nO KChrono baixa a atualização, encerra e " +
+    "instala em silêncio (Windows: instalador; Linux: troca do AppImage). Reabra o app em " +
+    "instantes — banco, config e vozes não são afetados.")) return;
   if (st) st.textContent = "baixando e preparando a atualização…";
   const r = await api("versao/instalar", "POST");
   if (!r.ok) {
@@ -2620,6 +2621,12 @@ async function instalarAtualizacao() {
     ` o app vai fechar — abra novamente em alguns segundos`;
   logMsg(`atualização para v${r.versao} em andamento — o app vai encerrar`,
     "l-admin", "log-operador");
+}
+
+async function encerrarApp() {
+  if (!confirm("Sair do KChrono?\n\nO servidor local vai parar (feche a aba depois).")) return;
+  const r = await api("app/sair", "POST");
+  if (r.ok) logMsg("KChrono encerrando…", "l-admin", "log-operador");
 }
 
 async function configurarSync() {

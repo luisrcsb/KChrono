@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=KChrono
+GenericName=Cronometragem RC
+Comment=Cronometragem de corridas RC com voz neural offline
+Exec=/opt/kchrono/KChrono.AppImage
+Icon=kchrono
+Terminal=false
+Categories=Utility;AudioVideo;Sports;
+StartupNotify=true

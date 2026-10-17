@@ -128,7 +128,7 @@ def main():
               '',
               'msgid ""',
               'msgstr ""',
-              '"Project-Id-Version: KChrono 1.0.4\\n"',
+              '"Project-Id-Version: KChrono 1.0.5\\n"',
               '"POT-Creation-Date: 2026-10-13\\n"',
               '"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\\n"',
               '"Last-Translator: FULL NAME <EMAIL@ADDRESS>\\n"',

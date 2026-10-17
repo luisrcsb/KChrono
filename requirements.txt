@@ -11,7 +11,7 @@ bleak>=0.21            # SKYRC LapWiz (Bluetooth BLE)
 
 # Voz TTS no Windows (locutor offline SAPI; reserva via pyttsx3)
 pyttsx3>=2.90
-comtypes>=1.2
+comtypes>=1.2; sys_platform == "win32"
 pywin32>=306; sys_platform == "win32"
 
 # Voz NEURAL offline (locução natural em pt-BR, sem internet) — recomendado.
