@@ -1,2 +1,9 @@
-task-xfce-desktop
+xserver-xorg
+xfce4
+xfce4-terminal
+lightdm
+dbus-x11
+policykit-1
+fonts-dejavu
+xdg-utils
 firefox-esr

@@ -49,6 +49,7 @@ lb config \
     --iso-publisher "KChrono" \
     --iso-volume "KChrono" \
     --archive-areas "main contrib non-free non-free-firmware" \
+    --apt-recommends false \
     --debian-installer live \
     --debian-installer-gui true \
     --bootloaders "syslinux,grub-efi" \
