@@ -29,6 +29,8 @@ CONFIG_MODELO = {
     "telao_tela": 1,                # monitor do telão 2ª tela (0 = principal)
     "voz_contagem": True,           # voz na contagem regressiva/largada
     "contador_s": 10,               # segundos da contagem antes da largada
+    # canal de atualização: repositório GitHub (usuario/repo) com releases
+    "atualizacao_repo": "",
 }
 
 

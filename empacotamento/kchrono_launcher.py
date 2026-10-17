@@ -29,8 +29,7 @@ import webview
 
 from servidor.api import app
 from nucleo.log import configurar_log
-
-VERSAO = "1.0.0"
+from atualizador import VERSAO_ATUAL as VERSAO   # espelha empacotamento/versao.json
 TITULO_JANELA = "KChrono — Cronometragem RC"
 TITULO_TELAO = "KChrono — Telão"
 URL_BASE = "http://127.0.0.1:8780"  # 127.0.0.1 evita prompt de firewall na 1ª execução

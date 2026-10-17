@@ -276,7 +276,7 @@ def gerar_po(msgids, saida, idioma):
         '',
         'msgid ""',
         'msgstr ""',
-        f'"Project-Id-Version: KChrono 1.0.3\\n"',
+        f'"Project-Id-Version: KChrono 1.0.4\\n"',
         f'"PO-Revision-Date: 2026-10-13\\n"',
         f'"Last-Translator: Auto-generated\\n"',
         f'"Language-Team: KChrono Team\\n"',

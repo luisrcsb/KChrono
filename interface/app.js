@@ -296,6 +296,13 @@ function tratarEvento(ev) {
       notificar("ghost_lap", `Ghost lap descartado — transponder ${ev.transponder}`, "👻");
       break;
     case "aviso": logMsg(`AVISO: ${ev.msg}`, "l-aviso", "log-operador"); break;
+    case "atualizacao":
+      if (ev.disponivel) {
+        const stU = document.getElementById("upd-status");
+        if (stU) stU.innerHTML = `<b style="color:var(--accent-green)">v${ev.versao_remota} disponível</b>` +
+          ` (atual v${ev.versao_atual}) — use "Instalar agora"`;
+      }
+      break;
     case "erro":
       logMsg(`ERRO: ${ev.msg}`, "l-erro", "log-operador");
       if (/decoder|conectad|conex/i.test(ev.msg || "")) refreshDecoderPainel();
@@ -2550,31 +2557,69 @@ async function encerrarCampeonato() {
 // ---------------------------------------------------------------- atualizações
 async function verificarVersao() {
   const st = document.getElementById("upd-status");
+  const versaoEl = document.getElementById("upd-versao");
   if (st) st.textContent = "verificando…";
   const r = await api("versao", "GET");
+  // restaura o repositório salvo no campo (sem apagar o que está sendo digitado)
+  const repo = document.getElementById("upd-repo");
+  if (repo && !repo.value && r.repo) repo.value = r.repo;
+  if (versaoEl && r.versao_atual) versaoEl.textContent = r.versao_atual;
   if (!st) return;
   if (r.disponivel) {
-    st.innerHTML = `<b style="color:var(--accent-green)">v${r.versao_remota} disponível</b> ` +
-      `(atual ${r.versao_atual})`;
+    const mb = r.arquivos?.windows?.tamanho;
+    st.innerHTML = `<b style="color:var(--accent-green)">v${r.versao_remota} disponível</b>` +
+      ` (atual v${r.versao_atual})${mb ? ` · ${(mb / 1e6).toFixed(0)} MB` : ""}` +
+      (r.canal ? ` · ${r.canal}` : "");
   } else if (r.erro) {
     st.textContent = `não foi possível verificar: ${r.erro}`;
   } else if (r.motivo) {
     st.textContent = `${r.versao_atual} · ${r.motivo}`;
   } else {
-    st.textContent = `${r.versao_atual} · já é a versão mais recente`;
+    st.textContent = `${r.versao_atual} · já é a versão mais recente` +
+      (r.canal ? ` · ${r.canal}` : "");
   }
+}
+
+async function salvarRepoAtualizacao() {
+  const inp = document.getElementById("upd-repo");
+  // aceita colar a URL do GitHub também (github.com/usuario/repo)
+  const repo = (inp?.value || "").trim()
+    .replace(/^https?:\/\/(www\.)?github\.com\//i, "").replace(/\/+$/, "");
+  if (!repo || !repo.includes("/")) {
+    alert("Informe o repositório no formato usuario/repo\n(ex.: seuusuario/KChrono).");
+    return;
+  }
+  const r = await api(`versao/repo?repo=${encodeURIComponent(repo)}`, "POST");
+  logMsg(`atualizações: canal definido para ${r.repo}`, "l-admin", "log-operador");
+  verificarVersao();
 }
 
 async function baixarAtualizacao() {
   const st = document.getElementById("upd-status");
-  if (st) st.textContent = "baixando…";
-  const chave = navigator.platform.toLowerCase().includes("win") ? "windows" : "linux";
-  const r = await api(`versao/baixar?chave=${chave}`);
+  if (st) st.textContent = "baixando a versão nova… pode levar um minuto";
+  const r = await api("versao/baixar?chave=windows", "POST");
   if (r.ok) {
-    if (st) st.innerHTML = `baixado: <b>${r.arquivo}</b> (v${r.versao}) — execute para atualizar`;
+    if (st) st.innerHTML = `baixado: <b>${r.arquivo}</b> (v${r.versao} · ${r.tamanho_mb} MB)` +
+      ` — use "Instalar agora"`;
   } else if (st) {
-    st.textContent = `falha: ${r.erro}`;
+    st.textContent = `falha no download: ${r.erro}`;
   }
+}
+
+async function instalarAtualizacao() {
+  const st = document.getElementById("upd-status");
+  if (!confirm("Instalar a versão nova agora?\n\nO KChrono baixa o instalador, encerra e " +
+    "atualiza em silêncio. Reabra o app em instantes — banco, config e vozes não são afetados.")) return;
+  if (st) st.textContent = "baixando e preparando a atualização…";
+  const r = await api("versao/instalar", "POST");
+  if (!r.ok) {
+    if (st) st.textContent = `falha: ${r.erro}`;
+    return;
+  }
+  if (st) st.innerHTML = `<b style="color:var(--accent-green)">atualizando para v${r.versao}…</b>` +
+    ` o app vai fechar — abra novamente em alguns segundos`;
+  logMsg(`atualização para v${r.versao} em andamento — o app vai encerrar`,
+    "l-admin", "log-operador");
 }
 
 async function configurarSync() {
@@ -2657,6 +2702,7 @@ async function atualizarSync() {
 
 setInterval(atualizarSync, 8000);
 atualizarSync();   // logo na abertura: restaura e-mail/senha/pista salvos
+verificarVersao(); // checa versão nova na abertura (resultado no Admin → Sobre)
 
 function previewNome() {
   const agora = new Date();

@@ -71,6 +71,8 @@ a = Analysis(
     datas=[
         (os.path.join(RAIZ, "interface"), "interface"),
         (os.path.join(RAIZ, "imagens"), "imagens"),
+        # versão do app (o atualizador compara com o canal de atualização)
+        (os.path.join(RAIZ, "empacotamento", "versao.json"), "empacotamento"),
     ] + _DADOS_VOZ + _VOZES_NURAIS,
     hiddenimports=HIDDEN,
     hookspath=[],

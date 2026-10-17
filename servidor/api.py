@@ -27,7 +27,7 @@ DIR_IMAGENS = DIR_PROJETO / "imagens"
 
 estado = EstadoApp()
 
-app = FastAPI(title="KChrono", version="1.0.3")
+app = FastAPI(title="KChrono", version="1.0.4")
 
 app.mount("/imagens", StaticFiles(directory=DIR_IMAGENS), name="imagens")
 app.mount("/static", StaticFiles(directory=DIR_INTERFACE), name="static")
@@ -68,6 +68,24 @@ async def _auto_conectar_sync():
             log.warning("sync não reconectado no boot: %s", e)
     # auto-conexão do decoder em loop (checkbox 'Conectar ao abrir', padrão on)
     estado.iniciar_auto_conectar()
+    # aviso discreto de versão nova (uma vez por abertura, sem travar o boot)
+    asyncio.create_task(_checar_atualizacao_boot())
+
+
+async def _checar_atualizacao_boot():
+    """Verifica o canal de atualização e avisa no log/painel se há versão nova."""
+    await asyncio.sleep(20)
+    try:
+        from atualizador import verificar
+        ver = await asyncio.to_thread(verificar)
+    except Exception as e:
+        log.debug("verificação de atualização falhou: %s", e)
+        return
+    if ver.get("disponivel"):
+        msg = (f"v{ver['versao_remota']} disponível (atual v{ver['versao_atual']})"
+               " — Admin → Sobre → Atualizações")
+        log.info("atualização: %s", msg)
+        estado.publicar("aviso", {"msg": msg})
 
 
 @app.get("/api/status")
@@ -142,14 +160,32 @@ async def api_portas():
 
 @app.get("/api/versao")
 async def api_versao():
-    from atualizador import verificar
-    return verificar()
+    from atualizador import VERSAO_ATUAL, verificar
+    return {"versao_atual": VERSAO_ATUAL, **await asyncio.to_thread(verificar)}
 
 
 @app.post("/api/versao/baixar")
 async def api_versao_baixar(chave: str = Query("windows")):
     from atualizador import baixar
-    return baixar(chave)
+    return await asyncio.to_thread(baixar, chave)
+
+
+@app.post("/api/versao/repo")
+async def api_versao_repo(repo: str = Query(...)):
+    """Define o repositório GitHub (usuario/repo) usado para atualizar o app."""
+    from .config import carregar_config, salvar_config
+    cfg = carregar_config()
+    cfg["atualizacao_repo"] = (repo or "").strip().strip("/")
+    salvar_config(cfg)
+    estado.config = cfg                       # mantém o config vivo em sincronia
+    return {"ok": True, "repo": cfg["atualizacao_repo"]}
+
+
+@app.post("/api/versao/instalar")
+async def api_versao_instalar():
+    """Baixa a versão nova, executa o instalador em silêncio e encerra o app."""
+    from atualizador import instalar
+    return await asyncio.to_thread(instalar)
 
 
 # ---------------------------------------------------------------- voz / som (Admin)

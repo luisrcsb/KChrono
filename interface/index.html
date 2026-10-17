@@ -51,7 +51,7 @@
       <img id="side-qr-img" alt="QR Code de Gestão Remota" style="display:none">
       <div class="side-qr-info" id="side-qr-info">gerando…</div>
     </div>
-    <div class="admin-rodape"><span id="ws-status">Desconectado do servidor</span><br>KChrono v1.0.3<br>por Raphael Belowodski</div>
+    <div class="admin-rodape"><span id="ws-status">Desconectado do servidor</span><br>KChrono v1.0.4<br>por Raphael Belowodski</div>
   </aside>
   <div class="corpo">
 
@@ -990,14 +990,23 @@
       <!-- ============ SOBRE ============ -->
       <div class="admin-sec" id="a-sobre">
         <div class="grid g4">
-          <div class="card"><h3>Versão</h3><div class="big">1.0.0</div><div class="sub">Fases 0 → 7 concluídas</div></div>
+          <div class="card"><h3>Versão</h3><div class="big" id="upd-versao">1.0.4</div><div class="sub">Fases 0 → 7 concluídas · atualizações pelo GitHub</div></div>
           <div class="card"><h3>Drivers</h3><div class="big" style="font-size:20px">P3 · EASYLAP · LapWiz</div><div class="sub">TCP · serial · Bluetooth</div></div>
           <div class="card"><h3>Stack</h3><div class="big" style="font-size:20px">Python · FastAPI</div><div class="sub">SQLite · WebSocket · vanilla JS</div></div>
           <div class="card"><h3>Atualizações</h3><div class="sub" id="upd-status">aguardando verificação…</div>
+            <div style="margin-top:8px"><label>Repositório GitHub da atualização (usuario/repo público)</label>
+              <div style="display:flex; gap:6px">
+                <input id="upd-repo" placeholder="ex.: seuusuario/KChrono" style="flex:1; min-width:0">
+                <button class="btn-slide" onclick="salvarRepoAtualizacao()">💾</button>
+              </div></div>
             <div style="display:flex; gap:8px; margin-top:8px; flex-wrap:wrap">
-              <button class="btn-slide" onclick="verificarVersao()">🔄 Verificar</button>
+              <button class="btn-slide" onclick="verificarVersao()">🔍 Verificar</button>
               <button class="btn-slide" onclick="baixarAtualizacao()">⬇ Baixar</button>
+              <button class="btn-slide" onclick="instalarAtualizacao()">🔄 Instalar agora</button>
             </div>
+            <p class="hint">Publique a versão nova como <b>release no GitHub</b> (tag <code>v1.0.5</code>,
+              asset <code>KChrono-Setup.exe</code>). "Instalar agora" baixa, fecha o app e instala em
+              silêncio — ao reabrir já é a versão nova (os dados ficam intactos).</p>
           </div>
         </div>
         <div class="admin-secao-tit">Créditos</div>
@@ -1022,7 +1031,7 @@
   <div class="dir">
     <span id="rodape-sync">Sincronização CTAD: aguardando</span>
     <span class="pill novo">NOVIDADE</span>
-    <span>KChrono v1.0.3 · por <b>Raphael Belowodski</b></span>
+    <span>KChrono v1.0.4 · por <b>Raphael Belowodski</b></span>
   </div>
 </div>
 
