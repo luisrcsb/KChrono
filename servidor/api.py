@@ -16,7 +16,7 @@ from .estado import EstadoApp
 from .gerente import acesso
 from .qr import (base_url_para_qr as qr_base_url, data_uri as qr_data_uri,
                  disponivel as qr_disponivel)
-from sync import ErroAuth
+from sync import ErroAuth, ErroBanco
 from caminhos import dir_recursos
 
 log = logging.getLogger("kchrono.api")
@@ -76,8 +76,20 @@ async def api_status():
 
 
 @app.post("/api/decoder/conectar")
-async def api_conectar(tipo: str = Query("p3"), alvo: Optional[str] = Query(None)):
+async def api_conectar(tipo: str = Query("p3"), alvo: Optional[str] = Query(None),
+                       velocidade: Optional[float] = Query(None)):
+    if tipo == "simulador" and velocidade:
+        estado.config["sim_velocidade"] = float(velocidade)
     return {"ok": await estado.conectar_decoder(tipo, alvo)}
+
+
+@app.get("/api/simulador/sessoes")
+async def api_simulador_sessoes():
+    """Lista as corridas enviadas ao CTAD (opções do simulador de transponder)."""
+    try:
+        return {"ok": True, "sessoes": await asyncio.to_thread(estado.listar_sessoes_ctad)}
+    except (ErroAuth, ErroBanco, ValueError, RuntimeError) as e:
+        return {"ok": False, "erro": str(e)}
 
 
 @app.get("/api/decoder/auto")
@@ -364,7 +376,8 @@ async def api_sync_configurar(email: str = Query(...), password: str = Query(...
     try:
         return {"ok": True, **estado.configurar_sync(email, password, pista_id)}
     except ErroAuth as e:
-        return {"ok": False, "erro": str(e)}
+        # credenciais já foram persistidas antes do teste (configurar_sync)
+        return {"ok": False, "erro": str(e), "salvo": True}
 
 
 @app.post("/api/sync/enviar")
@@ -394,7 +407,13 @@ async def api_sync_processar():
 
 @app.get("/api/sync/status")
 async def api_sync_status():
-    return estado.sincronizador.status()
+    """Status do sync + credenciais salvas (app local: os campos do Admin
+    precisam voltar a mostrar o que foi configurado)."""
+    cfg = estado.config
+    return {**estado.sincronizador.status(),
+            "email": cfg.get("email", ""),
+            "password": cfg.get("password", ""),
+            "pistaId": cfg.get("pistaId", "krathus")}
 
 
 @app.get("/api/sync/pilotos")

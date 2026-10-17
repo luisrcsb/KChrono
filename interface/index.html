@@ -430,7 +430,7 @@
           <div class="form-sessao">
             <div><label>E-mail (conta do site)</label><input id="sync-email" type="email" placeholder="email@exemplo.com"></div>
             <div><label>Senha</label><input id="sync-senha" type="password" placeholder="senha do CTAD"></div>
-            <div><label>ID da pista</label><input id="sync-pista" value="krathus"></div>
+            <div><label>ID da pista</label><input id="sync-pista" placeholder="krathus"></div>
             <button class="btn-slide" onclick="configurarSync()">🔐 Conectar e testar</button>
           </div>
           <p class="hint">Status: <b id="sync-status-text" style="color:var(--text-muted)">não configurado</b>
@@ -663,10 +663,24 @@
                   <option value="p3">MyLaps / AMB P3 (TCP)</option>
                   <option value="easylap">EASYLAP-USB (serial Robitronic)</option>
                   <option value="lapwiz">SKYRC LapWiz (Bluetooth BLE)</option>
+                  <option value="simulador">Simulador de corrida (CTAD)</option>
                 </select></div>
               <div><label id="hw-alvo-label">IP do decoder</label>
                 <input id="hw-alvo" value="192.168.0.50"></div>
               <div id="hw-porta-wrap"><label>Porta TCP</label><input id="hw-porta" value="5403"></div>
+              <div id="hw-sim-wrap" style="display:none"><label>Sessão do CTAD (reproduz como transponder)</label>
+                <div style="display:flex; gap:6px">
+                  <select id="hw-sessao" style="flex:1; min-width:0">
+                    <option value="">— carregue as sessões —</option>
+                  </select>
+                  <select id="hw-velocidade" title="Velocidade da reprodução" style="width:64px">
+                    <option value="1">1x</option>
+                    <option value="2">2x</option>
+                    <option value="5">5x</option>
+                    <option value="10">10x</option>
+                  </select>
+                  <button class="btn-slide" onclick="carregarSessoesCTAD()" title="Carregar corridas enviadas ao CTAD">🔄</button>
+                </div></div>
             </div>
             <p class="hint">Status: <b id="hw-status">—</b> · temp <b id="hw-temp">—</b> · tensão <b id="hw-tensao">—</b> · ruído <b id="hw-ruido">—</b></p>
             <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center">
@@ -685,6 +699,7 @@
               <tr><td>MyLaps / AMB P3</td><td>operacional — TCP, validado ao vivo</td></tr>
               <tr><td>EASYLAP-USB <span class="pill ok">pronto</span></td><td>serial 38400 8N1 · protocolo Robitronic — conecte p/ testar</td></tr>
               <tr><td>SKYRC LapWiz (RT004) <span class="pill novo">captura</span></td><td>BLE · descoberta + captura p/ decodificar o protocolo</td></tr>
+              <tr><td>Simulador (CTAD) <span class="pill novo">novo</span></td><td>reproduz uma corrida enviada ao CTAD como se fosse o transponder</td></tr>
               <tr><td>LapZ · GiroZ · RiCino</td><td>roadmap — serial/USB</td></tr>
             </table>
             <p class="hint">Teste de bancada via CLI: <code>python cli.py easylap --porta COM3</code> · <code>python cli.py lapwiz</code></p>

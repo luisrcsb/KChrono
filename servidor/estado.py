@@ -100,6 +100,9 @@ class EstadoApp:
 
         # --- Fase 3: sincronização com o CTAD ---
         self.config = carregar_config()
+        # o simulador é escolha de teste — nunca persiste entre aberturas
+        if self.config.get("decoder_tipo") == "simulador":
+            self.config["decoder_tipo"] = "p3"
         self.sincronizador = Sincronizador(
             banco=self.banco,
             pista_id=self.config.get("pistaId", "krathus"))
@@ -171,7 +174,7 @@ class EstadoApp:
                  transponder, tempo_us / 1e6)
 
     def _criar_driver(self, tipo: str, alvo: Optional[str] = None):
-        """Fábrica de drivers — p3 (MyLaps) | easylap (serial) | lapwiz (BLE)."""
+        """Fábrica de drivers — p3 (MyLaps) | easylap | lapwiz | simulador."""
         if tipo == "p3":
             return MyLapsP3(alvo or self.config.get("decoder_host", "192.168.0.50"),
                             int(self.config.get("decoder_porta", 5403)))
@@ -181,7 +184,18 @@ class EstadoApp:
         if tipo == "lapwiz":
             from drivers.lapwiz import LapWiz
             return LapWiz(endereco=alvo)
+        if tipo == "simulador":
+            from drivers.simulador import SimuladorCTAD
+            return SimuladorCTAD(banco=self.banco, sessao_key=alvo or "",
+                                 velocidade=float(self.config.get("sim_velocidade") or 1.0),
+                                 resolver_cliente=self._cliente_ctad,
+                                 ao_terminar=self._simulador_terminou)
         raise ValueError(f"driver desconhecido: {tipo}")
+
+    def _simulador_terminou(self):
+        """Replay do simulador completo (volta a esperar a próxima sessão)."""
+        self.publicar("sistema", {"msg": "simulador: replay concluído"
+                                         " — abra outra sessão para repetir"})
 
     async def desconectar_decoder(self) -> None:
         """Encerra o driver atual e a tarefa de leitura, se houver."""
@@ -396,6 +410,11 @@ class EstadoApp:
                 self.iniciar_auto_conectar()
             return False
         self._apos_conectar(tipo)
+        # simulador: se já há sessão em andamento, começa a emitir já
+        if tipo == "simulador" and hasattr(self.driver, "armar_replay"):
+            estado_motor = getattr(getattr(self.motor, "estado", None), "value", "")
+            if estado_motor not in ("", "parado", "finalizado"):
+                self.driver.armar_replay()
         return True
 
     async def _ler_decoder(self):
@@ -611,6 +630,9 @@ class EstadoApp:
                  self.sessao_id[:8], tipo, len(vinculos), len(self.motor._pilotos))
         self.motor.iniciar(TipoSessao(tipo))
         self.som.iniciada(tipo)
+        # simulador de CTAD: começa a emitir passagens junto com a sessão
+        if hasattr(self.driver, "armar_replay"):
+            self.driver.armar_replay()
         if tipo == "corrida" and self.voz_contagem_ativa():
             self.som.anunciar_largada()
         self.contadores = {"passings_validos": 0, "ghost_laps": 0, "gaps": 0,
@@ -1055,6 +1077,9 @@ class EstadoApp:
         if not self.motor:
             return False
         self.motor.finalizar()
+        # simulador de CTAD: corta a reprodução junto com a sessão
+        if hasattr(self.driver, "parar_replay"):
+            self.driver.parar_replay()
         self.pausado = False
         # congela o cronômetro no tempo final da sessão
         self._tempo_final_s = self.tempo_sessao_s()
@@ -1199,22 +1224,68 @@ class EstadoApp:
 
     # ---------------------------------------------------------------- sync (Fase 3)
     def configurar_sync(self, email: str, password: str, pista_id: Optional[str] = None) -> Dict:
-        """Configura e testa a conta do CTAD (login real, como o site)."""
+        """Configura e testa a conta do CTAD (login real, como o site).
+
+        As credenciais digitadas são persistidas ANTES do teste — assim elas
+        não se perdem quando a rede cai ou o login é recusado (o boot tenta
+        de novo na próxima abertura). Só liga o sincronizador no teste ok.
+        """
         cfg = dict(self.config)
         cfg["email"] = email
         if password:
             cfg["password"] = password
         if pista_id:
             cfg["pistaId"] = pista_id
-        cliente = CtadClient(cfg)
-        info = cliente.testar_conexao()   # levanta ErroAuth se recusado
-        # login ok — persiste e liga o sincronizador
         self.config = cfg
         salvar_config(cfg)
+        cliente = CtadClient(cfg)
+        info = cliente.testar_conexao()   # levanta ErroAuth se recusado
+        # login ok — liga o sincronizador
         self.sincronizador.cliente = cliente
         self.sincronizador.pista_id = cfg.get("pistaId", "krathus")
         self.publicar("sync", {"msg": f"conectado ao CTAD ({info['nivel']})"})
         return info
+
+    def _cliente_ctad(self):
+        """Cliente CTAD logado — reusa o do sincronizador ou loga do config."""
+        if self.sincronizador and self.sincronizador.cliente:
+            return self.sincronizador.cliente
+        cfg = self.config
+        if not (cfg.get("email") and cfg.get("password")):
+            raise ErroAuth("configure e-mail/senha do CTAD no Admin → Sincronização")
+        cliente = CtadClient(cfg)
+        cliente.login()
+        if self.sincronizador:
+            self.sincronizador.cliente = cliente
+        return cliente
+
+    def listar_sessoes_ctad(self) -> List[Dict]:
+        """Sessões enviadas ao CTAD (publicResumo/baterias) — p/ o simulador.
+
+        As da própria pista vêm primeiro; cada item traz a chave da bateria
+        (``key``) usada como alvo do driver simulador.
+        """
+        cliente = self._cliente_ctad()
+        resumos = cliente.rtdb_get("publicResumo/baterias") or {}
+        pista = (self.sincronizador.pista_id if self.sincronizador
+                 else self.config.get("pistaId", "krathus"))
+        sessoes: List[Dict] = []
+        for chave, r in resumos.items():
+            r = r or {}
+            melhor = r.get("melhorVolta") if isinstance(r.get("melhorVolta"), dict) else {}
+            sessoes.append({
+                "key": chave,
+                "sessao": r.get("sessao") or chave,
+                "pista": r.get("pistaId") or "",
+                "pilotos": r.get("totalPilotos") or 0,
+                "melhor": melhor.get("tempo"),
+                "melhor_piloto": melhor.get("piloto") or "",
+                "podio": r.get("podio") or [],
+                "atualizado": r.get("atualizadoEm") or 0,
+            })
+        # da minha pista primeiro; dentro do grupo, mais recentes primeiro
+        sessoes.sort(key=lambda s: (s["pista"] != pista, -s["atualizado"]))
+        return sessoes[:200]
 
     def _nome_sessao_para(self, sessao_id: str) -> str:
         try:

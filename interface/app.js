@@ -83,6 +83,18 @@ async function api(caminho, metodo = "POST", params = "", corpo = null) {
 }
 const conectarDecoder = () => {
   const tipo = document.getElementById("hw-tipo")?.value || "p3";
+  if (tipo === "simulador") {
+    // alvo = sessão do CTAD escolhida; velocidade da reprodução (1x..10x)
+    const sessao = document.getElementById("hw-sessao")?.value || "";
+    if (!sessao) {
+      logMsg("simulador: carregue e escolha uma corrida do CTAD (botão 🔄)",
+        "l-erro", "log-operador");
+      return Promise.resolve({ ok: false });
+    }
+    const vel = parseFloat(document.getElementById("hw-velocidade")?.value || "1") || 1;
+    return api("decoder/conectar", "POST",
+      `?tipo=simulador&alvo=${encodeURIComponent(sessao)}&velocidade=${vel}`);
+  }
   const alvoField = document.getElementById("hw-alvo")?.value?.trim() || "";
   if (tipo === "p3") {
     return api("decoder/conectar", "POST",
@@ -153,8 +165,17 @@ function hwTrocarTipo() {
   const label = document.getElementById("hw-alvo-label");
   const alvo = document.getElementById("hw-alvo");
   const wrapPorta = document.getElementById("hw-porta-wrap");
+  const wrapSim = document.getElementById("hw-sim-wrap");
+  if (wrapSim) wrapSim.style.display = tipo === "simulador" ? "" : "none";
+  if (tipo === "simulador") {
+    label.textContent = "IP do decoder"; alvo.disabled = true;
+    if (wrapPorta) wrapPorta.style.display = "none";
+    carregarSessoesCTAD();
+    return;
+  }
+  alvo.disabled = false;
   if (tipo === "p3") {
-    label.textContent = "IP do decoder"; alvo.value = "192.168.0.50"; alvo.disabled = false;
+    label.textContent = "IP do decoder"; alvo.value = "192.168.0.50";
     if (wrapPorta) wrapPorta.style.display = "";
   } else if (tipo === "easylap") {
     label.textContent = "Porta serial (COM)"; alvo.value = alvo.value.startsWith("COM") ? alvo.value : "COM3";
@@ -163,6 +184,28 @@ function hwTrocarTipo() {
     label.textContent = "Endereço BLE (vazio = descobrir)"; alvo.value = "";
     if (wrapPorta) wrapPorta.style.display = "none";
   }
+}
+async function carregarSessoesCTAD() {
+  // popula o seletor de corridas enviadas ao CTAD (simulador de transponder)
+  const sel = document.getElementById("hw-sessao");
+  if (!sel) return;
+  const anterior = sel.value;
+  sel.innerHTML = `<option value="">carregando…</option>`;
+  const r = await api("simulador/sessoes", "GET");
+  if (!r.ok) {
+    sel.innerHTML = `<option value="">— ${r.erro || "falha ao listar"} —</option>`;
+    return;
+  }
+  const sessoes = r.sessoes || [];
+  if (!sessoes.length) {
+    sel.innerHTML = `<option value="">— nenhuma corrida enviada ao CTAD —</option>`;
+    return;
+  }
+  sel.innerHTML = sessoes.map(s =>
+    `<option value="${s.key}">${s.sessao} · ${s.pilotos} pilotos`
+    + (s.melhor ? ` · melhor ${s.melhor}s` : "")
+    + `${s.pista ? ` · ${s.pista}` : ""}</option>`).join("");
+  if (anterior && [...sel.options].some(o => o.value === anterior)) sel.value = anterior;
 }
 // Telão em janela NATIVA do app (via Python); fora do app, cai no window.open.
 function telaoNativo(segundaTela) {
@@ -341,7 +384,7 @@ function renderSnapshot(s) {
 function renderDecoder(d) {
   const el = document.getElementById("card-decoder");
   const sub = document.getElementById("card-decoder-sub");
-  const nomes = { p3: "MyLaps P3", easylap: "EASYLAP-USB", lapwiz: "SKYRC LapWiz" };
+  const nomes = { p3: "MyLaps P3", easylap: "EASYLAP-USB", lapwiz: "SKYRC LapWiz", simulador: "Simulador CTAD" };
   if (el) {
     el.textContent = d.conectado ? "Conectado" : "Desconectado";
     el.style.color = d.conectado ? "var(--accent-green)" : "var(--accent-red)";
@@ -2546,7 +2589,10 @@ async function configurarSync() {
     document.getElementById("sync-nivel").textContent = r.nivel;
     logMsg(`sync: conectado ao CTAD como ${r.nivel}`, "l-admin", "log-operador");
   } else {
-    atualizarSyncTexto(`falhou: ${r.erro}`, "var(--accent-red)");
+    // credenciais ficam salvas mesmo com o teste falhando (rede/login)
+    atualizarSyncTexto(`falhou: ${r.erro}${r.salvo ? " — e-mail/senha salvos; tentaremos ao reabrir" : ""}`,
+      "var(--accent-red)");
+    logMsg(`sync: ${r.erro}${r.salvo ? " (credenciais salvas mesmo assim)" : ""}`, "l-erro", "log-operador");
   }
   atualizarSync();
 }
@@ -2584,6 +2630,15 @@ async function atualizarSync() {
   let s;
   try { s = await api("sync/status", "GET"); } catch (e) { return; }
   const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+  // restaura as credenciais salvas nos campos (só quando vazios — o timer de
+  // 8s não pode apagar o que o usuário está digitando agora)
+  const restaurar = (id, valor) => {
+    const el = document.getElementById(id);
+    if (el && !el.value && valor) el.value = valor;
+  };
+  restaurar("sync-email", s.email);
+  restaurar("sync-senha", s.password);
+  restaurar("sync-pista", s.pistaId);
   set("up-fila", s.pendentes ?? 0);
   set("up-enviados", s.enviados ?? 0);
   set("up-falhas", s.falhas ?? 0);
@@ -2601,6 +2656,7 @@ async function atualizarSync() {
 }
 
 setInterval(atualizarSync, 8000);
+atualizarSync();   // logo na abertura: restaura e-mail/senha/pista salvos
 
 function previewNome() {
   const agora = new Date();
