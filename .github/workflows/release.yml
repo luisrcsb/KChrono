@@ -91,17 +91,18 @@ jobs:
           name: publicacao-linux
           path: publicacao/linux
 
-      - name: Ferramentas live-build
+      - name: Ferramentas live-build (container Debian)
         run: |
-          sudo apt-get update
-          sudo apt-get install -y live-build debootstrap squashfs-tools \
-            xorriso dosfstools mtools systemd-container
+          docker pull debian:bookworm
 
       - name: ISO da live (Debian + Xfce + KChrono)
         run: |
           mkdir -p iso/config/includes.live/opt/kchrono
           cp publicacao/linux/*.AppImage iso/config/includes.live/opt/kchrono/KChrono.AppImage
-          sudo bash iso/montar_iso.sh
+          # O live-build do Ubuntu da runner é o ancestral 3.0~a57 (sem
+          # --bootloaders etc.) — montamos a ISO com o live-build do Debian
+          # dentro de um container privilegiado.
+          docker run --privileged --rm -v "$PWD:/trabalho" -w /trabalho debian:bookworm bash -c "set -e; apt-get update; DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends live-build debootstrap squashfs-tools xorriso dosfstools mtools systemd-container ca-certificates; bash iso/montar_iso.sh"
 
       - name: Pasta publicacao/iso
         run: |

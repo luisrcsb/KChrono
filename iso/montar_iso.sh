@@ -8,6 +8,10 @@
 # (a CI copia automaticamente; localmente:
 #    cp publicacao/linux/*.AppImage iso/config/includes.live/opt/kchrono/KChrono.AppImage)
 #
+# Precisa do live-build do DEBIAN (>= 2020). O pacote "live-build" do Ubuntu
+# é o ancestral 3.0~a57 e não serve — por isso a CI roda este script dentro
+# de um container debian:bookworm.
+#
 # Saída: iso/build/KChrono-live-*.iso
 set -euo pipefail
 
