@@ -108,7 +108,7 @@ jobs:
         run: |
           mkdir -p publicacao/iso
           VER=$(python3 -c "import json; print(json.load(open('empacotamento/versao.json'))['versao'])")
-          ISO=$(ls iso/build/*.iso | head -n 1)
+          ISO=$(find iso -maxdepth 2 -type f -name 'KChrono-live*.iso' | head -n 1)
           cp "$ISO" "publicacao/iso/KChrono-live-${VER}-amd64.iso"
           ls -lh publicacao/iso/
 

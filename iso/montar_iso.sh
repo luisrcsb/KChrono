@@ -61,4 +61,10 @@ echo "== lb build (15 a 25 min)"
 lb build
 
 echo "== ISO gerada:"
-ls -lh "$RAIZ"/iso/build/*.iso
+# live-build novo grava o .iso direto no dir de trabalho (não em build/)
+ISO="$(find "$RAIZ/iso" -maxdepth 2 -type f -name 'KChrono-live*.iso' | head -n 1)"
+if [ -z "$ISO" ]; then
+    echo "ERRO: imagem nao encontrada em $RAIZ/iso"
+    exit 1
+fi
+ls -lh "$ISO"
