@@ -1,9 +1,8 @@
-# KChrono — pacotes da live/instalação (Alvo: pendrive pronto pra pista)
-libfuse2                 # libfuse2 do AppImage
-bluez                     # Bluetooth (LapWiz BLE)
-espeak-ng                 # fallback de voz offline (Piper é o principal)
-network-manager           # Wi-Fi (celular/roteador da pista)
-network-manager-gnome      # ícone de rede do Xfce
-firmware-misc-nonfree      # blobs de hardware (Wi-Fi/Bluetooth)
-firmware-iwlwifi           # Wi-Fi Intel
-firmware-realtek           # Wi-Fi Realtek
+libfuse2
+bluez
+espeak-ng
+network-manager
+network-manager-gnome
+firmware-misc-nonfree
+firmware-iwlwifi
+firmware-realtek
