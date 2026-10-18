@@ -11,8 +11,8 @@
 !include "LogicLib.nsh"
 
 ; VERSAO e VERSAO_ARQ são sincronizados com versao.json por build.py
-!define VERSAO "1.0.6"
-!define VERSAO_ARQ "1-0-6"
+!define VERSAO "1.0.7"
+!define VERSAO_ARQ "1-0-7"
 !define APP "KChrono"
 !define FABRICANTE "KChrono"
 !define EXE "dist\KChrono.exe"

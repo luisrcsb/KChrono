@@ -2222,6 +2222,29 @@ async function marcarTodosCheckin(todos) {
   const r = await api("checkin/lote", "POST", "", { presentes: ids });
   if (r.ok) { checkinCache.presentes = r.presentes; renderCheckin(); }
 }
+function checkinToggleForm() {
+  const f = document.getElementById("op-checkin-form");
+  if (!f) return;
+  const abrir = f.style.display === "none";
+  f.style.display = abrir ? "" : "none";
+  if (abrir) {
+    const n = document.getElementById("op-checkin-novo-nome");
+    if (n) n.focus();
+  }
+}
+async function checkinAdicionarPiloto() {
+  const nome = (document.getElementById("op-checkin-novo-nome").value || "").trim();
+  if (!nome) { alert("Informe o nome do piloto."); return; }
+  const transp = (document.getElementById("op-checkin-novo-transp").value || "").trim();
+  const params = `nome=${encodeURIComponent(nome)}&transponders=${encodeURIComponent(transp)}`;
+  const r = await api(`pilotos/criar?${params}`);
+  if (!r.ok) { alert(`Não foi possível salvar: ${r.erro || "erro"}`); return; }
+  logMsg(`piloto criado no check-in: ${nome}`, "l-sistema", "log-operador");
+  document.getElementById("op-checkin-novo-nome").value = "";
+  document.getElementById("op-checkin-novo-transp").value = "";
+  await carregarCheckin();
+  if (r.id) await toggleCheckin(r.id, true);   // já marca na pista
+}
 async function anunciarGerente() {
   const texto = document.getElementById("ger-anuncio").value.trim();
   if (!texto) { alert("Digite o texto do anúncio."); return; }

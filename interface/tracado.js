@@ -13,7 +13,11 @@
    }
 
    A largura em metros e convertida para pixels via comprimento_m: a escala do
-   desenho = comprimento do tracado em unidades / comprimento real em metros. */
+   desenho = comprimento do tracado em unidades / comprimento real em metros.
+
+   Visual: pista cinza escuro com contorno, bordas internas xadrez
+   vermelho/branco (1 segmento por metro real), setas do sentido dos carros,
+   linha de chegada xadrez e grid alinhado a largura da pista. */
 "use strict";
 
 const TC = (() => {
@@ -211,72 +215,155 @@ const TC = (() => {
     const larguraPx = frac => variavel
       ? Math.max(3, larguraEm(tr, frac) * unidPorM * esc)
       : 20;
+    const pxPorM = unidPorM * esc;   // pixels de tela por metro real
+
+    const traco = pts => {
+      ctx.beginPath();
+      const a = px(pts[0]);
+      ctx.moveTo(a.x, a.y);
+      for (let i = 1; i < pts.length; i++) {
+        const b = px(pts[i]);
+        ctx.lineTo(b.x, b.y);
+      }
+    };
 
     // pista: passadas com largura quantizada (0,5 px) para poupar draw calls
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
-    ctx.strokeStyle = "#26344f";
+    const trechos = [];
     let run = [linhas[0]];
     let qLarg = -1;
-    const flush = () => {
-      if (run.length > 1) {
-        ctx.lineWidth = qLarg;
-        ctx.beginPath();
-        const a = px(run[0]);
-        ctx.moveTo(a.x, a.y);
-        for (let i = 1; i < run.length; i++) {
-          const b = px(run[i]);
-          ctx.lineTo(b.x, b.y);
-        }
-        ctx.stroke();
-      }
-      run = [];
-    };
     for (let i = 1; i < linhas.length; i++) {
       const f = ((linhas[i].d / lenUnid) - fLarg + 1) % 1;
       const q = Math.max(3, Math.round(larguraPx(f) * 2) / 2);
-      if (q !== qLarg) { if (run.length) { flush(); run = [linhas[i - 1]]; } qLarg = q; }
+      if (q !== qLarg) {
+        if (run.length > 1) trechos.push({ pts: run, w: qLarg });
+        run = [linhas[i - 1]];
+        qLarg = q;
+      }
       run.push(linhas[i]);
     }
-    flush();
+    if (run.length > 1) trechos.push({ pts: run, w: qLarg });
+
+    // contorno escuro + superficie cinza escuro
+    ctx.strokeStyle = "#101318";
+    for (const t of trechos) { ctx.lineWidth = t.w + 3; traco(t.pts); ctx.stroke(); }
+    ctx.strokeStyle = "#3d434c";
+    for (const t of trechos) { ctx.lineWidth = t.w; traco(t.pts); ctx.stroke(); }
 
     // eixo central tracejado
-    ctx.strokeStyle = "rgba(80,140,255,0.55)";
+    ctx.strokeStyle = "rgba(120,165,255,0.45)";
     ctx.lineWidth = 1.5;
     ctx.setLineDash([8, 10]);
-    ctx.beginPath();
-    let a0 = px(linhas[0]);
-    ctx.moveTo(a0.x, a0.y);
-    for (let i = 1; i < linhas.length; i++) {
-      const b = px(linhas[i]);
-      ctx.lineTo(b.x, b.y);
-    }
+    traco(linhas);
     if (tr.fechada) ctx.closePath();
     ctx.stroke();
     ctx.setLineDash([]);
 
-    // linha de largada (fita xadrez simplificada, cruzando a pista)
+    // bordas internas xadrez vermelho/branco — 1 segmento por metro real
+    if (variavel && pxPorM >= 8) {
+      const kerbW = frac => Math.max(3, Math.min(12, larguraPx(frac) * 0.22));
+      for (const lado of [1, -1]) {
+        const borda = [];
+        for (let i = 0; i < linhas.length; i++) {
+          const dir = dirNaAmostra(i, tr.largada && tr.largada.ang);
+          const perp = { x: -dir.y * lado, y: dir.x * lado };
+          const f = ((linhas[i].d / lenUnid) - fLarg + 1) % 1;
+          const off = larguraPx(f) / 2 - kerbW(f) / 2;
+          borda.push({ x: linhas[i].x + perp.x * off, y: linhas[i].y + perp.y * off,
+                       d: linhas[i].d, f });
+        }
+        // quebra nos limites exatos de cada metro (alterna vermelho/branco)
+        const met = unidPorM;
+        const segs = [];
+        let atual = null;
+        const empurra = p => {
+          if (atual && atual.cor === p.cor) atual.pts.push(p);
+          else { atual = { cor: p.cor, pts: [p] }; segs.push(atual); }
+        };
+        for (let i = 0; i < borda.length - 1; i++) {
+          const a = borda[i], b = borda[i + 1];
+          const corA = Math.floor(a.d / met) % 2;
+          empurra({ x: a.x, y: a.y, d: a.d, f: a.f, cor: corA });
+          const prox = (Math.floor(a.d / met) + 1) * met;
+          if (prox < b.d) {
+            const t = (prox - a.d) / (b.d - a.d);
+            empurra({ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t, d: prox,
+                      f: a.f + (b.f - a.f) * t, cor: Math.floor(prox / met) % 2 });
+          }
+        }
+        const ult = borda[borda.length - 1];
+        empurra({ x: ult.x, y: ult.y, d: ult.d, f: ult.f, cor: Math.floor(ult.d / met) % 2 });
+        ctx.lineCap = "butt";
+        for (const s of segs) {
+          if (s.pts.length < 2) continue;
+          ctx.strokeStyle = s.cor === 0 ? "#d23b3b" : "#f2f4f8";
+          ctx.lineWidth = kerbW(s.pts[0].f);
+          traco(s.pts);
+          ctx.stroke();
+        }
+      }
+      ctx.lineCap = "round";
+    }
+
+    // setas do sentido dos carros (a cada volta/N metros)
+    if (variavel && pxPorM >= 10 && compM > 0) {
+      const passoM = Math.max(3, Math.round(compM / 9));
+      const passoD = passoM * unidPorM;
+      let proxD = passoD * 0.5;
+      ctx.strokeStyle = "rgba(240,244,250,0.6)";
+      ctx.lineWidth = 2;
+      for (let i = 1; i < linhas.length - 1; i++) {
+        if (linhas[i].d < proxD) continue;
+        proxD = linhas[i].d + passoD;
+        const dir = dirNaAmostra(i, tr.largada && tr.largada.ang);
+        const perp = { x: -dir.y, y: dir.x };
+        const p = linhas[i];
+        const f = ((p.d / lenUnid) - fLarg + 1) % 1;
+        const s = Math.max(4, Math.min(11, larguraPx(f) * 0.28));
+        const q = px(p);
+        const ponta = { x: q.x + dir.x * s * 0.9, y: q.y + dir.y * s * 0.9 };
+        ctx.beginPath();
+        ctx.moveTo(ponta.x, ponta.y);
+        ctx.lineTo(q.x - dir.x * s * 0.5 + perp.x * s * 0.7,
+                   q.y - dir.y * s * 0.5 + perp.y * s * 0.7);
+        ctx.moveTo(ponta.x, ponta.y);
+        ctx.lineTo(q.x - dir.x * s * 0.5 - perp.x * s * 0.7,
+                   q.y - dir.y * s * 0.5 - perp.y * s * 0.7);
+        ctx.stroke();
+      }
+    }
+
+    // linha de chegada (xadrez de verdade, cruzando a pista)
     if (tr.largada) {
       // projetada no caminho amostrado: bate com a fracao 0 do perfil de largura
       const p = px(linhas[iLarg]);
-      const perpDoDir = d => norm(-d.y, d.x);
       const dir = dirNaAmostra(iLarg, tr.largada.ang);
-      const perp = perpDoDir(dir);
-      const meia = larguraPx(0) / 2;
-      ctx.strokeStyle = "#f5f7fb";
-      ctx.lineWidth = 5;
-      ctx.beginPath();
-      ctx.moveTo(p.x + perp.x * meia, p.y + perp.y * meia);
-      ctx.lineTo(p.x - perp.x * meia, p.y - perp.y * meia);
-      ctx.stroke();
-      ctx.strokeStyle = "#111826";
-      ctx.lineWidth = 2;
-      ctx.setLineDash([4, 4]);
-      ctx.stroke();
-      ctx.setLineDash([]);
+      const perp = norm(-dir.y, dir.x);
+      const larg = larguraPx(0);
+      const cols = Math.max(6, Math.min(16, Math.round(larg / 5)));
+      const colsPar = cols % 2 ? cols + 1 : cols;
+      const cw = larg / colsPar;
+      const prof = Math.max(3, Math.min(7, larg * 0.13));
+      for (let r = 0; r < 2; r++) {
+        for (let c = 0; c < colsPar; c++) {
+          ctx.fillStyle = (r + c) % 2 ? "#f2f4f8" : "#14171c";
+          const t0 = (c - colsPar / 2) * cw;
+          const d0 = prof * 0.5 - r * prof;
+          const pt = (tx, dd) => ({ x: p.x + perp.x * tx + dir.x * dd,
+                                    y: p.y + perp.y * tx + dir.y * dd });
+          const A = pt(t0, d0), B = pt(t0 + cw, d0);
+          const C = pt(t0 + cw, d0 - prof), D = pt(t0, d0 - prof);
+          ctx.beginPath();
+          ctx.moveTo(A.x, A.y); ctx.lineTo(B.x, B.y);
+          ctx.lineTo(C.x, C.y); ctx.lineTo(D.x, D.y);
+          ctx.closePath();
+          ctx.fill();
+        }
+      }
     }
 
-    // grid (colunas x vagas, atras da largada, no sentido contrario)
+    // grid (colunas x vagas, atras da linha de largada, no sentido contrario)
     if (tr.grid && tr.grid.colunas >= 1) {
       const g = tr.grid;
       let iG = 0, mg = Infinity;
@@ -290,18 +377,21 @@ const TC = (() => {
       const colunas = Math.max(1, Math.min(4, g.colunas | 0));
       const vagas = Math.max(colunas, g.vagas | 0);
       const linhasG = Math.ceil(vagas / colunas);
-      const larg = (variavel ? larguraPx(0) : 20);
-      const celW = Math.max(6, larg / colunas) * 0.85;
-      const celH = Math.max(7, larg / colunas * 0.9);
+      const fG = ((linhas[iG].d / lenUnid) - fLarg + 1) % 1;
+      const larg = variavel ? larguraPx(fG) : 20;
+      const gapC = larg / colunas;
+      const celW = Math.max(6, gapC * 0.72);
+      const celH = Math.max(8, Math.min(14, celW * 0.9));
+      const passoLin = celH * 1.4;
       ctx.fillStyle = "rgba(245,247,251,0.85)";
       ctx.strokeStyle = "#111826";
       ctx.lineWidth = 1;
       for (let li = 0; li < linhasG; li++) {
         for (let ci = 0; ci < colunas; ci++) {
-          const cx = p.x - dir.x * (li + 1) * celH * 1.15 + perp.x * (ci - (colunas - 1) / 2) * celW * 1.15;
-          const cy = p.y - dir.y * (li + 1) * celH * 1.15 + perp.y * (ci - (colunas - 1) / 2) * celW * 1.15;
+          const dx = -dir.x * (li * passoLin + celH / 2 + 2) + perp.x * (ci - (colunas - 1) / 2) * gapC;
+          const dy = -dir.y * (li * passoLin + celH / 2 + 2) + perp.y * (ci - (colunas - 1) / 2) * gapC;
           ctx.beginPath();
-          ctx.rect(cx - celW / 2, cy - celH / 2, celW, celH);
+          ctx.rect(p.x + dx - celW / 2, p.y + dy - celH / 2, celW, celH);
           ctx.fill();
           ctx.stroke();
         }

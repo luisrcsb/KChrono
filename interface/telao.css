@@ -100,7 +100,13 @@ td.pos{font-weight:800; color:var(--ouro)}
 .abas-telao .btn-fs{margin-left:auto; border-radius:.8vmin; font-weight:400}
 .painel{display:none; flex:1; min-height:0}
 .painel.on{display:block}
-#tv-ritmo, #tv-posicoes, #tv-track{background:var(--bg2); border:.2vmin solid var(--borda);
+#tv-ritmo, #tv-posicoes{background:var(--bg2); border:.2vmin solid var(--borda);
   border-radius:0 .8vmin .8vmin .8vmin; padding:1vmin 1.4vmin; min-height:38vmin;
   max-height:44vmin; overflow:auto}
 .painel canvas{width:100%; height:36vmin}
+/* track view: area de design maior — ocupa todo o espaco restante da tela */
+#tv-track{background:var(--bg2); border:.2vmin solid var(--borda);
+  border-radius:0 .8vmin .8vmin .8vmin; padding:1vmin 1.4vmin;
+  display:none; min-height:38vmin}
+#tv-track.on{display:flex}
+#tv-track canvas{width:100%; height:100%; min-height:36vmin}

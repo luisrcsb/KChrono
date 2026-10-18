@@ -1,10 +1,10 @@
 {
-  "versao": "1.0.6",
+  "versao": "1.0.7",
   "canal": "estavel",
   "url_base": "",
-  "notas": "Versão 1.0.6 — Simulador de corridas: busca corridas realizadas no CTAD e reemite ao vivo como se estivesse acontecendo agora, com velocidade à escolha (0,5x a 10x) e sistema de telemetria selecionável (MyLaps/AMB P3, EASYLAP-USB ou SKYRC LapWiz) em Admin → Hardware. Sessões de simulação são marcadas como SIMULAÇÃO e valem só para testes e desenvolvimento: não contam em recordes, relatórios, campeonatos e nunca vão ao CTAD.",
+  "notas": "Versão 1.0.7 — Corrige bugs reportados em validação v1.0.6: corretivo de importação de pilotos do site (Firebase krathus-telemetria), botão adicionar piloto no check-in, redesenho da pista (cinza escuro, bordas internas xadrez vermelho/branco 1m, setas de sentido, grid/finish-line melhorado), área de design do telão ampliada, e controles de pausa/stop no simulador. Decoder robustecido com canais duais TCP, validação TLV e auto-recuperação.",
   "arquivos": {
-    "windows": "KChrono-Setup-1-0-6.exe",
-    "linux": "KChrono-1.0.6-x86_64.AppImage"
+    "windows": "KChrono-Setup-1-0-7.exe",
+    "linux": "KChrono-1.0.7-x86_64.AppImage"
   }
 }

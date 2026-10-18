@@ -12,9 +12,9 @@ CONFIG_PATH = DIR_PROJETO / "config.json"
 #: Modelo gravado no primeiro uso (credenciais do projeto KChrono no Firebase)
 CONFIG_MODELO = {
     "firebase": {
-        "apiKey": "AIzaSyAQMfIgj8t1YpemLgx-xxvftVKco5ML7JU",
-        "databaseURL": "https://kchrono-default-rtdb.firebaseio.com",
-        "storageBucket": "kchrono.firebasestorage.app",
+        "apiKey": "AIzaSyDCTkeIa6QsY2zYs8S__HlIwcY-zcuhZCA",
+        "databaseURL": "https://krathus-telemetria-default-rtdb.firebaseio.com",
+        "storageBucket": "krathus-telemetria.firebasestorage.app",
     },
     "email": "",
     "password": "",

@@ -1,0 +1,159 @@
+{
+  "firebase": {
+    "apiKey": "AIzaSyDCTkeIa6QsY2zYs8S__HlIwcY-zcuhZCA",
+    "databaseURL": "https://krathus-telemetria-default-rtdb.firebaseio.com",
+    "storageBucket": "krathus-telemetria.firebasestorage.app"
+  },
+  "email": "luisrcsb@gmail.com",
+  "password": "DC4cdbrabus*",
+  "pistaId": "krathus",
+  "auto_upload": true,
+  "tempo_minimo_volta_s": 3,
+  "decoder_tipo": "p3",
+  "decoder_host": "192.168.0.50",
+  "decoder_porta": 5403,
+  "decoder_auto": true,
+  "sim_sistema": "p3",
+  "sim_velocidade": 1.0,
+  "telao_tela": 0,
+  "voz_contagem": true,
+  "contador_s": 1,
+  "atualizacao_repo": "",
+  "som": {
+    "frases": {
+      "vai": "Vai!",
+      "atencao": "Atenção pilotos, preparem-se para a largada!",
+      "contagem": "{n}",
+      "treino_iniciado": "Treino iniciado. Boa prática a todos!",
+      "classificacao_iniciada": "Classificação iniciada. Cada piloto tem seu tempo.",
+      "corrida_iniciada": "Corrida iniciada. Boa sorte a todos!",
+      "pausada": "Sessão pausada.",
+      "retomada": "Sessão retomada.",
+      "finalizada": "Sessão finalizada. Confiram a classificação.",
+      "volta": "Volta {numero}: {nome}, {tempo} segundos.",
+      "posicoes": "Posições: {lista}.",
+      "recorde_pessoal": "Novo recorde pessoal de {nome}: {tempo} segundos!",
+      "recorde_pista": "Novo recorde da pista! {nome}, {tempo} segundos!",
+      "melhor_volta": "Melhor volta: {nome}, {tempo} segundos.",
+      "ghost_lap": "Atenção: volta inválida detectada.",
+      "gato": "Atenção: volta marcada como suspeita."
+    },
+    "volume": 0.9,
+    "velocidade": 180,
+    "intervalo_posicoes": 0.0,
+    "posicoes_topo": 4,
+    "anunciar_volta": true,
+    "anunciar_recorde_pessoal": true,
+    "anunciar_recorde_pista": true,
+    "voz": "piper:C:\\Users\\luisr\\OneDrive\\Documentos\\Projetos\\KChrono\\dados\\vozes\\pt_BR-faber-medium.onnx",
+    "audios": {
+      "vai": "vai.mp3"
+    },
+    "anunciar_a_cada_voltas": 5,
+    "habilitados": {
+      "atencao": true,
+      "vai": true,
+      "contagem": true,
+      "treino_iniciado": true,
+      "classificacao_iniciada": true,
+      "corrida_iniciada": true,
+      "pausada": true,
+      "retomada": true,
+      "finalizada": true,
+      "volta": true,
+      "posicoes": true,
+      "recorde_pessoal": true,
+      "recorde_pista": true,
+      "melhor_volta": true,
+      "ghost_lap": true,
+      "gato": true,
+      "passagem": true,
+      "lider": false
+    },
+    "voz_neural_adotada": true,
+    "som_passagem": true,
+    "som_lider": false
+  },
+  "checkin": [
+    13,
+    14,
+    15,
+    16,
+    17,
+    18
+  ],
+  "notificacoes": {
+    "decoder_offline": true,
+    "ghost_lap": true,
+    "fila_upload": true,
+    "recorde": true,
+    "navegador": false,
+    "som_alerta": true
+  },
+  "gerente": {
+    "usuario": "82996640051",
+    "salt": "2c3056afcbfad94197056da33108b508",
+    "senha_hash": "291bc3ef75331533b061f09f65ecfbed27bd96d3739df3e68bcd3c6d498cb6fa",
+    "criado_em": "2026-10-12T14:27:39"
+  },
+  "campeonato_plano": {
+    "etapas": [
+      {
+        "etapa": "treino",
+        "rotulo": "Treino",
+        "duracao": 1
+      },
+      {
+        "etapa": "intervalo",
+        "rotulo": "Intervalo",
+        "duracao": 1
+      },
+      {
+        "etapa": "classificacao",
+        "rotulo": "Classificação",
+        "duracao": 1
+      },
+      {
+        "etapa": "intervalo",
+        "rotulo": "Intervalo",
+        "duracao": 1
+      },
+      {
+        "etapa": "corrida",
+        "rotulo": "Corrida",
+        "duracao": 4
+      }
+    ],
+    "numero_provas": 1,
+    "treino_min": 1,
+    "classificacao_min": 1,
+    "corrida_min": 4,
+    "intervalo_min": 1,
+    "class_3voltas": true
+  },
+  "banner": [
+    {
+      "tipo": "aviso",
+      "tag": "📢",
+      "titulo": "4ª Copinha WL Toys",
+      "sub": "Hoje as 19h ",
+      "texto": "participe! ",
+      "botao": "participar",
+      "acao": "operador"
+    },
+    {
+      "tipo": "decoder"
+    },
+    {
+      "tipo": "campeonato"
+    }
+  ],
+  "gerente_tokens": {
+    "LFtlsMVoTSNPU97so9ZTAVKxNVuKHqOj": {
+      "usuario": "qrcode",
+      "convite": true,
+      "criado_em": 1792015530.3036804,
+      "expira": 1792101930.3036807
+    }
+  }
+}

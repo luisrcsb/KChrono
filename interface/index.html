@@ -145,6 +145,16 @@
                oninput="renderCheckin()">
         <button class="btn-mini" onclick="marcarTodosCheckin(true)">✔ Todos presentes</button>
         <button class="btn-mini" onclick="marcarTodosCheckin(false)">✖ Limpar</button>
+        <button class="destaque" onclick="checkinToggleForm()">➕ Adicionar piloto</button>
+      </div>
+      <div id="op-checkin-form" class="card" style="display:none; margin:8px 0; padding:12px">
+        <div class="acoes" style="margin:0; flex-wrap:wrap">
+          <input id="op-checkin-novo-nome" class="input-busca" placeholder="Nome do piloto*"
+                 style="flex:1; min-width:180px">
+          <input id="op-checkin-novo-transp" class="input-busca" placeholder="Transponder (ex.: 1234)"
+                 style="flex:1; min-width:140px">
+          <button class="destaque" onclick="checkinAdicionarPiloto()">✔ Salvar e marcar na pista</button>
+        </div>
       </div>
       <div id="op-checkin" class="lista-checkin">carregando…</div>
       <p class="hint" style="margin-top:8px">Marque quem está na pista antes de iniciar a
@@ -1180,7 +1190,7 @@
   </div>
 </div>
 
-<script src="/static/tracado.js?v=1.0"></script>
-<script src="/static/app.js?v=2.5"></script>
+<script src="/static/tracado.js?v=1.1"></script>
+<script src="/static/app.js?v=2.6"></script>
 </body>
 </html>
