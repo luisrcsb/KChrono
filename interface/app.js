@@ -2195,9 +2195,9 @@ async function carregarCheckin() {
   renderCheckin();
 }
 function renderCheckin() {
-  const el = document.getElementById("ger-checkin");
+  const el = document.getElementById("op-checkin");
   if (!el) return;
-  const q = (document.getElementById("ger-checkin-busca").value || "").toLowerCase();
+  const q = (document.getElementById("op-checkin-busca").value || "").toLowerCase();
   const lst = checkinCache.pilotos.filter(p => !q || p.nome.toLowerCase().includes(q));
   el.innerHTML = lst.map(p => {
     const on = checkinCache.presentes.includes(p.id);
@@ -2205,7 +2205,7 @@ function renderCheckin() {
       <input type="checkbox" ${on ? "checked" : ""} onchange="toggleCheckin(${p.id}, this.checked)">
       ${_esc(p.nome)}</label>`;
   }).join("") || '<p class="hint">nenhum piloto</p>';
-  const n = document.getElementById("ger-checkin-n");
+  const n = document.getElementById("op-checkin-n");
   if (n) n.textContent = checkinCache.presentes.length;
 }
 async function toggleCheckin(id, presente) {
@@ -2760,6 +2760,7 @@ carregarAutoConectar();
 carregarVozContagem();
 carregarTelaoTela();
 conectarWS();
+carregarCheckin();   // painel do operador: checkboxes de quem está na pista
 carregarNotificacoes();
 mostrar("operador");
 gerarQRSessao();

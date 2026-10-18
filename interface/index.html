@@ -51,7 +51,7 @@
       <img id="side-qr-img" alt="QR Code de Gestão Remota" style="display:none">
       <div class="side-qr-info" id="side-qr-info">gerando…</div>
     </div>
-    <div class="admin-rodape"><span id="ws-status">Desconectado do servidor</span><br>KChrono v1.0.5<br>por Raphael Belowodski</div>
+    <div class="admin-rodape"><span id="ws-status">Desconectado do servidor</span><br>KChrono v1.0.6<br>por Raphael Belowodski</div>
   </aside>
   <div class="corpo">
 
@@ -134,6 +134,21 @@
         <p class="hint" style="margin-top:6px">Criar e editar abrem o menu <b>🏆 Campeonatos</b>, onde ficam as
           regras, os inscritos, as chaves, as durações e a sequência das etapas.</p>
       </div>
+    </div>
+
+    <!-- check-in: quem está na pista, antes de iniciar a sessão -->
+    <div class="card" style="margin-bottom:16px">
+      <h3>Pilotos na pista — check-in (<span id="op-checkin-n">0</span> marcados)</h3>
+      <div class="acoes" style="margin:10px 0">
+        <input id="op-checkin-busca" class="input-busca" placeholder="Filtrar pilotos…"
+               oninput="renderCheckin()">
+        <button class="btn-mini" onclick="marcarTodosCheckin(true)">✔ Todos presentes</button>
+        <button class="btn-mini" onclick="marcarTodosCheckin(false)">✖ Limpar</button>
+      </div>
+      <div id="op-checkin" class="lista-checkin">carregando…</div>
+      <p class="hint" style="margin-top:8px">Marque quem está na pista antes de iniciar a
+        sessão: só os pilotos marcados entram na corrida. Se ninguém for marcado, entram
+        todos os transponders cadastrados.</p>
     </div>
 
     <!-- campeonato em andamento -->
@@ -238,16 +253,8 @@
           </div>
         </div>
 
-        <div class="admin-secao-tit">Check-in dos pilotos (<span id="ger-checkin-n">0</span> presentes)</div>
-        <div class="card">
-          <div class="acoes" style="margin-bottom:10px">
-            <input id="ger-checkin-busca" class="input-busca" placeholder="Filtrar pilotos…"
-                   oninput="renderCheckin()">
-            <button class="btn-mini" onclick="marcarTodosCheckin(true)">✔ Todos presentes</button>
-            <button class="btn-mini" onclick="marcarTodosCheckin(false)">✖ Limpar</button>
-          </div>
-          <div id="ger-checkin" class="lista-checkin">carregando…</div>
-        </div>
+        <p class="hint" style="margin:0 0 12px">O check-in dos pilotos agora fica no
+          <b>Painel do Operador</b> (logo abaixo da Configuração da Sessão).</p>
 
         <div class="admin-secao-tit">Volta manual (correção)</div>
         <div class="card">
@@ -1002,7 +1009,7 @@
       <!-- ============ SOBRE ============ -->
       <div class="admin-sec" id="a-sobre">
         <div class="grid g4">
-          <div class="card"><h3>Versão</h3><div class="big" id="upd-versao">1.0.5</div><div class="sub">Fases 0 → 7 concluídas · atualizações pelo GitHub</div></div>
+          <div class="card"><h3>Versão</h3><div class="big" id="upd-versao">1.0.6</div><div class="sub">Fases 0 → 7 concluídas · atualizações pelo GitHub</div></div>
           <div class="card"><h3>Drivers</h3><div class="big" style="font-size:20px">P3 · EASYLAP · LapWiz</div><div class="sub">TCP · serial · Bluetooth</div></div>
           <div class="card"><h3>Stack</h3><div class="big" style="font-size:20px">Python · FastAPI</div><div class="sub">SQLite · WebSocket · vanilla JS</div></div>
           <div class="card"><h3>Atualizações</h3><div class="sub" id="upd-status">aguardando verificação…</div>
@@ -1046,7 +1053,7 @@
   <div class="dir">
     <span id="rodape-sync">Sincronização CTAD: aguardando</span>
     <span class="pill novo">NOVIDADE</span>
-    <span>KChrono v1.0.5 · por <b>Raphael Belowodski</b></span>
+    <span>KChrono v1.0.6 · por <b>Raphael Belowodski</b></span>
   </div>
 </div>
 

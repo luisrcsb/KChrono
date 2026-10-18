@@ -1,10 +1,10 @@
 {
-  "versao": "1.0.5",
+  "versao": "1.0.6",
   "canal": "estavel",
   "url_base": "",
-  "notas": "Versão 1.0.5 — KChrono agora sai também para Linux (AppImage) com ISO de pendrive pronta (Debian + Xfce + navegador, KChrono já instalado, boot e instalação no disco). Atualização automática em ambas as plataformas: no Windows instala em silêncio, no Linux troca o AppImage e reabre sozinho. Publicação por tag no GitHub com CI montando os três pacotes.",
+  "notas": "Versão 1.0.6 — Simulador de corridas: busca corridas realizadas no CTAD e reemite ao vivo como se estivesse acontecendo agora, com velocidade à escolha (0,5x a 10x) e sistema de telemetria selecionável (MyLaps/AMB P3, EASYLAP-USB ou SKYRC LapWiz) em Admin → Hardware. Sessões de simulação são marcadas como SIMULAÇÃO e valem só para testes e desenvolvimento: não contam em recordes, relatórios, campeonatos e nunca vão ao CTAD.",
   "arquivos": {
     "windows": "KChrono-Setup.exe",
-    "linux": "KChrono-1.0.5-x86_64.AppImage"
+    "linux": "KChrono-1.0.6-x86_64.AppImage"
   }
 }

@@ -10,7 +10,7 @@
 !include "FileFunc.nsh"
 !include "LogicLib.nsh"
 
-!define VERSAO "1.0.5"
+!define VERSAO "1.0.6"
 !define APP "KChrono"
 !define FABRICANTE "KChrono"
 !define EXE "dist\KChrono.exe"

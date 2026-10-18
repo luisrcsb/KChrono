@@ -27,7 +27,7 @@ DIR_IMAGENS = DIR_PROJETO / "imagens"
 
 estado = EstadoApp()
 
-app = FastAPI(title="KChrono", version="1.0.5")
+app = FastAPI(title="KChrono", version="1.0.6")
 
 app.mount("/imagens", StaticFiles(directory=DIR_IMAGENS), name="imagens")
 app.mount("/static", StaticFiles(directory=DIR_INTERFACE), name="static")
