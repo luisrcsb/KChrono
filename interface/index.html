@@ -61,7 +61,8 @@
     <header class="main-header">
       <h1>Painel do Operador</h1>
       <div class="perfil"><span class="tag" id="perfil-nivel">SUPERUSER</span>
-        sessão <span id="operador-sessao">—</span> · <span id="operador-estado">sem sessão</span></div>
+        sessão <span id="operador-sessao">—</span> · <span id="operador-estado">sem sessão</span>
+        <span class="pill novo" id="operador-sim" hidden>SIMULAÇÃO — não oficial</span></div>
       <div class="acoes-topo">
         <button class="btn-slide" onclick="abrirTelaoSegundaTela()" title="Abre o telão em janela separada (2ª tela)">
           🖥️ Abrir Telão 2ª Tela
@@ -663,24 +664,35 @@
                   <option value="p3">MyLaps / AMB P3 (TCP)</option>
                   <option value="easylap">EASYLAP-USB (serial Robitronic)</option>
                   <option value="lapwiz">SKYRC LapWiz (Bluetooth BLE)</option>
-                  <option value="simulador">Simulador de corrida (CTAD)</option>
+                  <option value="simulador">Simulador de corridas (CTAD) — testes</option>
                 </select></div>
               <div><label id="hw-alvo-label">IP do decoder</label>
                 <input id="hw-alvo" value="192.168.0.50"></div>
               <div id="hw-porta-wrap"><label>Porta TCP</label><input id="hw-porta" value="5403"></div>
-              <div id="hw-sim-wrap" style="display:none"><label>Sessão do CTAD (reproduz como transponder)</label>
+              <div id="hw-sim-wrap" style="display:none"><label>Corrida do CTAD (reproduz ao vivo como se fosse agora)</label>
                 <div style="display:flex; gap:6px">
                   <select id="hw-sessao" style="flex:1; min-width:0">
                     <option value="">— carregue as sessões —</option>
                   </select>
                   <select id="hw-velocidade" title="Velocidade da reprodução" style="width:64px">
+                    <option value="0.5">0,5x</option>
                     <option value="1">1x</option>
                     <option value="2">2x</option>
                     <option value="5">5x</option>
                     <option value="10">10x</option>
                   </select>
-                  <button class="btn-slide" onclick="carregarSessoesCTAD()" title="Carregar corridas enviadas ao CTAD">🔄</button>
-                </div></div>
+                  <button class="btn-slide" onclick="carregarSessoesCTAD()" title="Buscar corridas realizadas no CTAD">🔄</button>
+                </div>
+                <label style="margin-top:6px">Sistema de telemetria (de onde "vem" a simulação)</label>
+                <select id="hw-sistema" title="Assinatura do sistema simulado">
+                  <option value="p3">MyLaps / AMB P3</option>
+                  <option value="easylap">EASYLAP-USB</option>
+                  <option value="lapwiz">SKYRC LapWiz</option>
+                </select>
+                <p class="hint" style="margin:6px 0 0">Somente testes e desenvolvimento: a
+                  sessão simulada é marcada como <b>SIMULAÇÃO</b> — não conta em
+                  recordes/relatórios/campeonatos e não vai ao CTAD.</p>
+              </div>
             </div>
             <p class="hint">Status: <b id="hw-status">—</b> · temp <b id="hw-temp">—</b> · tensão <b id="hw-tensao">—</b> · ruído <b id="hw-ruido">—</b></p>
             <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center">
@@ -699,7 +711,7 @@
               <tr><td>MyLaps / AMB P3</td><td>operacional — TCP, validado ao vivo</td></tr>
               <tr><td>EASYLAP-USB <span class="pill ok">pronto</span></td><td>serial 38400 8N1 · protocolo Robitronic — conecte p/ testar</td></tr>
               <tr><td>SKYRC LapWiz (RT004) <span class="pill novo">captura</span></td><td>BLE · descoberta + captura p/ decodificar o protocolo</td></tr>
-              <tr><td>Simulador (CTAD) <span class="pill novo">novo</span></td><td>reproduz uma corrida enviada ao CTAD como se fosse o transponder</td></tr>
+              <tr><td>Simulador de corridas (CTAD) <span class="pill novo">teste</span></td><td>busca corridas do CTAD e reemite ao vivo — velocidade (0,5x..10x) e sistema de telemetria (P3/EASYLAP/LapWiz) à escolha · <b>não oficial</b>: só testes/desenvolvimento</td></tr>
               <tr><td>LapZ · GiroZ · RiCino</td><td>roadmap — serial/USB</td></tr>
             </table>
             <p class="hint">Teste de bancada via CLI: <code>python cli.py easylap --porta COM3</code> · <code>python cli.py lapwiz</code></p>

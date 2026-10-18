@@ -84,7 +84,7 @@ async function api(caminho, metodo = "POST", params = "", corpo = null) {
 const conectarDecoder = () => {
   const tipo = document.getElementById("hw-tipo")?.value || "p3";
   if (tipo === "simulador") {
-    // alvo = sessão do CTAD escolhida; velocidade da reprodução (1x..10x)
+    // alvo = corrida do CTAD; velocidade (0,5x..10x) e sistema de telemetria
     const sessao = document.getElementById("hw-sessao")?.value || "";
     if (!sessao) {
       logMsg("simulador: carregue e escolha uma corrida do CTAD (botão 🔄)",
@@ -92,8 +92,10 @@ const conectarDecoder = () => {
       return Promise.resolve({ ok: false });
     }
     const vel = parseFloat(document.getElementById("hw-velocidade")?.value || "1") || 1;
+    const fonte = document.getElementById("hw-sistema")?.value || "p3";
     return api("decoder/conectar", "POST",
-      `?tipo=simulador&alvo=${encodeURIComponent(sessao)}&velocidade=${vel}`);
+      `?tipo=simulador&alvo=${encodeURIComponent(sessao)}&velocidade=${vel}` +
+      `&sistema=${encodeURIComponent(fonte)}`);
   }
   const alvoField = document.getElementById("hw-alvo")?.value?.trim() || "";
   if (tipo === "p3") {
@@ -396,7 +398,8 @@ function renderDecoder(d) {
     el.textContent = d.conectado ? "Conectado" : "Desconectado";
     el.style.color = d.conectado ? "var(--accent-green)" : "var(--accent-red)";
   }
-  if (sub) sub.textContent = `${nomes[d.tipo] || d.tipo} · ${d.host || "—"}${d.porta ? ":" + d.porta : ""}`;
+  const fonte = d.tipo === "simulador" && d.sistema ? ` (${nomes[d.sistema] || d.sistema})` : "";
+  if (sub) sub.textContent = `${nomes[d.tipo] || d.tipo}${fonte} · ${d.host || "—"}${d.porta ? ":" + d.porta : ""}`;
   const led = document.getElementById("led-decoder");
   const txt = document.getElementById("txt-ligacao");
   if (led) led.classList.toggle("on", d.conectado);
@@ -404,6 +407,15 @@ function renderDecoder(d) {
   // reflete o estado na aba de Admin > Hardware (sem sobrescrever o que o usuário digita)
   const sel = document.getElementById("hw-tipo");
   if (sel && d.tipo && document.activeElement !== sel) sel.value = d.tipo;
+  // espelha as opções do simulador (fonte de telemetria e velocidade)
+  const simSel = document.getElementById("hw-sistema");
+  if (simSel && d.tipo === "simulador" && d.sistema &&
+      [...simSel.options].some(o => o.value === d.sistema) &&
+      document.activeElement !== simSel) simSel.value = d.sistema;
+  const velSel = document.getElementById("hw-velocidade");
+  if (velSel && d.tipo === "simulador" && d.sim_velocidade != null &&
+      [...velSel.options].some(o => Number(o.value) === Number(d.sim_velocidade)) &&
+      document.activeElement !== velSel) velSel.value = String(Number(d.sim_velocidade));
   const pill = document.getElementById("hw-status-pill");
   if (pill) {
     pill.textContent = d.conectado ? "conectado" : "desconectado";
@@ -467,11 +479,14 @@ function renderSessao(s) {
   if (cs) cs.textContent = s.estado || "—";
   const css = document.getElementById("card-sessao-sub");
   if (css) css.textContent =
-    s.id ? `sessão ${s.id.slice(0, 8)}${s.pausada ? " · pausada" : ""}` : "nenhuma sessão ativa";
+    s.id ? `sessão ${s.id.slice(0, 8)}${s.simulacao ? " · SIMULAÇÃO" : ""}` +
+           `${s.pausada ? " · pausada" : ""}` : "nenhuma sessão ativa";
   const opEst = document.getElementById("operador-estado");
   if (opEst) opEst.textContent = s.estado || "sem sessão";
   const opSes = document.getElementById("operador-sessao");
   if (opSes) opSes.textContent = s.id ? s.id.slice(0, 8) : "—";
+  const opSim = document.getElementById("operador-sim");
+  if (opSim) opSim.hidden = !(s.id && s.simulacao);
   // estado da sessão → botão principal de ação
   estadoSessao = s.estado || "parado";
   sessaoAtiva = !!(s.id && !["parado", "finalizado"].includes(estadoSessao));
@@ -993,7 +1008,7 @@ function filtrarSessoes() {
       { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) : "—";
     return `<div class="item-sessao ${sessaoAberta === s.id ? "on" : ""}"
                  onclick="abrirSessao('${s.id}')">
-      <div class="t">${s.tipo} · ${quando}</div>
+      <div class="t">${s.tipo} · ${quando}${s.simulacao ? ' <span class="pill novo" title="teste/desenvolvimento — não oficial">simulação</span>' : ""}</div>
       <div class="m">${s.voltas} voltas · ${s.pilotos} piloto(s) · melhor ${s.melhor_s ?? "—"}s</div>
     </div>`;
   }).join("") || '<p class="hint">nenhuma sessão encontrada</p>';
@@ -1004,7 +1019,12 @@ async function abrirSessao(id) {
   if (!d.ok) { logMsg(`histórico: ${d.erro}`, "l-erro", "log-operador"); return; }
   sessaoAberta = id;
   const acoes = document.getElementById("acoes-sessao");
-  if (acoes) acoes.style.display = "flex";
+  if (acoes) {
+    acoes.style.display = "flex";
+    // sessão de simulação não vai ao CTAD — esconde o botão de envio
+    const btnEnv = acoes.querySelector('button[onclick="enviarSessaoCTAD()"]');
+    if (btnEnv) btnEnv.hidden = !!d.simulacao;
+  }
   filtrarSessoes();
   renderTabelaHistorico(d);
 }
@@ -1012,6 +1032,11 @@ async function abrirSessao(id) {
 async function enviarSessaoCTAD() {
   if (!sessaoAberta) return;
   const s = sessoesCache.find(x => x.id === sessaoAberta);
+  if (s && s.simulacao) {
+    alert("Sessão de SIMULAÇÃO — só para testes/desenvolvimento.\n\n" +
+          "Resultado não oficial: não vai ao CTAD.");
+    return;
+  }
   const resumo = s ? `${s.tipo} · ${s.voltas} voltas · ${s.pilotos} piloto(s)`
                    : sessaoAberta.slice(0, 8);
   if (!confirm(`Enviar esta sessão ao CTAD?\n\n${resumo}\n\nEla ficará visível no site do CTAD ` +
@@ -1030,7 +1055,8 @@ async function enviarSessaoCTAD() {
 function renderTabelaHistorico(d) {
   const maxV = d.max_voltas;
   document.getElementById("detalhe-titulo").textContent =
-    `Voltas volta a volta — ${d.pilotos.length} piloto(s), ${maxV} voltas`;
+    `Voltas volta a volta — ${d.pilotos.length} piloto(s), ${maxV} voltas` +
+    (d.simulacao ? " · SIMULAÇÃO (teste — não oficial)" : "");
 
   // tempos acumulados e líder de cada volta
   const acum = {};

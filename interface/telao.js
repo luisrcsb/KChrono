@@ -124,6 +124,7 @@ function renderBandeira(p) {
 
 // ---------------------------------------------------------------- telas
 function renderSessao(s) {
+  document.querySelectorAll(".titulo-sim").forEach(el => { el.hidden = !s.simulacao; });
   const estado = s.estado || "parado";
   if (estado === estadoAtual) return;
   estadoAtual = estado;

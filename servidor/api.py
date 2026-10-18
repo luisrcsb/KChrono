@@ -95,9 +95,16 @@ async def api_status():
 
 @app.post("/api/decoder/conectar")
 async def api_conectar(tipo: str = Query("p3"), alvo: Optional[str] = Query(None),
-                       velocidade: Optional[float] = Query(None)):
-    if tipo == "simulador" and velocidade:
-        estado.config["sim_velocidade"] = float(velocidade)
+                       velocidade: Optional[float] = Query(None),
+                       sistema: Optional[str] = Query(None)):
+    if tipo == "simulador":
+        # opções da simulação (testes/desenvolvimento) ficam salvas
+        from .config import salvar_config
+        if velocidade:
+            estado.config["sim_velocidade"] = float(velocidade)
+        if sistema in ("p3", "easylap", "lapwiz"):
+            estado.config["sim_sistema"] = sistema
+        salvar_config(estado.config)
     return {"ok": await estado.conectar_decoder(tipo, alvo)}
 
 

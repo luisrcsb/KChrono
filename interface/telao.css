@@ -84,6 +84,7 @@ td.pos{font-weight:800; color:var(--ouro)}
 .badge{font-size:1.4vmin; font-weight:700; padding:.2vmin .9vmin; border-radius:.8vmin; margin-left:.8vmin}
 .badge.lider{background:rgba(255,183,3,.2); color:var(--ouro)}
 .badge.melhor{background:rgba(46,196,182,.18); color:var(--verde)}
+.badge.sim{background:rgba(255,84,84,.22); color:#ff9d9d}
 .rodape{display:flex; justify-content:space-between; font-size:1.6vmin; color:var(--mut)}
 .rodape b{color:var(--txt)}
 

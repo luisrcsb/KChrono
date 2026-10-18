@@ -47,6 +47,8 @@ class EstadoApp:
         self.driver = MyLapsP3(host_decoder, porta_decoder)
         self.motor: Optional[MotorCorrida] = None
         self.sessao_id: Optional[str] = None
+        #: True quando a sessão atual veio do simulador (teste — não oficial)
+        self.sessao_simulacao = False
         self.conectado = False
         self.pausado = False
         self.drift = MonitorDrift()
@@ -188,6 +190,7 @@ class EstadoApp:
             from drivers.simulador import SimuladorCTAD
             return SimuladorCTAD(banco=self.banco, sessao_key=alvo or "",
                                  velocidade=float(self.config.get("sim_velocidade") or 1.0),
+                                 sistema=str(self.config.get("sim_sistema") or "p3"),
                                  resolver_cliente=self._cliente_ctad,
                                  ao_terminar=self._simulador_terminou)
         raise ValueError(f"driver desconhecido: {tipo}")
@@ -317,10 +320,13 @@ class EstadoApp:
         self.conectado = True
         self._ultimo_rx_us = agora_monotonic_us()
         self.config["decoder_tipo"] = tipo
-        self.publicar("sistema", {"msg": f"decoder {tipo} {como}"
-                                         + (f" ({getattr(self.driver, 'porta_usada', '')})"
-                                            if getattr(self.driver, "porta_usada", None)
-                                            else "")})
+        extra = ""
+        if getattr(self.driver, "porta_usada", None):
+            extra += f" ({self.driver.porta_usada})"
+        if tipo == "simulador":
+            extra += (f" — fonte {self.config.get('sim_sistema', 'p3')}"
+                      " · teste/desenvolvimento (não oficial)")
+        self.publicar("sistema", {"msg": f"decoder {tipo} {como}{extra}"})
         self._task_decoder = asyncio.create_task(self._ler_decoder())
         self._garantir_vigia()
 
@@ -606,7 +612,10 @@ class EstadoApp:
                        duracao: float = 10, criterio: str = "tempo") -> bool:
         if self.motor and self.motor.estado.value not in ("parado", "finalizado"):
             return False
-        self.sessao_id = self.banco.abrir_sessao(pista_id=None, tipo=TipoSessao(tipo))
+        # simulador ligado = sessão de teste/desenvolvimento (não oficial)
+        self.sessao_simulacao = bool(getattr(self.driver, "simulado", False))
+        self.sessao_id = self.banco.abrir_sessao(pista_id=None, tipo=TipoSessao(tipo),
+                                                 simulacao=self.sessao_simulacao)
         self.parametros = {"duracao": duracao, "criterio": criterio,
                            "tempo_minimo_volta_s": tempo_minimo_s}
         self.motor = MotorCorrida(
@@ -651,7 +660,8 @@ class EstadoApp:
         self._recorde_pessoal = self.banco.melhores_por_piloto()
         self._ultima_leitura_voltas = 0
         self._iniciar_anuncios()
-        self.publicar("sessao", {"estado": self.motor.estado.value, "tipo": tipo})
+        self.publicar("sessao", {"estado": self.motor.estado.value, "tipo": tipo,
+                                 "simulacao": self.sessao_simulacao})
         return True
 
     def _resolver_transponder(self, transponder: int):
@@ -760,7 +770,8 @@ class EstadoApp:
             self._pausa_inicio_us = None
             self._pausado_total_us = 0
             self.pausado = False
-            self.publicar("sessao", {"estado": "correndo"})
+            self.publicar("sessao", {"estado": "correndo",
+                                     "simulacao": self.sessao_simulacao})
             return True
         except RuntimeError:
             return False
@@ -813,7 +824,8 @@ class EstadoApp:
             self.som.pausada()
         else:
             self.som.retomada()
-        self.publicar("sessao", {"estado": "pausada" if pausar else "retomada"})
+        self.publicar("sessao", {"estado": "pausada" if pausar else "retomada",
+                                 "simulacao": self.sessao_simulacao})
         return True
 
     def tempo_sessao_s(self) -> Optional[float]:
@@ -1042,7 +1054,8 @@ class EstadoApp:
         self.pausado = False
         # bip forte e alto no verde — sinal sonoro da largada (sem locução)
         self.som.bip_largada()
-        self.publicar("sessao", {"estado": "correndo"})
+        self.publicar("sessao", {"estado": "correndo",
+                                 "simulacao": self.sessao_simulacao})
         self._publicar_semaforo({"fase": "verde", "acesas": 0, "numero": None,
                                  "restante_ms": 0, "total_ms": 0})
 
@@ -1109,7 +1122,9 @@ class EstadoApp:
             resultados=resultados,
         )
         # auto-upload (Fase 3): enfileira a sessão completa para o CTAD
-        if self.config.get("auto_upload") and self.sincronizador.configurado:
+        # (sessão de simulação nunca vai ao CTAD — é teste/desenvolvimento)
+        if (self.config.get("auto_upload") and self.sincronizador.configurado
+                and not self.sessao_simulacao):
             try:
                 payload = self.sincronizador.sessao_para_upload(
                     self.sessao_id, f"sessao_{self.sessao_id[:8]}")
@@ -1118,6 +1133,7 @@ class EstadoApp:
             except Exception as e:
                 log.warning("auto-upload falhou: %s", e)
         self.publicar("sessao", {"estado": "finalizada",
+                                 "simulacao": self.sessao_simulacao,
                                  "classificacao": self._classificacao()})
         return True
 
@@ -1302,6 +1318,9 @@ class EstadoApp:
         """Monta o payload de upload SEM enviar (para conferência)."""
         if not sessao_id:
             raise RuntimeError("informe a sessão")
+        if self.banco.sessao_e_simulacao(sessao_id):
+            raise RuntimeError("sessão de simulação — só para testes/desenvolvimento, "
+                               "não é oficial e não vai ao CTAD")
         nome = nome_sessao or self._nome_sessao_para(sessao_id)
         return self.sincronizador.sessao_para_upload(sessao_id, nome)
 
@@ -1312,6 +1331,9 @@ class EstadoApp:
         alvo = sessao_id or self.sessao_id
         if not alvo:
             raise RuntimeError("nenhuma sessão ativa para enviar")
+        if self.banco.sessao_e_simulacao(alvo):
+            raise RuntimeError("sessão de simulação — só para testes/desenvolvimento, "
+                               "não é oficial e não vai ao CTAD")
         nome = nome_sessao or self._nome_sessao_para(alvo)
         payload = self.sincronizador.sessao_para_upload(alvo, nome)
         self.sincronizador.enfileirar(payload)
@@ -1714,6 +1736,8 @@ class EstadoApp:
                           de: Optional[str] = None, ate: Optional[str] = None) -> List[Dict]:
         saida = []
         for s in self.banco.listar_sessoes():
+            if s["simulacao"]:
+                continue   # simulação não alimenta relatório/CSV (extração de dados)
             inicio = s["inicio"] or ""
             if tipo and s["tipo"] != tipo:
                 continue
@@ -2276,6 +2300,9 @@ class EstadoApp:
         if resultados is None:
             if not self.motor:
                 raise RuntimeError("nenhuma sessão ativa para lançar resultado")
+            if self.sessao_simulacao:
+                raise RuntimeError("sessão de simulação — resultado de teste, "
+                                   "não vale para campeonato")
             resultados = [{"nome": l.nome, "piloto_id": l.piloto_id,
                            "posicao": l.posicao,
                            "melhor_volta_us": int(l.melhor_volta_us or 0)}
@@ -2365,6 +2392,7 @@ class EstadoApp:
             saida.append({
                 "id": s["id"], "tipo": s["tipo"], "estado": s["estado"],
                 "inicio": s["inicio"], "fim": s["fim"],
+                "simulacao": bool(s["simulacao"]),
                 "voltas": s["n_voltas"], "pilotos": s["n_pilotos"],
                 "melhor_s": round(s["melhor_us"] / 1_000_000, 3)
                 if s["melhor_us"] else None})
@@ -2380,7 +2408,9 @@ class EstadoApp:
         pilotos = sorted(por.items(), key=lambda kv: -len(kv[1]))
         max_voltas = max((len(vs) for vs in por.values()), default=0)
         melhor_geral = min((v["tempo"] for vs in por.values() for v in vs), default=None)
-        return {"sessao_id": sessao_id, "max_voltas": max_voltas,
+        return {"sessao_id": sessao_id,
+                "simulacao": self.banco.sessao_e_simulacao(sessao_id),
+                "max_voltas": max_voltas,
                 "melhor_geral": melhor_geral,
                 "pilotos": [{"nome": n, "voltas": [{"numero": v["numero"],
                                                    "tempo": v["tempo"]}
@@ -2402,8 +2432,11 @@ class EstadoApp:
                         "porta": getattr(self.driver, "porta",
                                          getattr(self.driver, "porta_usada", None)),
                         "status": self._ultimo_status,
+                        "sistema": getattr(self.driver, "sistema", None),
+                        "sim_velocidade": self.config.get("sim_velocidade"),
                         "segundos_sem_dados": sem_dados_s},
             "sessao": {"id": self.sessao_id, "estado": motor_estado,
+                       "simulacao": self.sessao_simulacao,
                        "pausada": self.pausado, "tempo_s": tempo_sessao,
                        "restante_s": self.restante_sessao_s(),
                        "regressiva": self.restante_sessao_s() is not None,

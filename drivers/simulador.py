@@ -6,9 +6,14 @@ transponders (vinculados aos pilotos locais), rtc_time em µs — o motor
 de corrida, a classificação, a voz e o sync enxergam tudo exatamente
 como em pista real.
 
-Fluxo: Admin → Hardware → tipo "Simulador (CTAD)" → escolher sessão →
+Fluxo: Admin → Hardware → tipo "Simulador (CTAD)" → escolher corrida,
+velocidade (0,5x..10x) e sistema de telemetria (p3/easylap/lapwiz) →
 Conectar. As passagens começam sozinhas quando uma sessão é iniciada no
 KChrono e param quando ela finaliza (ou ao reconectar).
+
+IMPORTANTE: é ferramenta de teste/desenvolvimento — a sessão nasce
+marcada como SIMULAÇÃO, não conta como resultado oficial (recordes,
+relatórios e campeonatos ignoram suas voltas) e nunca é enviada ao CTAD.
 
 Uso típico:
     driver = SimuladorCTAD(cliente=ctad_client, banco=banco, sessao_key="bat_...")
@@ -39,10 +44,21 @@ INTERVALO_STATUS_S = 8
 
 
 class SimuladorCTAD(Decoder):
-    """Reproduz uma sessão do CTAD no lugar do decoder físico."""
+    """Reproduz uma sessão do CTAD no lugar do decoder físico (teste/não oficial)."""
+
+    #: marca o driver como simulação — sessões abertas com ele NÃO são oficiais
+    simulado = True
+
+    #: assinatura de cada sistema de telemetria simulado:
+    #: decoder_id, força (mín, máx), hits (mín, máx)
+    ASSINATURA = {
+        "p3":      (9001, 70, 130, 4, 160),
+        "easylap": (9002, 35, 90, 8, 60),
+        "lapwiz":  (9003, 30, 70, 5, 40),
+    }
 
     def __init__(self, cliente=None, banco=None, sessao_key: str = "",
-                 velocidade: float = 1.0,
+                 velocidade: float = 1.0, sistema: str = "p3",
                  ao_terminar: Optional[Callable[[], None]] = None,
                  resolver_cliente: Optional[Callable] = None):
         #: cliente CTAD já logado, ou callable que devolve um (login lazy)
@@ -51,6 +67,8 @@ class SimuladorCTAD(Decoder):
         self._banco = banco
         self.sessao_key = sessao_key
         self.velocidade = max(0.1, float(velocidade or 1.0))
+        #: sistema de telemetria simulado (assinatura de status/passagens)
+        self.sistema = sistema if sistema in self.ASSINATURA else "p3"
         self._ao_terminar = ao_terminar
         self._payload: Optional[dict] = None
         self._aberto = False
@@ -82,9 +100,9 @@ class SimuladorCTAD(Decoder):
             raise ValueError(f"sessão '{self.sessao_key}' sem dados no CTAD")
         self._payload = payload
         self._vincular_pilotos(payload)
-        log.info("simulador: '%s' carregada — %d piloto(s), x%.1f",
-                 payload.get("sessao", self.sessao_key), len(self.transponders),
-                 self.velocidade)
+        log.info("simulador [%s]: '%s' carregada — %d piloto(s), x%.1f (teste/não oficial)",
+                 self.sistema, payload.get("sessao", self.sessao_key),
+                 len(self.transponders), self.velocidade)
 
     def _vincular_pilotos(self, payload: dict) -> None:
         """Garante piloto local + transponder para cada nome da bateria.
@@ -113,8 +131,7 @@ class SimuladorCTAD(Decoder):
                         on_desconhecido: Optional[Callback] = None) -> None:
         # status fake no boot: a UI mostra decoder ligado (tensão/temperatura)
         if on_status:
-            on_status(Status(temperatura=31, tensao=Decimal("12.4"), ruido=4,
-                             decoder_id=9000), None)
+            on_status(self._status_fake(), None)
         coracao = asyncio.create_task(self._bater(on_status))
         try:
             while self._aberto:
@@ -133,14 +150,18 @@ class SimuladorCTAD(Decoder):
         finally:
             coracao.cancel()
 
+    def _status_fake(self) -> Status:
+        """Status do "decoder" — decoder_id com a assinatura da fonte simulada."""
+        return Status(temperatura=31, tensao=Decimal("12.4"), ruido=4,
+                      decoder_id=self.ASSINATURA[self.sistema][0])
+
     async def _bater(self, on_status: Optional[Callback]) -> None:
         """Status periódico — mesmo ritmo de um decoder real (evita watchdog)."""
         try:
             while self._aberto:
                 await asyncio.sleep(INTERVALO_STATUS_S)
                 if on_status:
-                    on_status(Status(temperatura=31, tensao=Decimal("12.4"),
-                                     ruido=4, decoder_id=9000), None)
+                    on_status(self._status_fake(), None)
         except asyncio.CancelledError:
             pass
 
@@ -195,9 +216,13 @@ class SimuladorCTAD(Decoder):
             if espera > 0:
                 await asyncio.sleep(espera)
             numero += 1
+            did, smin, smax, hmin, hmax = self.ASSINATURA[self.sistema]
             passing = Passing(transponder=codigo,
                               rtc_time=base_us + int(t_s * 1_000_000),
-                              passing_number=numero, strength=8, hits=4)
+                              passing_number=numero, decoder_id=did,
+                              # variação determinística no lugar do 8/4 fixos
+                              strength=smin + (numero * 37) % (smax - smin + 1),
+                              hits=hmin + (numero * 17) % (hmax - hmin + 1))
             if on_passing:
                 on_passing(passing, None)
         log.info("simulador: replay concluído (%d passagens)", numero)

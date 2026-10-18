@@ -26,6 +26,9 @@ CONFIG_MODELO = {
     "decoder_host": "192.168.0.50",
     "decoder_porta": 5403,
     "decoder_auto": True,         # tenta conectar em loop ao abrir o app
+    # simulador de corridas (testes/desenvolvimento — nunca resultados oficiais)
+    "sim_sistema": "p3",            # fonte simulada: p3 | easylap | lapwiz
+    "sim_velocidade": 1.0,          # velocidade da reprodução (0.5 = meio-tempo)
     "telao_tela": 1,                # monitor do telão 2ª tela (0 = principal)
     "voz_contagem": True,           # voz na contagem regressiva/largada
     "contador_s": 10,               # segundos da contagem antes da largada

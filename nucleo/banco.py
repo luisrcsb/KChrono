@@ -324,6 +324,14 @@ class Banco:
                 self.conn.execute(
                     "INSERT OR REPLACE INTO _migracoes (versao, aplicada_em)"
                     " VALUES (7, ?)", (agora_iso(),))
+            if versao < 8:
+                # Simulador de corridas: sessão de teste/desenvolvimento (não oficial)
+                self.conn.execute(
+                    "ALTER TABLE sessoes ADD COLUMN simulacao INTEGER NOT NULL DEFAULT 0")
+                self.conn.execute("PRAGMA user_version = 8")
+                self.conn.execute(
+                    "INSERT OR REPLACE INTO _migracoes (versao, aplicada_em)"
+                    " VALUES (8, ?)", (agora_iso(),))
 
     # ----- pistas -----
     def criar_pista(self, nome: str) -> int:
@@ -443,28 +451,42 @@ class Banco:
 
     # ----- recordes (locução) -----
     def melhor_volta_pista_us(self) -> Optional[int]:
-        """Melhor volta absoluta já registrada (todas as sessões)."""
-        row = self.conn.execute("SELECT MIN(tempo_us) AS m FROM voltas").fetchone()
+        """Melhor volta absoluta já registrada (somente sessões oficiais)."""
+        row = self.conn.execute(
+            "SELECT MIN(v.tempo_us) AS m FROM voltas v"
+            " JOIN sessoes s ON s.id = v.sessao_id WHERE s.simulacao = 0").fetchone()
         return row["m"] if row and row["m"] is not None else None
 
     def melhores_por_piloto(self) -> Dict[int, int]:
-        """Melhor volta de cada piloto (todas as sessões) — base do recorde pessoal."""
+        """Melhor volta oficial de cada piloto — base do recorde pessoal."""
         rows = self.conn.execute(
-            "SELECT piloto_id, MIN(tempo_us) AS m FROM voltas GROUP BY piloto_id").fetchall()
+            "SELECT v.piloto_id, MIN(v.tempo_us) AS m FROM voltas v"
+            " JOIN sessoes s ON s.id = v.sessao_id WHERE s.simulacao = 0"
+            " GROUP BY v.piloto_id").fetchall()
         return {r["piloto_id"]: r["m"] for r in rows}
 
     # ----- sessões -----
     def abrir_sessao(self, pista_id: Optional[int], tipo: TipoSessao,
-                     parametros: Optional[dict] = None) -> str:
+                     parametros: Optional[dict] = None,
+                     simulacao: bool = False) -> str:
+        """Abre a sessão; simulacao=True marca teste/desenvolvimento (não oficial)."""
         import json
         sessao_id = str(uuid.uuid4())
         with self.conn:
             self.conn.execute(
-                "INSERT INTO sessoes (id, pista_id, tipo, estado, inicio, parametros)"
-                " VALUES (?, ?, ?, ?, ?, ?)",
+                "INSERT INTO sessoes (id, pista_id, tipo, estado, inicio, parametros,"
+                " simulacao) VALUES (?, ?, ?, ?, ?, ?, ?)",
                 (sessao_id, pista_id, tipo.value, EstadoSessao.PARADO.value,
-                 agora_iso(), json.dumps(parametros or {})))
+                 agora_iso(), json.dumps(parametros or {}), int(simulacao)))
         return sessao_id
+
+    def sessao_e_simulacao(self, sessao_id: Optional[str]) -> bool:
+        """True se a sessão veio do simulador (teste — não oficial)."""
+        if not sessao_id:
+            return False
+        row = self.conn.execute(
+            "SELECT simulacao FROM sessoes WHERE id = ?", (sessao_id,)).fetchone()
+        return bool(row and row["simulacao"])
 
     def atualizar_estado_sessao(self, sessao_id: str, estado: EstadoSessao):
         with self.conn:
@@ -761,18 +783,24 @@ class Banco:
         def _n(sql):
             return self.conn.execute(sql).fetchone()[0]
         return {
-            "sessoes": _n("SELECT COUNT(*) FROM sessoes"),
-            "sessoes_finalizadas": _n("SELECT COUNT(*) FROM sessoes WHERE estado = 'finalizado'"),
+            "sessoes": _n("SELECT COUNT(*) FROM sessoes WHERE simulacao = 0"),
+            "sessoes_finalizadas": _n("SELECT COUNT(*) FROM sessoes"
+                                      " WHERE estado = 'finalizado' AND simulacao = 0"),
+            "sessoes_simulacao": _n("SELECT COUNT(*) FROM sessoes WHERE simulacao = 1"),
             "pilotos": _n("SELECT COUNT(*) FROM pilotos"),
             "pilotos_ativos": _n("SELECT COUNT(*) FROM pilotos WHERE ativo = 1"),
             "transponders": _n("SELECT COUNT(*) FROM transponders"),
-            "voltas": _n("SELECT COUNT(*) FROM voltas"),
+            "voltas": _n("SELECT COUNT(*) FROM voltas v"
+                         " JOIN sessoes s ON s.id = v.sessao_id WHERE s.simulacao = 0"),
+            "voltas_simulacao": _n("SELECT COUNT(*) FROM voltas v"
+                                   " JOIN sessoes s ON s.id = v.sessao_id"
+                                   " WHERE s.simulacao = 1"),
             "passings": _n("SELECT COUNT(*) FROM passings"),
             "campeonatos": _n("SELECT COUNT(*) FROM campeonatos"),
         }
 
     def relatorio_pilotos(self):
-        """Agregado por piloto: voltas, sessões, melhor volta e última atividade."""
+        """Agregado por piloto (sessões oficiais — simulação fica de fora)."""
         return self.conn.execute(
             "SELECT p.id, p.nome, p.apelido, p.telefone, p.funcoes, p.ativo,"
             " COUNT(v.id) AS voltas,"
@@ -780,7 +808,9 @@ class Banco:
             " MIN(v.tempo_us) AS melhor_us,"
             " MAX(s.inicio) AS ultima_sessao"
             " FROM pilotos p"
-            " LEFT JOIN voltas v ON v.piloto_id = p.id"
+            " LEFT JOIN (SELECT vv.* FROM voltas vv"
+            "   JOIN sessoes s2 ON s2.id = vv.sessao_id"
+            "   WHERE s2.simulacao = 0) v ON v.piloto_id = p.id"
             " LEFT JOIN sessoes s ON s.id = v.sessao_id"
             " GROUP BY p.id ORDER BY voltas DESC, p.nome COLLATE NOCASE").fetchall()
 
