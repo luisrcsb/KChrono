@@ -595,6 +595,7 @@ class EstadoApp:
                 "parametros": self.parametros}
 
     def _classificacao(self):
+        comp_m = self._comprimento_pista_m()
         return [{"posicao": l.posicao, "nome": l.nome, "voltas": l.voltas,
                  "tempo": formatar(l.tempo_total_us), "melhor": formatar(l.melhor_volta_us),
                  "melhor_us": l.melhor_volta_us, "ultima": formatar(l.ultima_volta_us),
@@ -604,6 +605,9 @@ class EstadoApp:
                  "desvio": formatar(int(l.desvio_us)) if l.desvio_us else "-",
                  "consistencia": f"{l.consistencia_pct:.1f}%" if l.consistencia_pct else "-",
                  "transponder": l.transponder, "suspeita": l.suspeita,
+                 # km/h da melhor volta (comprimento real da pista)
+                 "velocidade": (f"{comp_m / (l.melhor_volta_us / 1e6) * 3.6:.1f}"
+                                if comp_m and l.melhor_volta_us else ""),
                  "piloto_id": l.piloto_id}
                 for l in self.motor.classificacao()]
 
@@ -614,8 +618,11 @@ class EstadoApp:
             return False
         # simulador ligado = sessão de teste/desenvolvimento (não oficial)
         self.sessao_simulacao = bool(getattr(self.driver, "simulado", False))
-        self.sessao_id = self.banco.abrir_sessao(pista_id=None, tipo=TipoSessao(tipo),
-                                                 simulacao=self.sessao_simulacao)
+        # sessão nasce vinculada à pista ativa (traçado/comprimento)
+        pista_ativa = self.banco.pista_ativa()
+        self.sessao_id = self.banco.abrir_sessao(
+            pista_id=pista_ativa["id"] if pista_ativa else None,
+            tipo=TipoSessao(tipo), simulacao=self.sessao_simulacao)
         self.parametros = {"duracao": duracao, "criterio": criterio,
                            "tempo_minimo_volta_s": tempo_minimo_s}
         self.motor = MotorCorrida(
@@ -1143,6 +1150,60 @@ class EstadoApp:
 
     def estado_pista(self) -> Dict:
         return {"bandeira": self.bandeira, "motivo": self.bandeira_motivo}
+
+    # ----- traçado da pista (editor de traçado) -----
+    def listar_pistas_ui(self) -> List[Dict]:
+        return [{"id": r["id"], "nome": r["nome"], "ativa": bool(r["ativa"]),
+                 "comprimento_m": r["comprimento_m"],
+                 "tem_tracado": bool(r["tem_tracado"])}
+                for r in self.banco.listar_pistas()]
+
+    def tracado_pista(self) -> Optional[Dict]:
+        """Traçado da pista ativa (None se ainda não desenhado)."""
+        row = self.banco.pista_ativa()
+        if not row or not row["tracado"]:
+            return None
+        try:
+            tr = json.loads(row["tracado"])
+        except (TypeError, ValueError):
+            return None
+        if not isinstance(tr, dict):
+            return None
+        tr["pista_id"] = row["id"]
+        tr["pista_nome"] = row["nome"]
+        tr["comprimento_m"] = row["comprimento_m"]
+        return tr
+
+    def salvar_tracado_pista(self, pista_id: int, tracado: Dict) -> Dict:
+        if not isinstance(tracado, dict) or not tracado.get("pontos"):
+            raise ValueError("traçado vazio — desenhe ao menos dois pontos")
+        comp = tracado.get("comprimento_m")
+        try:
+            comp = float(comp) if comp else None
+        except (TypeError, ValueError):
+            comp = None
+        self.banco.salvar_tracado_pista(int(pista_id), json.dumps(tracado), comp)
+        # efêmero: só para as interfaces ao vivo (não polui o log "Recente")
+        self.publicar("tracada", {"tracada": self.tracado_pista()}, registrar=False)
+        return {"ok": True, "tracada": self.tracado_pista()}
+
+    def criar_pista_ui(self, nome: str) -> Dict:
+        nome = (nome or "").strip() or "Pista"
+        pid = self.banco.criar_pista(nome)
+        return {"ok": True, "pista_id": pid}
+
+    def ativar_pista(self, pista_id: int) -> Dict:
+        if not self.banco.buscar_pista(int(pista_id)):
+            raise ValueError("pista inexistente")
+        self.banco.definir_pista_ativa(int(pista_id))
+        self.publicar("tracada", {"tracada": self.tracado_pista()}, registrar=False)
+        return {"ok": True, "tracada": self.tracado_pista()}
+
+    def _comprimento_pista_m(self) -> Optional[float]:
+        row = self.banco.pista_ativa()
+        if row and row["comprimento_m"]:
+            return float(row["comprimento_m"])
+        return None
 
     def definir_bandeira(self, cor: str, motivo: str = "") -> Dict:
         """Define a bandeira/estado da pista (controle do gerente)."""
@@ -2442,6 +2503,7 @@ class EstadoApp:
                        "regressiva": self.restante_sessao_s() is not None,
                        "parametros": self.parametros},
             "pista": self.estado_pista(),
+            "tracada": self.tracado_pista(),
             "contadores": self.contadores,
             "classificacao": self._classificacao() if self.motor else [],
             "eventos": self.eventos[-30:],

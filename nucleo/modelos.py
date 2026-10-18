@@ -28,6 +28,8 @@ class EstadoSessao(str, Enum):
 class Pista:
     id: Optional[int]
     nome: str
+    comprimento_m: Optional[float] = None  # comprimento real (estatísticas)
+    ativa: bool = False                    # pista das sessões em andamento
 
 
 @dataclass

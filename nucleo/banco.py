@@ -332,12 +332,56 @@ class Banco:
                 self.conn.execute(
                     "INSERT OR REPLACE INTO _migracoes (versao, aplicada_em)"
                     " VALUES (8, ?)", (agora_iso(),))
+            if versao < 9:
+                # Editor de traçado: geometria JSON + comprimento real (estatísticas)
+                self.conn.execute("ALTER TABLE pistas ADD COLUMN tracado TEXT")
+                self.conn.execute(
+                    "ALTER TABLE pistas ADD COLUMN comprimento_m REAL")
+                self.conn.execute(
+                    "ALTER TABLE pistas ADD COLUMN ativa INTEGER"
+                    " NOT NULL DEFAULT 0")
+                self.conn.execute("PRAGMA user_version = 9")
+                self.conn.execute(
+                    "INSERT OR REPLACE INTO _migracoes (versao, aplicada_em)"
+                    " VALUES (9, ?)", (agora_iso(),))
 
     # ----- pistas -----
     def criar_pista(self, nome: str) -> int:
         with self.conn:
             cur = self.conn.execute("INSERT INTO pistas (nome) VALUES (?)", (nome,))
         return cur.lastrowid
+
+    def listar_pistas(self):
+        return self.conn.execute(
+            "SELECT id, nome, comprimento_m, ativa,"
+            " (tracado IS NOT NULL) AS tem_tracado"
+            " FROM pistas ORDER BY nome COLLATE NOCASE").fetchall()
+
+    def buscar_pista(self, pista_id: int):
+        return self.conn.execute(
+            "SELECT * FROM pistas WHERE id = ?", (pista_id,)).fetchone()
+
+    def pista_ativa(self):
+        """Pista ativa (ativa = 1) ou a primeira cadastrada (fallback)."""
+        row = self.conn.execute(
+            "SELECT * FROM pistas WHERE ativa = 1 ORDER BY id LIMIT 1").fetchone()
+        if row:
+            return row
+        return self.conn.execute(
+            "SELECT * FROM pistas ORDER BY id LIMIT 1").fetchone()
+
+    def salvar_tracado_pista(self, pista_id: int, tracado_json,
+                             comprimento_m: Optional[float]) -> None:
+        with self.conn:
+            self.conn.execute(
+                "UPDATE pistas SET tracado = ?, comprimento_m = ? WHERE id = ?",
+                (tracado_json, comprimento_m, pista_id))
+
+    def definir_pista_ativa(self, pista_id: int) -> None:
+        with self.conn:
+            self.conn.execute("UPDATE pistas SET ativa = 0")
+            self.conn.execute(
+                "UPDATE pistas SET ativa = 1 WHERE id = ?", (pista_id,))
 
     # ----- pilotos -----
     def criar_piloto(self, nome: str, apelido: str = "", fonia: str = "",

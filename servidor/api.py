@@ -318,6 +318,45 @@ async def api_pista_bandeira(cor: str = Query(...), motivo: str = Query("")):
         return {"ok": False, "erro": str(e)}
 
 
+# ----- traçado da pista (editor de pista) -----
+@app.get("/api/pistas")
+async def api_listar_pistas():
+    return {"pistas": estado.listar_pistas_ui(),
+            "tracada": estado.tracado_pista()}
+
+
+@app.post("/api/pistas/criar")
+async def api_criar_pista(nome: str = Query("Pista")):
+    return estado.criar_pista_ui(nome)
+
+
+@app.get("/api/pistas/{pista_id}/tracado")
+async def api_buscar_tracado(pista_id: int):
+    row = estado.banco.buscar_pista(pista_id)
+    if not row:
+        raise HTTPException(404, "pista inexistente")
+    tr = json.loads(row["tracado"]) if row["tracado"] else None
+    if isinstance(tr, dict):
+        tr["comprimento_m"] = row["comprimento_m"]
+    return {"tracada": tr}
+
+
+@app.post("/api/pistas/{pista_id}/tracado")
+async def api_salvar_tracado(pista_id: int, tracado: dict = Body(...)):
+    try:
+        return estado.salvar_tracado_pista(pista_id, tracado)
+    except ValueError as e:
+        return {"ok": False, "erro": str(e)}
+
+
+@app.post("/api/pistas/{pista_id}/ativar")
+async def api_ativar_pista(pista_id: int):
+    try:
+        return estado.ativar_pista(pista_id)
+    except ValueError as e:
+        return {"ok": False, "erro": str(e)}
+
+
 @app.get("/api/checkin")
 async def api_checkin_listar():
     return {"presentes": estado.listar_presentes()}

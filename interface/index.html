@@ -33,6 +33,7 @@
     <nav id="adm-nav">
       <a class="on" data-titulo="Operador painel" onclick="mostrarOperador(this)">🎮 Painel do Operador</a>
       <a data-titulo="Gerente de Pista bandeira check-in" onclick="adminSecao(this,'a-gerente')">🚦 Gerente de Pista</a>
+      <a data-titulo="Pista traçado retas curvas largada grid largura comprimento" onclick="adminSecao(this,'a-pista')">🏟️ Pista &amp; Traçado</a>
       <a data-titulo="Voltas histórico sessões central" onclick="adminSecao(this,'a-voltas')">🏁 Voltas</a>
       <a data-titulo="Telão Semáforo colunas" onclick="adminSecao(this,'a-telao')">📺 Telão &amp; Semáforo</a>
       <a data-titulo="Campeonatos etapas ranking" onclick="adminSecao(this,'a-camp')">🏆 Campeonatos <span class="prev">Fase 5</span></a>
@@ -151,6 +152,15 @@
         todos os transponders cadastrados.</p>
     </div>
 
+    <!-- mapa da pista ativa (traçado desenhado no editor) -->
+    <div class="card" id="pista-mini-card" style="margin-bottom:16px" hidden>
+      <h3>Pista <span id="pista-mini-nome"
+              style="font-weight:400; font-size:14px; color:var(--text-muted)"></span></h3>
+      <canvas id="canvas-pista-mini"
+              style="width:100%; height:210px; display:block; margin-top:8px"></canvas>
+      <p class="hint" style="margin-top:6px" id="pista-mini-info"></p>
+    </div>
+
     <!-- campeonato em andamento -->
     <div class="card" style="margin-bottom:16px">
       <h3>🏆 Campeonato em andamento</h3>
@@ -180,8 +190,8 @@
       <h3>Classificação ao vivo <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--text-main)">— clique numa linha para selecionar o piloto (marcar gato / apagar volta)</span></h3>
       <div class="tabela-wrap">
         <table class="tabela-op" id="tabela-classificacao">
-          <tr><th>Pos</th><th>Nº</th><th>Abr</th><th>Piloto</th><th>Voltas</th><th>Total</th><th>Intervalo</th><th>Gap</th><th>Última</th><th>Melhor</th><th>Média</th><th>Desvio</th><th>Consist.</th><th>Transponder</th><th>Ações</th></tr>
-          <tr><td colspan="15" style="color:var(--text-muted)">nenhuma volta registrada</td></tr>
+          <tr><th>Pos</th><th>Nº</th><th>Abr</th><th>Piloto</th><th>Voltas</th><th>Total</th><th>Intervalo</th><th>Gap</th><th>Última</th><th>Melhor</th><th>km/h</th><th>Média</th><th>Desvio</th><th>Consist.</th><th>Transponder</th><th>Ações</th></tr>
+          <tr><td colspan="16" style="color:var(--text-muted)">nenhuma volta registrada</td></tr>
         </table>
       </div>
     </div>
@@ -222,6 +232,118 @@
         <h1 id="admin-titulo">Gerente de Pista</h1>
         <div class="perfil"><span class="tag">SUPERUSER</span> acesso total</div>
       </header>
+
+      <!-- ============ PISTA & TRAÇADO (editor de traçados) ============ -->
+      <div class="admin-sec" id="a-pista">
+        <div class="card">
+          <h3>Pista ativa</h3>
+          <div class="acoes">
+            <select id="ed-pista" onchange="edTrocarPista()" style="max-width:240px"></select>
+            <input id="ed-pista-nome" placeholder="nome da nova pista" style="max-width:180px">
+            <button class="btn-mini" onclick="edNovaPista()">➕ Nova pista</button>
+            <button class="btn-mini" onclick="edAtivarPista()">⭐ Tornar ativa</button>
+            <span id="ed-ativa-info" class="hint"></span>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>Editor de traçado</h3>
+          <div class="acoes" style="margin-bottom:8px; flex-wrap:wrap">
+            <button class="btn-mini" id="ed-btn-ponto" onclick="edFerramenta('ponto')">➕ Reta (clique p/ adicionar)</button>
+            <button class="btn-mini" id="ed-btn-curva" onclick="edFerramenta('curva')">🌀 Curva no canto (auto)</button>
+            <button class="btn-mini" id="ed-btn-mover" onclick="edFerramenta('mover')">✋ Mover / apagar vértice</button>
+            <span class="rot" style="margin-left:8px">encaixe</span>
+            <select id="ed-snap" style="width:96px">
+              <option value="0">livre</option>
+              <option value="45" selected>45°</option>
+              <option value="90">90°</option>
+            </select>
+            <select id="ed-molde" onchange="edMolde(this.value)">
+              <option value="">moldes…</option>
+              <option value="oval">oval</option>
+              <option value="retangulo">retângulo</option>
+              <option value="c">letra C</option>
+              <option value="oito">letra oito</option>
+              <option value="gride">gride de blocos</option>
+            </select>
+            <button class="btn-mini" onclick="edFechar()">🔁 Fechar/Abrir pista</button>
+            <button class="btn-mini" onclick="edDesfazer()">↩ Desfazer</button>
+            <button class="btn-mini" onclick="edLimpar()">🗑 Limpar</button>
+          </div>
+
+          <canvas id="ed-canvas"
+                  style="width:100%; height:430px; display:block; background:#0d1424;
+                         border:1px solid var(--border, #1a2438); border-radius:8px;
+                         cursor:crosshair; touch-action:none"></canvas>
+
+          <div class="acoes" style="margin-top:10px; flex-wrap:wrap">
+            <label class="rot">vértice <b id="ed-sel-info">nenhum</b></label>
+            <label class="rot">raio da curva (m)
+              <input type="range" id="ed-raio" min="0" max="250" step="1" value="0"
+                     style="width:130px; vertical-align:middle" oninput="edRaio(this.value)">
+            </label>
+            <span id="ed-angulo-info" class="hint"></span>
+            <button class="btn-mini" onclick="edCurvaAuto()">✨ Curva automática (sistema escolhe o raio)</button>
+          </div>
+
+          <div class="acoes" style="margin-top:8px; flex-wrap:wrap">
+            <button class="btn-mini" onclick="edLargada()">📍 Marcar largada no vértice</button>
+            <button class="btn-mini" onclick="edGrid()">🏁 Marcar grid no vértice</button>
+            <label class="rot">colunas
+              <input type="number" id="ed-grid-col" value="2" min="1" max="4" style="width:54px"
+                     onchange="edGridOpcoes()"></label>
+            <label class="rot">vagas
+              <input type="number" id="ed-grid-vagas" value="10" min="2" max="60" style="width:60px"
+                     onchange="edGridOpcoes()"></label>
+          </div>
+          <p class="hint" style="margin-top:10px">
+            <b>Como usar:</b> clique no canvas para criar as retas (ângulo encaixa em 45°/90°;
+            <i>livre</i> desliga o encaixe). Selecione um vértice e clique em
+            <b>✨ Curva automática</b> — o sistema mede o ângulo do canto (45°, 90° ou o que for)
+            e escolhe sozinho o melhor raio tangente às duas retas; a régua <i>raio</i> ajusta
+            depois. A <b>largada</b> é o ponto 0 da volta (ancora do perfil de largura).
+          </p>
+        </div>
+
+        <div class="grid g2">
+          <div class="card">
+            <h3>Medidas &amp; estatísticas</h3>
+            <div class="form-sessao">
+              <div><label>Comprimento total da pista (m) — para velocidade média</label>
+                <input id="ed-comprimento" type="number" min="10" step="1" value="120"></div>
+            </div>
+            <div class="acoes" style="margin-top:10px">
+              <label class="rot">largura base (m)
+                <input id="ed-larg-base" type="number" min="0.2" step="0.05" value="1" style="width:76px"
+                       oninput="edMedidas()"></label>
+              <label class="rot">largura início (m)
+                <input id="ed-larg-ini" type="number" min="0.2" step="0.05" value="1" style="width:76px"
+                       oninput="edMedidas()"></label>
+              <label class="rot">largura fim (m)
+                <input id="ed-larg-fim" type="number" min="0.2" step="0.05" value="0.8" style="width:76px"
+                       oninput="edMedidas()"></label>
+            </div>
+            <p class="hint">Largura variável ancorada na largada: início (na linha) → base
+              (meio da volta) → fim (chegando na largada). Ex.: 1 m → 1 m → 0,8 m.</p>
+          </div>
+          <div class="card">
+            <h3>Onde exibir este traçado</h3>
+            <div class="acoes">
+              <label><input type="checkbox" id="ed-ex-telao" checked> 📺 Telão</label>
+              <label><input type="checkbox" id="ed-ex-operador" checked> 🎮 Painel do Operador</label>
+              <label><input type="checkbox" id="ed-ex-gerente" checked> 📱 Gerente (celular)</label>
+              <label><input type="checkbox" id="ed-ex-simulador" checked> 🧪 Simulador</label>
+            </div>
+            <p class="hint">Telão/Operador/Gerente ligam e desligam a exibição normal;
+              <b>Simulador</b> decide se o traçado aparece no telão quando a sessão é de
+              teste (replay de corrida do CTAD).</p>
+            <div class="acoes" style="margin-top:12px">
+              <button class="btn-slide" onclick="edSalvar()">💾 Salvar traçado</button>
+              <span id="ed-msg" class="hint"></span>
+            </div>
+          </div>
+        </div>
+      </div>
 
       <!-- ============ GERENTE DE PISTA ============ -->
       <div class="admin-sec" id="a-gerente">
@@ -1057,6 +1179,7 @@
   </div>
 </div>
 
-<script src="/static/app.js?v=2.4"></script>
+<script src="/static/tracado.js?v=1.0"></script>
+<script src="/static/app.js?v=2.5"></script>
 </body>
 </html>

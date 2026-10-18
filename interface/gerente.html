@@ -124,16 +124,24 @@
       </div>
     </div>
 
+    <!-- MAPA DA PISTA (traçado desenhado no Admin) -->
+    <div class="g-card" id="g-track-card" hidden>
+      <h3>Pista <span id="g-track-nome" class="g-hint" style="font-weight:400"></span></h3>
+      <canvas id="g-canvas-track"
+              style="width:100%; height:170px; display:block; margin-top:6px"></canvas>
+      <p class="g-hint" id="g-track-info" style="margin-top:4px"></p>
+    </div>
+
     <!-- CLASSIFICAÇÃO -->
     <div class="g-card g-class">
       <h3>Classificação ao vivo</h3>
       <div class="g-tabela-wrap">
         <table class="g-tabela" id="g-tabela">
           <thead>
-            <tr><th>Pos</th><th>Piloto</th><th>Voltas</th><th>Melhor</th><th>Última</th>
+            <tr><th>Pos</th><th>Piloto</th><th>Voltas</th><th>Melhor</th><th>km/h</th><th>Última</th>
               <th>Total</th><th>Gap</th><th>Ações</th></tr>
           </thead>
-          <tbody><tr><td colspan="8" class="g-vazio">sem sessão ativa</td></tr></tbody>
+          <tbody><tr><td colspan="9" class="g-vazio">sem sessão ativa</td></tr></tbody>
         </table>
       </div>
     </div>
@@ -183,6 +191,7 @@
 </section>
 
 <div id="g-toast" class="g-toast"></div>
-<script src="/static/gerente.js?v=1.7"></script>
+<script src="/static/tracado.js?v=1.0"></script>
+<script src="/static/gerente.js?v=1.8"></script>
 </body>
 </html>

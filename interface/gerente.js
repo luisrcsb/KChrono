@@ -112,9 +112,11 @@ function gTratar(ev) {
     gRenderSessao(ev.sessao);
     gRenderClassificacao(ev.classificacao || []);
     if (ev.pista) gAtualizarPista(ev.pista.bandeira, ev.pista.motivo);
+    if (ev.tracada !== undefined) gRenderTracada(ev.tracada);
     return;
   }
   switch (ev.tipo) {
+    case "tracada": gRenderTracada(ev.tracada || null); break;
     case "classificacao": gRenderClassificacao(ev.linhas || []); break;
     case "sessao":
       gRenderSessao({ ...(gSessao || {}), estado: ev.estado, pausada: ev.pausada });
@@ -131,6 +133,31 @@ function gTratar(ev) {
     case "admin": gToast(ev.msg || "ação administrativa"); break;
   }
 }
+
+// ---------------------------------------------------------------- traçado da pista
+let gTracada = null;
+
+function gRenderTracada(tr) {
+  gTracada = tr || null;
+  const card = document.getElementById("g-track-card");
+  if (!card) return;
+  const exibir = !!(tr && tr.exibir && tr.exibir.gerente !== false);
+  card.hidden = !exibir;
+  if (!exibir) return;
+  document.getElementById("g-track-nome").textContent = tr.pista_nome || "";
+  document.getElementById("g-track-info").textContent =
+    tr.comprimento_m ? `${tr.comprimento_m} m por volta` : "";
+  gDesenharTracada();
+}
+
+function gDesenharTracada() {
+  const c = document.getElementById("g-canvas-track");
+  if (!c || c.hidden || !gTracada || c.clientWidth < 20) return;
+  const ctx = c.getContext("2d");
+  TC.desenhar(ctx, c.width = c.clientWidth, c.height = c.clientHeight, gTracada);
+}
+
+window.addEventListener("resize", () => gDesenharTracada());
 
 // ---------------------------------------------------------------- sessão
 let gCrono = { base: 0, restante: null, ref: performance.now(), correndo: false };
@@ -176,7 +203,7 @@ function gRenderClassificacao(linhas) {
   document.getElementById("g-voltas-tot").textContent = `${maxV} voltas`;
   const tb = document.querySelector("#g-tabela tbody");
   if (!gClassificacao.length) {
-    tb.innerHTML = `<tr><td colspan="8" class="g-vazio">sem sessão ativa</td></tr>`;
+    tb.innerHTML = `<tr><td colspan="9" class="g-vazio">sem sessão ativa</td></tr>`;
     return;
   }
   tb.innerHTML = gClassificacao.map(l => `
@@ -185,6 +212,7 @@ function gRenderClassificacao(linhas) {
       <td>${gEsc(l.nome)}${l.suspeita ? ' <span class="g-pill" style="color:#ff8a99">gato</span>' : ""}</td>
       <td>${l.voltas}</td>
       <td>${l.melhor || "-"}</td>
+      <td>${l.velocidade || "-"}</td>
       <td>${l.ultima || "-"}</td>
       <td>${l.tempo || "-"}</td>
       <td>${l.gap || ""}</td>
@@ -322,6 +350,7 @@ async function gRecarregarSessao() {
     if (s.sessao) gRenderSessao(s.sessao);
     if (s.decoder) gRenderDecoder(s.decoder);
     gRenderClassificacao(s.classificacao || []);
+    if (s.tracada !== undefined) gRenderTracada(s.tracada);
     if (d.pilotos) gPilotos = d.pilotos;
     if (d.presentes) gPresentes = d.presentes;
     gRenderCheckin();

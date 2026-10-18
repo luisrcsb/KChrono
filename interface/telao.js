@@ -6,6 +6,9 @@
 let ws = null;
 let estadoAtual = "parado";
 let ultimaLinhas = [];
+let tracadaAtual = null;      // traçado salvo da pista ativa (evento/snapshot)
+let sessaoSimulacao = false;  // sessão de teste (replay do simulador)
+let tracadaCache = null;      // pista estática em offscreen (evita redesenhar)
 let ultimasVoltas = { pilotos: [], parametros: { duracao: 10, criterio: "tempo" } };
 // cronômetro da sessão: base do servidor + contagem local (como no operador)
 // clockRestanteS != null => corrida por tempo: o relógio conta REGRESSIVO.
@@ -77,9 +80,14 @@ function tratarEvento(ev) {
     renderSessao(ev.sessao);
     renderClassificacao(ev.classificacao || []);
     renderBandeira(ev.pista);
+    if (ev.tracada !== undefined) tracadaAtual = ev.tracada || null;
     return;
   }
   switch (ev.tipo) {
+    case "tracada":
+      tracadaAtual = ev.tracada || null;
+      if (tabAtual === "tv-track") desenharTrack();
+      break;
     case "sessao":
       renderSessao(ev);
       atualizarClockViaStatus();   // o evento não traz tempo_s — busca a base
@@ -125,6 +133,8 @@ function renderBandeira(p) {
 // ---------------------------------------------------------------- telas
 function renderSessao(s) {
   document.querySelectorAll(".titulo-sim").forEach(el => { el.hidden = !s.simulacao; });
+  // em simulação o traçado obedece à chave "simulador"; caso normal, a "telao"
+  sessaoSimulacao = !!s.simulacao;
   const estado = s.estado || "parado";
   if (estado === estadoAtual) return;
   estadoAtual = estado;
@@ -260,12 +270,13 @@ function renderClassificacao(linhas) {
       <td>${l.gap || ""}</td>
       <td>${l.ultima || "-"}</td>
       <td>${l.melhor || "-"}${l.melhor_us === record ? '<span class="badge melhor">record</span>' : ""}</td>
+      <td>${l.velocidade || "-"}</td>
       <td>${l.media && l.media !== "-" ? l.media : "-"}</td>
       <td>${estS != null ? fmtTempo(estS) : "-"}</td>
     </tr>`;
   }).join("");
   document.querySelector("#tabela-telao tbody").innerHTML =
-    corpo || '<tr><td colspan="11" style="color:var(--mut)">aguardando largada…</td></tr>';
+    corpo || '<tr><td colspan="12" style="color:var(--mut)">aguardando largada…</td></tr>';
 }
 
 // ---------------------------------------------------------------- gráficos
@@ -369,6 +380,22 @@ function pararTrack() {
   trackLoop = null;
 }
 
+// pista estática (traçado real) em canvas offscreen — só redesenha quando
+// o traçado ou o tamanho da tela mudam
+function tracadaPronta(W, H) {
+  if (!tracadaAtual) return null;
+  const chave = `${W}x${H}|` + JSON.stringify(tracadaAtual);
+  if (tracadaCache && tracadaCache.chave === chave) return tracadaCache.met;
+  const off = document.createElement("canvas");
+  off.width = W;
+  off.height = H;
+  const ctx = off.getContext("2d");
+  const met = TC.desenhar(ctx, W, H, tracadaAtual);
+  if (!met) return null;
+  tracadaCache = { chave, off, met };
+  return met;
+}
+
 function desenharTrack() {
   const canvas = document.getElementById("canvas-track");
   if (!canvas) return;
@@ -377,23 +404,34 @@ function desenharTrack() {
   const H = canvas.height = canvas.clientHeight;
   ctx.clearRect(0, 0, W, H);
 
-  // traçado default (oval estilo pista) — editável na Fase 5
-  ctx.strokeStyle = "#22304d";
-  ctx.lineWidth = 26;
-  ctx.beginPath();
-  ctx.ellipse(W / 2, H / 2, W * 0.36, H * 0.34, 0, 0, Math.PI * 2);
-  ctx.stroke();
-  ctx.strokeStyle = "#3a86ff";
-  ctx.lineWidth = 2;
-  ctx.setLineDash([8, 8]);
-  ctx.beginPath();
-  ctx.ellipse(W / 2, H / 2, W * 0.36, H * 0.34, 0, 0, Math.PI * 2);
-  ctx.stroke();
-  ctx.setLineDash([]);
+  // traçado salvo da pista ativa (chaves por superfície: telão / simulador)
+  let met = null;
+  const ex = tracadaAtual && tracadaAtual.exibir;
+  const usarTracada = !!tracadaAtual &&
+    !!(ex && (sessaoSimulacao ? ex.simulador !== false : ex.telao !== false));
+  if (usarTracada) {
+    met = tracadaPronta(W, H);
+    if (met) ctx.drawImage(tracadaCache.off, 0, 0);
+  }
 
-  // linha de largada/chegada
-  ctx.fillStyle = "#fff";
-  ctx.fillRect(W / 2 + W * 0.36 - 3, H / 2 - 13, 6, 26);
+  if (!met) {
+    // sem traçado salvo: oval de referência (layout antigo)
+    ctx.strokeStyle = "#22304d";
+    ctx.lineWidth = 26;
+    ctx.beginPath();
+    ctx.ellipse(W / 2, H / 2, W * 0.36, H * 0.34, 0, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.strokeStyle = "#3a86ff";
+    ctx.lineWidth = 2;
+    ctx.setLineDash([8, 8]);
+    ctx.beginPath();
+    ctx.ellipse(W / 2, H / 2, W * 0.36, H * 0.34, 0, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    // linha de largada/chegada
+    ctx.fillStyle = "#fff";
+    ctx.fillRect(W / 2 + W * 0.36 - 3, H / 2 - 13, 6, 26);
+  }
 
   // carros: progresso = voltas / voltas do líder
   const linhas = ultimaLinhas.filter(l => l.voltas > 0);
@@ -407,9 +445,15 @@ function desenharTrack() {
   const maxV = Math.max(...linhas.map(l => l.voltas));
   linhas.forEach((l, i) => {
     const frac = (l.voltas % 1 === 0 ? l.voltas - 0.02 : l.voltas) / Math.max(maxV, 1);
-    const ang = -Math.PI / 2 + frac * Math.PI * 2;
-    const x = W / 2 + Math.cos(ang) * W * 0.36;
-    const y = H / 2 + Math.sin(ang) * H * 0.34;
+    let x, y;
+    if (met) {
+      const p = TC.pontoEm(met, frac);
+      x = p.x; y = p.y;
+    } else {
+      const ang = -Math.PI / 2 + frac * Math.PI * 2;
+      x = W / 2 + Math.cos(ang) * W * 0.36;
+      y = H / 2 + Math.sin(ang) * H * 0.34;
+    }
     ctx.fillStyle = CORES[l.posicao - 1] || "#fff";
     ctx.beginPath();
     ctx.arc(x, y, 9, 0, Math.PI * 2);

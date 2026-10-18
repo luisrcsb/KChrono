@@ -319,6 +319,9 @@ function tratarEvento(ev) {
     case "checkin":
       if (Array.isArray(ev.presentes)) { checkinCache.presentes = ev.presentes; renderCheckin(); }
       break;
+    case "tracada":
+      renderTracada(ev.tracada || null);
+      break;
     case "anuncio":
       logMsg(`anúncio: ${ev.texto}`, "l-admin", "log-operador");
       break;
@@ -380,6 +383,7 @@ function renderSnapshot(s) {
   renderStatus(s.decoder.status ? { ...s.decoder.status } : null);
   renderClassificacao({ linhas: s.classificacao || [] });
   if (s.pista) _renderEstadoPista(s.pista);
+  if (s.tracada !== undefined) renderTracada(s.tracada);
   if (Array.isArray(s.checkin)) { checkinCache.presentes = s.checkin; if (checkinCache.pilotos.length) renderCheckin(); }
   if (s.campeonato) renderEstadoCampeonato(s.campeonato);
   (s.eventos || []).slice(-12).forEach(e => {
@@ -577,8 +581,8 @@ function renderStatus(st) {
     sideSub.textContent = `${st.temperatura ?? "?"}°C · ${st.tensao ?? "?"}V · ruído ${st.ruido ?? "?"}`;
 }
 
-const HEADER_OP = "<tr><th>Pos</th><th>Nº</th><th>Abr</th><th>Piloto</th><th>Voltas</th><th>Total</th><th>Intervalo</th><th>Gap</th><th>Última</th><th>Melhor</th><th>Média</th><th>Desvio</th><th>Consist.</th><th>Transponder</th><th>Ações</th></tr>";
-const VAZIO_OP = '<tr><td colspan="15" style="color:var(--text-muted)">nenhuma volta registrada</td></tr>';
+const HEADER_OP = "<tr><th>Pos</th><th>Nº</th><th>Abr</th><th>Piloto</th><th>Voltas</th><th>Total</th><th>Intervalo</th><th>Gap</th><th>Última</th><th>Melhor</th><th>km/h</th><th>Média</th><th>Desvio</th><th>Consist.</th><th>Transponder</th><th>Ações</th></tr>";
+const VAZIO_OP = '<tr><td colspan="16" style="color:var(--text-muted)">nenhuma volta registrada</td></tr>';
 let linhaSel = null;
 
 function renderClassificacao(ev) {
@@ -588,7 +592,7 @@ function renderClassificacao(ev) {
        <td>${l.posicao}</td><td>${l.numero || "-"}</td><td>${l.abreviado || ""}</td>
        <td>${l.nome}${l.suspeita ? '<span class="gato">gato</span>' : ""}</td>
        <td>${l.voltas}</td><td>${l.tempo || "-"}</td><td>${l.intervalo || "-"}</td><td>${l.gap || ""}</td>
-       <td>${l.ultima || "-"}</td><td>${l.melhor || "-"}</td><td>${l.media || "-"}</td>
+       <td>${l.ultima || "-"}</td><td>${l.melhor || "-"}</td><td>${l.velocidade || "-"}</td><td>${l.media || "-"}</td>
        <td>${l.desvio || "-"}</td><td>${l.consistencia || "-"}</td><td>${l.transponder ?? "-"}</td>
        <td><span class="acao" title="marcar gato" onclick="event.stopPropagation();marcarGato()">🚫</span> <span class="acao" title="apagar" onclick="event.stopPropagation();apagarVolta()">🗑</span></td></tr>`).join("");
 
@@ -1728,6 +1732,7 @@ function adminSecao(btn, id) {
   if (id === "a-voz") carregarSom();
   if (id === "a-sobre") verificarVersao();
   if (id === "a-gerente") carregarGerente();
+  if (id === "a-pista") carregarEditorPista();
   if (id === "a-relatorio") carregarRelatorioResumo();
   if (id === "a-voltas") carregarHistorico();
   if (id === "a-notificacoes") carregarNotificacoes();
@@ -2764,3 +2769,503 @@ carregarCheckin();   // painel do operador: checkboxes de quem está na pista
 carregarNotificacoes();
 mostrar("operador");
 gerarQRSessao();
+
+// ================================================================
+// EDITOR DE TRAÇADO DE PISTA (Admin → Pista & Traçado)
+// ================================================================
+const ED_MUNDO = { w: 1000, h: 562 };
+const ED_PADRAO = () => ({
+  pontos: [], fechada: false, largada: null, grid: null,
+  largura: { base: 1, inicio: 1, fim: 0.8 },
+  comprimento_m: 120,
+  exibir: { telao: true, operador: true, gerente: true, simulador: true },
+});
+const ed = { tr: ED_PADRAO(), pistaId: null, ferramenta: "ponto",
+             sel: -1, drag: -1, lista: [], ligado: false };
+
+function edMsg(txt) {
+  const el = document.getElementById("ed-msg");
+  if (!el) return;
+  el.textContent = txt || "";
+  if (txt) { clearTimeout(ed._msgT); ed._msgT = setTimeout(() => { el.textContent = ""; }, 7000); }
+}
+
+async function carregarEditorPista() {
+  let lista = [];
+  try {
+    const r = await api("pistas", "GET");
+    lista = r.pistas || [];
+  } catch (e) { edMsg("erro ao carregar as pistas"); return; }
+  if (!lista.length) {
+    try { await api("pistas/criar?nome=Pista", "POST"); } catch (e) {}
+    try { lista = (await api("pistas", "GET")).pistas || []; } catch (e) {}
+  }
+  const selEl = document.getElementById("ed-pista");
+  if (!selEl) return;
+  if (!ed.pistaId || !lista.some(p => p.id === ed.pistaId)) {
+    const ativa = lista.find(p => p.ativa) || lista[0];
+    ed.pistaId = ativa ? ativa.id : null;
+  }
+  selEl.innerHTML = lista.map(p =>
+    `<option value="${p.id}">${p.nome}${p.ativa ? " ★" : ""}</option>`).join("");
+  selEl.value = String(ed.pistaId);
+  const ativa = lista.find(p => p.ativa);
+  const info = document.getElementById("ed-ativa-info");
+  if (info) info.textContent = !ativa ? "nenhuma pista ativa"
+    : (ativa.id === ed.pistaId && ativa.ativa)
+      ? "★ esta é a pista ativa das sessões"
+      : `★ pista ativa: ${ativa.nome}`;
+  await edCarregarTracada(ed.pistaId);
+  edLigarCanvas();
+}
+
+async function edCarregarTracada(pid) {
+  let tr = null;
+  try { tr = (await api(`pistas/${pid}/tracado`, "GET")).tracada; } catch (e) {}
+  ed.tr = tr || ED_PADRAO();
+  if (!ed.tr.largura) ed.tr.largura = { base: 1, inicio: 1, fim: 0.8 };
+  if (!ed.tr.exibir) ed.tr.exibir = { telao: true, operador: true, gerente: true, simulador: true };
+  ed.sel = -1;
+  edPreencherCampos();
+  edDesenhar();
+  edAtualizarSelInfo();
+}
+
+function edPreencherCampos() {
+  const set = (id, v) => {
+    const el = document.getElementById(id);
+    if (el && document.activeElement !== el) el.value = v;
+  };
+  const ck = (id, v) => { const el = document.getElementById(id); if (el) el.checked = v !== false; };
+  set("ed-larg-base", ed.tr.largura.base ?? 1);
+  set("ed-larg-ini", ed.tr.largura.inicio ?? 1);
+  set("ed-larg-fim", ed.tr.largura.fim ?? 0.8);
+  set("ed-comprimento", ed.tr.comprimento_m || 120);
+  set("ed-grid-col", ed.tr.grid ? ed.tr.grid.colunas : 2);
+  set("ed-grid-vagas", ed.tr.grid ? ed.tr.grid.vagas : 10);
+  ck("ed-ex-telao", ed.tr.exibir.telao);
+  ck("ed-ex-operador", ed.tr.exibir.operador);
+  ck("ed-ex-gerente", ed.tr.exibir.gerente);
+  ck("ed-ex-simulador", ed.tr.exibir.simulador);
+}
+
+function edMapeamento() {
+  const c = document.getElementById("ed-canvas");
+  const W = c ? c.clientWidth || 800 : 800;
+  const H = c ? c.clientHeight || 430 : 430;
+  const esc = Math.min(W / ED_MUNDO.w, H / ED_MUNDO.h);
+  return { esc, ox: (W - ED_MUNDO.w * esc) / 2, oy: (H - ED_MUNDO.h * esc) / 2 };
+}
+
+function edMundoDoEvento(ev) {
+  const c = document.getElementById("ed-canvas");
+  const r = c.getBoundingClientRect();
+  const m = edMapeamento();
+  return { x: (ev.clientX - r.left - m.ox) / m.esc,
+           y: (ev.clientY - r.top - m.oy) / m.esc };
+}
+
+function edSnap(ancla, p) {
+  const graus = parseInt((document.getElementById("ed-snap") || {}).value || "0", 10);
+  if (!graus || !ancla) return p;
+  const dx = p.x - ancla.x, dy = p.y - ancla.y;
+  const dist = Math.hypot(dx, dy);
+  if (dist < 1) return p;
+  const passo = graus * Math.PI / 180;
+  const a = Math.round(Math.atan2(dy, dx) / passo) * passo;
+  return { x: ancla.x + Math.cos(a) * dist, y: ancla.y + Math.sin(a) * dist };
+}
+
+function edVerticeProximo(p, lim = 16) {
+  const pts = ed.tr.pontos || [];
+  let melhor = -1, dm = lim * lim;
+  pts.forEach((pt, i) => {
+    const d = (pt.x - p.x) ** 2 + (pt.y - p.y) ** 2;
+    if (d <= dm) { dm = d; melhor = i; }
+  });
+  return melhor;
+}
+
+function edEscalaUnPorM() {
+  const bruto = TC.comprimentoBruto(ed.tr);
+  const comp = Number(ed.tr.comprimento_m) || 0;
+  return (bruto > 0 && comp > 0) ? bruto / comp : 1;
+}
+
+function edFerramenta(f) {
+  ed.ferramenta = f;
+  ["ponto", "curva", "mover"].forEach(k => {
+    const b = document.getElementById(`ed-btn-${k}`);
+    if (b) {
+      const on = k === f;
+      b.style.outline = on ? "2px solid #3a86ff" : "";
+      b.style.outlineOffset = on ? "1px" : "";
+    }
+  });
+  edMsg({ ponto: "clique para adicionar retas (encaixe em 45°/90°)",
+          curva: "clique num canto para transformá-lo em curva automática",
+          mover: "arraste para mover; duplo-clique apaga o vértice" }[f] || "");
+}
+
+function edLigarCanvas() {
+  const c = document.getElementById("ed-canvas");
+  if (!c || ed.ligado) return;
+  ed.ligado = true;
+  c.addEventListener("mousedown", ev => {
+    if (!ed.tr || !ed.tr.pontos) return;
+    const p = edMundoDoEvento(ev);
+    const i = edVerticeProximo(p);
+    if (ed.ferramenta === "ponto") {
+      if (i >= 0) { ed.sel = i; edDesenhar(); edAtualizarSelInfo(); return; }
+      const pts = ed.tr.pontos;
+      const origem = pts.length ? pts[pts.length - 1] : null;
+      const alvo = edSnap(origem, p);
+      if (pts.length >= 3) {
+        const p0 = pts[0];
+        if (Math.hypot(p0.x - alvo.x, p0.y - alvo.y) < 18) {
+          ed.tr.fechada = true;
+          edDesenhar(); edMsg("pista fechada ✔"); return;
+        }
+      }
+      if (!origem) ed.tr.largada = null;   // primeiro ponto começa um traçado novo
+      pts.push({ x: Math.round(alvo.x * 10) / 10, y: Math.round(alvo.y * 10) / 10 });
+      ed.sel = pts.length - 1;
+      edDesenhar(); edAtualizarSelInfo();
+      return;
+    }
+    if (ed.ferramenta === "curva") {
+      if (i < 0) { edMsg("clique sobre um canto (vértice) do traçado"); return; }
+      ed.sel = i; edCurvaAuto(); edAtualizarSelInfo();
+      return;
+    }
+    if (i >= 0) { ed.sel = i; ed.drag = i; edDesenhar(); edAtualizarSelInfo(); }
+  });
+  c.addEventListener("mousemove", ev => {
+    if (ed.drag < 0) return;
+    const p = edMundoDoEvento(ev);
+    const pt = ed.tr.pontos[ed.drag];
+    if (!pt) return;
+    pt.x = Math.round(Math.max(0, Math.min(ED_MUNDO.w, p.x)) * 10) / 10;
+    pt.y = Math.round(Math.max(0, Math.min(ED_MUNDO.h, p.y)) * 10) / 10;
+    edDesenhar();
+  });
+  window.addEventListener("mouseup", () => { ed.drag = -1; });
+  c.addEventListener("dblclick", ev => {
+    const i = edVerticeProximo(edMundoDoEvento(ev));
+    if (i < 0) return;
+    ed.tr.pontos.splice(i, 1);
+    if (ed.tr.pontos.length < 3) ed.tr.fechada = false;
+    ed.sel = -1;
+    edDesenhar(); edAtualizarSelInfo();
+    edMsg("vértice apagado");
+  });
+  const comp = document.getElementById("ed-comprimento");
+  if (comp) comp.addEventListener("input", edMedidas);
+  const chave = id => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener("change", () => {
+      ed.tr.exibir = {
+        telao: document.getElementById("ed-ex-telao").checked,
+        operador: document.getElementById("ed-ex-operador").checked,
+        gerente: document.getElementById("ed-ex-gerente").checked,
+        simulador: document.getElementById("ed-ex-simulador").checked,
+      };
+    });
+  };
+  ["ed-ex-telao", "ed-ex-operador", "ed-ex-gerente", "ed-ex-simulador"].forEach(chave);
+  edFerramenta(ed.ferramenta);
+}
+
+function edDesenhar() {
+  const c = document.getElementById("ed-canvas");
+  if (!c) return;
+  const ctx = c.getContext("2d");
+  const W = c.width = c.clientWidth || 800;
+  const H = c.height = c.clientHeight || 430;
+  ctx.fillStyle = "#0d1424";
+  ctx.fillRect(0, 0, W, H);
+  // grade de apoio
+  ctx.fillStyle = "rgba(132,146,166,0.18)";
+  for (let x = 40; x < W; x += 40)
+    for (let y = 40; y < H; y += 40) ctx.fillRect(x, y, 1.5, 1.5);
+  const m = ed.metrica = TC.desenhar(ctx, W, H, ed.tr,
+    { mundo: ED_MUNDO, pontos: true, sel: ed.sel, semLimpar: true });
+  ctx.font = "13px system-ui";
+  ctx.fillStyle = "#8492a6";
+  if (!m) {
+    ctx.fillStyle = "#5b6b85";
+    ctx.fillText("clique para criar o primeiro ponto da pista", 24, 30);
+    return;
+  }
+  if (ed.tr.largada) {
+    const p = ed.metrica.px(ed.tr.largada);
+    ctx.fillText("📍 largada", p.x + 12, p.y - 10);
+  }
+  if (ed.tr.grid) {
+    const p = ed.metrica.px(ed.tr.grid);
+    ctx.fillText("🏁 grid", p.x + 12, p.y + 22);
+  }
+}
+
+function edAtualizarSelInfo() {
+  const info = document.getElementById("ed-sel-info");
+  const ang = document.getElementById("ed-angulo-info");
+  const raio = document.getElementById("ed-raio");
+  const B = ed.tr.pontos && ed.tr.pontos[ed.sel];
+  if (ed.sel < 0 || !B) {
+    if (info) info.textContent = "nenhum";
+    if (ang) ang.textContent = "";
+    if (raio) raio.value = 0;
+    return;
+  }
+  const g = TC.anguloVertice(ed.tr, ed.sel);
+  const esc = edEscalaUnPorM();
+  if (info) info.textContent = `#${ed.sel + 1} de ${ed.tr.pontos.length}`;
+  if (ang) ang.textContent = g
+    ? `ângulo do canto: ${g}° · raio: ` +
+      (B.curva && B.curva.raio ? `${Math.round(B.curva.raio / esc)} m` : "sem curva")
+    : "";
+  if (raio && document.activeElement !== raio)
+    raio.value = (B.curva && B.curva.raio) ? Math.round(B.curva.raio / esc) : 0;
+}
+
+function edRaio(valorM) {
+  const B = ed.tr.pontos && ed.tr.pontos[ed.sel];
+  if (!B) { edAtualizarSelInfo(); return; }
+  const un = (Number(valorM) || 0) * edEscalaUnPorM();
+  if (un > 1) B.curva = { raio: Math.round(un * 10) / 10 };
+  else delete B.curva;
+  edDesenhar();
+  edAtualizarSelInfo();
+}
+
+function edCurvaAuto() {
+  const i = ed.sel;
+  const pts = ed.tr.pontos || [];
+  const n = pts.length;
+  if (i < 0 || !pts[i] || n < 3) {
+    edMsg("selecione um vértice (ferramenta ✋ ou 🌀) para virar curva");
+    return;
+  }
+  if (!ed.tr.fechada && (i === 0 || i === n - 1)) {
+    edMsg("as pontas de uma pista aberta não viram curva");
+    return;
+  }
+  const A = pts[(i - 1 + n) % n], B = pts[i], C = pts[(i + 1) % n];
+  const r = TC.raioAutoCanto(A, B, C);
+  if (!r) { edMsg("este canto não cabe curva (as retas quase se tocam)"); return; }
+  B.curva = { raio: r, auto: true };
+  edDesenhar();
+  edAtualizarSelInfo();
+  edMsg(`curva automática: canto de ${TC.anguloVertice(ed.tr, i)}° — ` +
+        `sistema escolheu raio ${Math.round(r / edEscalaUnPorM())} m (o maior tangente às duas retas)`);
+}
+
+function edLargada() {
+  const i = ed.sel;
+  const pts = ed.tr.pontos || [];
+  const n = pts.length;
+  if (i < 0 || !pts[i]) { edMsg("selecione o vértice da largada com a ferramenta ✋"); return; }
+  const B = pts[i], prox = pts[(i + 1) % n];
+  const ang = Math.atan2(prox.y - B.y, prox.x - B.x) * 180 / Math.PI;
+  ed.tr.largada = { x: B.x, y: B.y, ang: Math.round(ang * 10) / 10 };
+  edDesenhar();
+  edMsg("📍 largada marcada — largura e voltas contam a partir dela");
+}
+
+function edGrid() {
+  const i = ed.sel >= 0 ? ed.sel : -1;
+  const pts = ed.tr.pontos || [];
+  const src = i >= 0 ? pts[i] : ed.tr.largada;
+  if (!src || !pts.length) {
+    edMsg("selecione o vértice onde o grid será posicionado");
+    return;
+  }
+  const n = pts.length;
+  const prox = pts[i >= 0 ? (i + 1) % n : 0];
+  const ang = Math.atan2(prox.y - src.y, prox.x - src.x) * 180 / Math.PI;
+  ed.tr.grid = {
+    x: src.x, y: src.y, ang: Math.round(ang * 10) / 10,
+    colunas: parseInt(document.getElementById("ed-grid-col").value, 10) || 2,
+    vagas: parseInt(document.getElementById("ed-grid-vagas").value, 10) || 10,
+  };
+  edDesenhar();
+  edMsg("🏁 grid marcado (atrás da largada, no sentido contrário)");
+}
+
+function edGridOpcoes() {
+  if (!ed.tr.grid) return;
+  ed.tr.grid.colunas = parseInt(document.getElementById("ed-grid-col").value, 10) || 2;
+  ed.tr.grid.vagas = parseInt(document.getElementById("ed-grid-vagas").value, 10) || 10;
+  edDesenhar();
+}
+
+function edMedidas() {
+  const v = (id, d) => Math.max(0.2, Number(document.getElementById(id).value) || d);
+  ed.tr.largura = { base: v("ed-larg-base", 1),
+                    inicio: v("ed-larg-ini", 1),
+                    fim: v("ed-larg-fim", 1) };
+  ed.tr.comprimento_m = Number(document.getElementById("ed-comprimento").value) || 0;
+  edDesenhar();
+}
+
+function edFechar() {
+  if ((ed.tr.pontos || []).length < 3) { edMsg("ao menos 3 pontos para fechar"); return; }
+  ed.tr.fechada = !ed.tr.fechada;
+  edDesenhar();
+  edMsg(ed.tr.fechada ? "pista fechada ✔" : "pista aberta");
+}
+
+function edDesfazer() {
+  if (!ed.tr.pontos.length) return;
+  ed.tr.pontos.pop();
+  if (ed.tr.pontos.length < 3) ed.tr.fechada = false;
+  ed.sel = Math.min(ed.sel, ed.tr.pontos.length - 1);
+  edDesenhar(); edAtualizarSelInfo();
+}
+
+function edLimpar() {
+  if (!confirm("Apagar todo o traçado desta pista?")) return;
+  ed.tr = ED_PADRAO();
+  ed.sel = -1;
+  edPreencherCampos();
+  edDesenhar(); edAtualizarSelInfo();
+  edMsg("traçado apagado (salve para gravar)");
+}
+
+function edAplicarMolde(pts, fechada) {
+  const n = pts.length;
+  ed.tr.pontos = pts.map(p => ({ x: Math.round(p.x), y: Math.round(p.y) }));
+  ed.tr.fechada = !!fechada;
+  // curvas automáticas em todos os cantos
+  const ini = fechada ? 0 : 1;
+  const fim = fechada ? n : n - 1;
+  for (let i = ini; i < fim; i++) {
+    const A = ed.tr.pontos[(i - 1 + n) % n], B = ed.tr.pontos[i], C = ed.tr.pontos[(i + 1) % n];
+    const r = TC.raioAutoCanto(A, B, C);
+    if (r > 4) B.curva = { raio: r, auto: true };
+  }
+  ed.sel = -1;
+  ed.tr.largada = null;
+  ed.tr.grid = null;
+  if (n >= 2) {
+    const B = ed.tr.pontos[0], prox = ed.tr.pontos[1];
+    const ang = Math.round(Math.atan2(prox.y - B.y, prox.x - B.x) * 180 / Math.PI);
+    ed.tr.largada = { x: B.x, y: B.y, ang };
+    ed.tr.grid = { x: B.x, y: B.y, ang, colunas: 2, vagas: 10 };
+  }
+  edDesenhar();
+  edAtualizarSelInfo();
+}
+
+function edMolde(tipo) {
+  if (!tipo) return;
+  let pts = [], fechada = true;
+  if (tipo === "oval") {
+    for (let i = 0; i < 14; i++) {
+      const a = (i / 14) * Math.PI * 2;
+      pts.push({ x: 500 + Math.cos(a) * 400, y: 281 + Math.sin(a) * 205 });
+    }
+  } else if (tipo === "retangulo") {
+    pts = [{ x: 130, y: 90 }, { x: 870, y: 90 }, { x: 870, y: 472 }, { x: 130, y: 472 }];
+  } else if (tipo === "c") {
+    fechada = false;
+    pts = [{ x: 780, y: 90 }, { x: 360, y: 90 }, { x: 140, y: 190 },
+           { x: 140, y: 372 }, { x: 360, y: 472 }, { x: 780, y: 472 }];
+  } else if (tipo === "oito") {
+    for (let i = 0; i < 16; i++) {
+      const t = (i / 16) * Math.PI * 2;
+      pts.push({ x: 500 + 430 * Math.cos(t), y: 281 + 195 * Math.sin(2 * t) });
+    }
+  } else if (tipo === "gride") {
+    pts = [{ x: 110, y: 90 }, { x: 890, y: 90 }, { x: 890, y: 300 }, { x: 560, y: 300 },
+           { x: 560, y: 210 }, { x: 440, y: 210 }, { x: 440, y: 300 }, { x: 110, y: 300 }];
+  }
+  if (pts.length < 3) return;
+  edAplicarMolde(pts, fechada);
+  document.getElementById("ed-molde").value = "";
+  edMsg(`molde "${tipo}" aplicado — ajuste livre nos pontos`);
+}
+
+async function edTrocarPista() {
+  const sel = document.getElementById("ed-pista");
+  ed.pistaId = parseInt(sel.value, 10) || null;
+  await edCarregarTracada(ed.pistaId);
+}
+
+async function edNovaPista() {
+  const nome = (document.getElementById("ed-pista-nome").value || "").trim() || "Pista";
+  try {
+    const r = await api("pistas/criar?nome=" + encodeURIComponent(nome), "POST");
+    if (r && r.pista_id) {
+      ed.pistaId = r.pista_id;
+      await carregarEditorPista();
+      edMsg(`pista "${nome}" criada`);
+    }
+  } catch (e) { edMsg("erro ao criar pista"); }
+}
+
+async function edAtivarPista() {
+  if (!ed.pistaId) return;
+  try {
+    const r = await api(`pistas/${ed.pistaId}/ativar`, "POST");
+    if (r && r.ok) {
+      renderTracada(r.tracada);
+      await carregarEditorPista();
+      edMsg("★ pista ativada — as próximas sessões usam este traçado");
+    } else edMsg((r && r.erro) || "erro ao ativar");
+  } catch (e) { edMsg("erro ao ativar pista"); }
+}
+
+async function edSalvar() {
+  if (!ed.pistaId) return;
+  edMedidas();
+  if ((ed.tr.pontos || []).length < 2) { edMsg("desenhe ao menos dois pontos antes de salvar"); return; }
+  ed.tr.exibir = {
+    telao: document.getElementById("ed-ex-telao").checked,
+    operador: document.getElementById("ed-ex-operador").checked,
+    gerente: document.getElementById("ed-ex-gerente").checked,
+    simulador: document.getElementById("ed-ex-simulador").checked,
+  };
+  try {
+    const r = await api(`pistas/${ed.pistaId}/tracado`, "POST", "", ed.tr);
+    if (r && r.ok) {
+      renderTracada(r.tracada);
+      edMsg(`traçado salvo · comprimento ${ed.tr.comprimento_m || "?"} m`);
+    } else edMsg((r && r.erro) || "erro ao salvar");
+  } catch (e) { edMsg("erro ao salvar o traçado"); }
+}
+
+// ---------------------------------------------------------------- mini-mapa do operador
+let tracadaAtual = null;
+
+function renderTracada(tr) {
+  tracadaAtual = tr || null;
+  const card = document.getElementById("pista-mini-card");
+  if (!card) return;
+  const exibir = !!(tr && tr.exibir && tr.exibir.operador !== false);
+  card.hidden = !exibir;
+  if (!exibir) return;
+  const nome = document.getElementById("pista-mini-nome");
+  if (nome) nome.textContent = tr.pista_nome || "";
+  const info = document.getElementById("pista-mini-info");
+  if (info) {
+    const comp = tr.comprimento_m ? `${tr.comprimento_m} m` : "comprimento não informado";
+    const lg = tr.largura
+      ? `largura ${tr.largura.inicio ?? tr.largura.base} → ${tr.largura.base} → ` +
+        `${tr.largura.fim ?? tr.largura.base} m (perfil da volta)`
+      : "";
+    info.textContent = `${comp}${lg ? " · " + lg : ""}`;
+  }
+  desenharPistaMini();
+}
+
+function desenharPistaMini() {
+  const c = document.getElementById("canvas-pista-mini");
+  if (!c || c.hidden || !tracadaAtual) return;
+  if (c.clientWidth < 20) return;
+  const ctx = c.getContext("2d");
+  TC.desenhar(ctx, c.width = c.clientWidth, c.height = c.clientHeight, tracadaAtual);
+}
+
+window.addEventListener("resize", () => desenharPistaMini());
