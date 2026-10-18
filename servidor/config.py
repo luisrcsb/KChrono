@@ -26,6 +26,8 @@ CONFIG_MODELO = {
     "decoder_host": "192.168.0.50",
     "decoder_porta": 5403,
     "decoder_auto": True,         # tenta conectar em loop ao abrir o app
+    "decoder_redundante": True,   # 2 canais TCP simultâneos no P3 (v1.0.7)
+    "decoder_sem_dados_s": 45,    # silêncio que caracteriza conexão zumbi
     # simulador de corridas (testes/desenvolvimento — nunca resultados oficiais)
     "sim_sistema": "p3",            # fonte simulada: p3 | easylap | lapwiz
     "sim_velocidade": 1.0,          # velocidade da reprodução (0.5 = meio-tempo)

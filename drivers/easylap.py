@@ -31,6 +31,9 @@ log = logging.getLogger("kchrono.driver.easylap")
 INIT = bytes([0x03, 0xB9, 0x01])   # inicializa a comunicação
 TIPO_CARRO = 0x84
 TIPO_TIMESTAMP = 0x83
+#: faixa plausível do byte de comprimento (o protocolo usa pacotes de ~8-14 B);
+#: fora disso = byte de lixo/dessincronismo -> ressincroniza
+TAM_MIN, TAM_MAX = 4, 64
 
 
 class EasyLap(Decoder):
@@ -47,6 +50,7 @@ class EasyLap(Decoder):
         self._sequencia = 0
         self._ultimo_tempo_ms = None
         self.porta_usada: Optional[str] = None
+        self.stats = {"pacotes": 0, "ressincronizacoes": 0, "erros_leitura": 0}
 
     # ----- portas disponíveis -----
     @staticmethod
@@ -103,17 +107,33 @@ class EasyLap(Decoder):
             return self._serial.read(tamanho)   # devolve o que tiver (timeout 1s)
         except Exception as e:
             log.warning("erro lendo serial: %s", e)
+            self.stats["erros_leitura"] += 1
             self.conectado = False
             return b""
 
     def _extrair_pacotes(self) -> List[bytes]:
+        """Extrai pacotes validados do buffer (1º byte = tamanho total).
+
+        Robustez v1.0.7: comprimento improvável (0, gigante) ou tipo sem o
+        bit alto = dessincronismo -> descarta 1 byte e ressincroniza. Antes,
+        um comprimento 0 travava o buffer em loop infinito.
+        """
         pacotes = []
         while self._buffer:
             tam = self._buffer[0]
+            if tam < TAM_MIN or tam > TAM_MAX:
+                self._buffer = self._buffer[1:]
+                self.stats["ressincronizacoes"] += 1
+                continue
             if len(self._buffer) < tam:
                 break
-            pacotes.append(self._buffer[:tam])
+            pacote = self._buffer[:tam]
+            if not (pacote[2] & 0x80):      # tipos conhecidos: 0x83/0x84
+                self._buffer = self._buffer[1:]
+                self.stats["ressincronizacoes"] += 1
+                continue
             self._buffer = self._buffer[tam:]
+            pacotes.append(pacote)
         return pacotes
 
     def _processar(self, pacote: bytes, on_passing, on_status, on_desconhecido):
@@ -121,6 +141,7 @@ class EasyLap(Decoder):
             return
         tipo = pacote[2]
         if tipo == TIPO_CARRO and len(pacote) >= 13:
+            self.stats["pacotes"] += 1
             uid = pacote[3] | (pacote[4] << 8)
             tempo_ms = (pacote[8] | (pacote[9] << 8)
                         | (pacote[10] << 16) | (pacote[11] << 24))

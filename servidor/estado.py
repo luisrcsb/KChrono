@@ -66,6 +66,11 @@ class EstadoApp:
         #: último frame recebido do decoder (qualquer tipo) — watchdog
         self._ultimo_rx_us: Optional[int] = None
         self._aviso_silencio_em: float = 0.0
+        #: força reconexão quando o decoder fica mudo demais (watchdog)
+        self._reconectou_silencio_em: float = 0.0
+        #: alvo da última conexão manual (COM do EASYLAP, endereço do LapWiz,
+        #: sessão do simulador) — preservado no auto-reconnect
+        self._decoder_alvo: Optional[str] = None
         self.contadores = {"passings_validos": 0, "ghost_laps": 0, "gaps": 0,
                            "sem_piloto": 0}
         self.inicio_sessao_us: Optional[int] = None
@@ -179,7 +184,9 @@ class EstadoApp:
         """Fábrica de drivers — p3 (MyLaps) | easylap | lapwiz | simulador."""
         if tipo == "p3":
             return MyLapsP3(alvo or self.config.get("decoder_host", "192.168.0.50"),
-                            int(self.config.get("decoder_porta", 5403)))
+                            int(self.config.get("decoder_porta", 5403)),
+                            redundante=bool(self.config.get("decoder_redundante", True)),
+                            timeout_leitura=float(self.config.get("decoder_sem_dados_s") or 45))
         if tipo == "easylap":
             from drivers.easylap import EasyLap
             return EasyLap(porta=alvo)
@@ -203,6 +210,7 @@ class EstadoApp:
     async def desconectar_decoder(self) -> None:
         """Encerra o driver atual e a tarefa de leitura, se houver."""
         self._quer_decoder = False
+        self._decoder_alvo = None
         self.parar_auto_conectar()
         if self._task_decoder and not self._task_decoder.done():
             self._task_decoder.cancel()
@@ -323,6 +331,9 @@ class EstadoApp:
         extra = ""
         if getattr(self.driver, "porta_usada", None):
             extra += f" ({self.driver.porta_usada})"
+        canais = getattr(self.driver, "canais_ativos", 0)
+        if canais and canais > 1:
+            extra += f" · {canais} canais (redundante)"
         if tipo == "simulador":
             extra += (f" — fonte {self.config.get('sim_sistema', 'p3')}"
                       " · teste/desenvolvimento (não oficial)")
@@ -340,7 +351,7 @@ class EstadoApp:
                 if tentativa == 1:
                     log.info("auto-conexão do decoder (%s) em loop...", tipo)
                 try:
-                    self.driver = self._criar_driver(tipo, None)
+                    self.driver = self._criar_driver(tipo, self._decoder_alvo)
                     await self.driver.connect()
                 except (OSError, asyncio.TimeoutError, ValueError) as e:
                     if tentativa == 1:
@@ -368,6 +379,18 @@ class EstadoApp:
                     self.publicar("aviso", {"msg":
                         f"decoder conectado mas sem enviar dados há {gap:.0f}s — "
                         "verifique rede/cabo/loop (o P3 aceita no máx 4 conexões)"})
+                # escalada: mudo demais = conexão zumbi/serial morta -> fecha o
+                # driver e dispara o auto-reconnect (cobre EASYLAP/LapWiz, que
+                # não têm timeout de leitura próprio)
+                if gap > 90 and time.monotonic() - self._reconectou_silencio_em > 120:
+                    self._reconectou_silencio_em = time.monotonic()
+                    log.warning("decoder mudo há %.0fs — forçando reconexão", gap)
+                    self.publicar("aviso", {"msg":
+                        f"decoder sem dados há {gap:.0f}s — reconectando..."})
+                    try:
+                        await self.driver.close()
+                    except Exception:
+                        pass
         except asyncio.CancelledError:
             pass
 
@@ -381,7 +404,7 @@ class EstadoApp:
                 tipo = self.config.get("decoder_tipo", "p3")
                 log.info("tentando reconectar o decoder (%s)...", tipo)
                 try:
-                    self.driver = self._criar_driver(tipo, None)
+                    self.driver = self._criar_driver(tipo, self._decoder_alvo)
                     await self.driver.connect()
                 except (OSError, asyncio.TimeoutError, ValueError) as e:
                     log.warning("reconexão ao decoder falhou: %s", e)
@@ -395,6 +418,7 @@ class EstadoApp:
                                alvo: Optional[str] = None) -> bool:
         """Conecta o driver selecionado: p3 (MyLaps) | easylap | lapwiz."""
         tipo = tipo or self.config.get("decoder_tipo", "p3")
+        self._decoder_alvo = alvo        # preservado no auto-reconnect
         if self.conectado and self.driver:
             if tipo == self.config.get("decoder_tipo", "p3"):
                 return True                      # já conectado no mesmo driver
@@ -2495,7 +2519,9 @@ class EstadoApp:
                         "status": self._ultimo_status,
                         "sistema": getattr(self.driver, "sistema", None),
                         "sim_velocidade": self.config.get("sim_velocidade"),
-                        "segundos_sem_dados": sem_dados_s},
+                        "segundos_sem_dados": sem_dados_s,
+                        "canais": getattr(self.driver, "canais_ativos", None),
+                        "rx": dict(getattr(self.driver, "stats", {}) or {})},
             "sessao": {"id": self.sessao_id, "estado": motor_estado,
                        "simulacao": self.sessao_simulacao,
                        "pausada": self.pausado, "tempo_s": tempo_sessao,

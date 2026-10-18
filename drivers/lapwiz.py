@@ -15,6 +15,7 @@ restante da estrutura já está pronto.
 """
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import Callable, List, Optional
 

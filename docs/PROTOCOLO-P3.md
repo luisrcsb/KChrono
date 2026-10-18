@@ -7,6 +7,9 @@
 ## 1. Transporte
 
 - O **decoder escuta** conexões TCP na porta **5403** (até **4 conexões** simultâneas).
+- O KChrono (v1.0.7+) usa **2 conexões simultâneas** por redundância: se um canal
+  cair, o outro segue recebendo e o canal morto é reaberto com backoff (passings
+  vindos dos dois canais são deduplicados).
 - Não há request/response obrigatório: ao conectar, o decoder **envia mensagens
   espontâneas** (status, sessão) e passa a transmitir **passings** em tempo real.
 - Conexão testada com `Test-NetConnection 192.168.0.50 -Port 5403` → OK (PC da pista: 192.168.0.12).
@@ -194,6 +197,11 @@ with socket.create_connection((HOST, PORT), timeout=5) as s:
 5. **Comandos ao decoder** (opcional, read-only primeiro): documentar comportamento antes de implementar. **Aberto.**
 6. **Gaps de passings** (ex.: #9163 perdido): o motor de corrida (Fase 1) deve reconciliar
    voltas por `passing_number`, não por contagem de eventos.
+7. ~~Integridade dos frames / robustez de leitura~~ — **Fechado (v1.0.7):** o driver valida o
+   campo `tamanho` do header contra o comprimento real (quando sem byte-stuffing) e limita
+   os campos TLV ao corpo do frame — frame corrompido é descartado e contabilizado
+   (`stats`), com ressincronismo do buffer, canal redundante (2 conexões, dedup),
+   timeout de silêncio (conexão zumbi) e reabertura automática de canal.
 
 ## 7. Referências
 
