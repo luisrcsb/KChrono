@@ -29,7 +29,8 @@ abre automaticamente em <http://localhost:8780>.
 
 1. Instale o [NSIS](https://nsis.sourceforge.io/).
 2. Abra `instalador.nsi` e compile (`makensis instalador.nsi`).
-3. Resultado: `empacotamento\KChrono-Setup.exe`.
+3. Resultado: `empacotamento\KChrono-Setup-<versão>.exe` (ex.:
+   `KChrono-Setup-1-0-6.exe` — a versão entra no nome com hífens).
 
 O instalador cria atalhos no Menu Iniciar e na Área de Trabalho, registra a
 desinstalação e oferece a opção de iniciar com o Windows.
@@ -67,7 +68,7 @@ O KChrono consulta um arquivo `versao.json` publicado em um servidor
 **Admin → 🖥️ Sobre o KChrono** há os botões **Verificar** e **Baixar**.
 
 Para ativar:
-1. Publique `versao.json` e os pacotes (`KChrono-Setup.exe`,
+1. Publique `versao.json` e os pacotes (`KChrono-Setup-<versão>.exe`,
    `kchrono-linux.tar.gz`) em um endereço HTTPS.
 2. Preencha `"url_base"` em `versao.json` e ajuste o número de `"versao"`.
 3. A cada novo lançamento, incremente a versão e republic​e os arquivos.

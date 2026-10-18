@@ -88,7 +88,7 @@ O KChrono agora é um **app nativo de verdade** (não abre navegador):
 ```bash
 cd empacotamento
 build-windows.bat          # compila KChrono.exe com PyInstaller
-# Depois, no NSIS (makensis instalador.nsi) gera KChrono-Setup.exe
+# Depois, no NSIS (makensis instalador.nsi) gera KChrono-Setup-<versão>.exe
 ```
 
 **Requisitos**: Python 3.11+, WebView2 Runtime (já incluso no Windows 10/11 atualizado).
@@ -155,7 +155,7 @@ kchrono --sem-janela           # Headless
 
 Configure `url_base` em `empacotamento/versao.json` apontando para onde você publica:
 - `versao.json` (mesmo formato)
-- `KChrono-Setup.exe` (Windows)
+- `KChrono-Setup.exe` (Windows — o nome precisa bater com o campo `arquivos.windows` do `versao.json`)
 - `kchrono-linux.tar.gz` (Linux — opcional)
 
 No painel Admin → **Salvamento/Uploads** aparece botão "Verificar atualização" e "Baixar".

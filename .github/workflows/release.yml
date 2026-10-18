@@ -3,7 +3,7 @@
 #   git tag v1.0.5 && git push origin v1.0.5
 #
 # A tag dispara:
-#   windows → KChrono-Setup.exe (PyInstaller onefile + NSIS)
+#   windows → KChrono-Setup-<v>.exe (PyInstaller onefile + NSIS)
 #   linux   → KChrono-<v>-x86_64.AppImage (container Ubuntu 22.04)
 #   iso     → KChrono-live-<v>-amd64.iso (live-build: Debian + Xfce + KChrono)
 #   publicar → anexa os três arquivos na release da tag
@@ -52,8 +52,10 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force publicacao\windows | Out-Null
+          $v = (Get-Content empacotamento\versao.json | ConvertFrom-Json).versao
+          $vf = $v -replace '\.', '-'
           Copy-Item empacotamento\dist\KChrono.exe publicacao\windows\
-          Copy-Item empacotamento\KChrono-Setup.exe publicacao\windows\
+          Copy-Item "empacotamento\KChrono-Setup-$vf.exe" publicacao\windows\
 
       - uses: actions/upload-artifact@v4
         with:

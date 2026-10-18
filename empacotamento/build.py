@@ -22,7 +22,7 @@ AQUI = os.path.dirname(os.path.abspath(__file__))
 
 
 def _sincronizar_versao_nsis():
-    """Espelha versao.json no !define VERSAO do instalador NSIS."""
+    """Espelha versao.json nos !define VERSAO e VERSAO_ARQ do instalador NSIS."""
     vfile = os.path.join(AQUI, "versao.json")
     nsi = os.path.join(AQUI, "instalador.nsi")
     try:
@@ -34,11 +34,16 @@ def _sincronizar_versao_nsis():
         novo, n = re.subn(r'(!define VERSAO ")[^"]*(")',
                           lambda m: m.group(1) + versao + m.group(2),
                           txt, count=1)
-        if n and novo != txt:
+        # VERSAO_ARQ = versão com hífens → nome do arquivo do instalador
+        novo, n2 = re.subn(r'(!define VERSAO_ARQ ")[^"]*(")',
+                           lambda m: m.group(1) + versao.replace(".", "-")
+                           + m.group(2), novo, count=1)
+        if (n or n2) and novo != txt:
             with open(nsi, "w", encoding="utf-8",
                       errors="surrogateescape", newline="") as f:
                 f.write(novo)
-            print(f"[build] instalador.nsi VERSAO = {versao}")
+            print(f"[build] instalador.nsi VERSAO = {versao}"
+                  f" (arquivo: KChrono-Setup-{versao.replace('.', '-')}.exe)")
     except Exception as e:
         print(f"[build] aviso: não sincronizei a versão do NSIS ({e})")
 

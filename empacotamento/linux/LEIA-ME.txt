@@ -4,7 +4,7 @@ KChrono no Linux — LEIA-ME
 Arquivos
 --------
   KChrono-<versao>-x86_64.AppImage   aplicativo completo (arquivo único)
-  (o instalador Windows KChrono-Setup.exe fica na pasta windows/ da release
+  (o instalador Windows KChrono-Setup-<versão>.exe fica na pasta windows/ da release
    e a ISO da live na pasta iso/)
 
 Como rodar (Debian 12+, Ubuntu 22.04+, Linux Mint 21+)

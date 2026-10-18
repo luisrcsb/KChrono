@@ -68,13 +68,23 @@ def build_windows() -> None:
         return
 
     print("== [windows] NSIS (instalador)")
+    versao = _versao()
+    nome_setup = (f"KChrono-Setup-{versao.replace('.', '-')}.exe"
+                  if versao != "?" else "KChrono-Setup.exe")
     subprocess.run([makensis, "instalador.nsi"], check=True,
                    cwd=RAIZ / "empacotamento")
-    setup = RAIZ / "empacotamento" / "KChrono-Setup.exe"
+    setup = RAIZ / "empacotamento" / nome_setup
     if not setup.exists():
-        sys.exit("ERRO: KChrono-Setup.exe não foi gerado")
-    shutil.copy2(setup, alvo / "KChrono-Setup.exe")
-    print(f"OK [windows] publicacao/windows/ (v{_versao()})")
+        sys.exit(f"ERRO: {nome_setup} não foi gerado")
+    # Remove instaladores de versões anteriores — só fica o da versão atual
+    for velho in (RAIZ / "empacotamento").glob("KChrono-Setup*.exe"):
+        if velho.name != nome_setup:
+            velho.unlink()
+    for velho in alvo.glob("KChrono-Setup*.exe"):
+        if velho.name != nome_setup:
+            velho.unlink()
+    shutil.copy2(setup, alvo / nome_setup)
+    print(f"OK [windows] publicacao/windows/ (v{versao} -> {nome_setup})")
 
 
 def build_linux() -> None:

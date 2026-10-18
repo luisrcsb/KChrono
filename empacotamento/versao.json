@@ -4,7 +4,7 @@
   "url_base": "",
   "notas": "Versão 1.0.6 — Simulador de corridas: busca corridas realizadas no CTAD e reemite ao vivo como se estivesse acontecendo agora, com velocidade à escolha (0,5x a 10x) e sistema de telemetria selecionável (MyLaps/AMB P3, EASYLAP-USB ou SKYRC LapWiz) em Admin → Hardware. Sessões de simulação são marcadas como SIMULAÇÃO e valem só para testes e desenvolvimento: não contam em recordes, relatórios, campeonatos e nunca vão ao CTAD.",
   "arquivos": {
-    "windows": "KChrono-Setup.exe",
+    "windows": "KChrono-Setup-1-0-6.exe",
     "linux": "KChrono-1.0.6-x86_64.AppImage"
   }
 }

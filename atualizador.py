@@ -5,7 +5,8 @@ Canal principal: **GitHub Releases** do repositório configurado em
 público). A tag da release é a versão (ex.: ``v1.0.5``) e os assets são
 os pacotes gerados pela CI:
 
-* Windows → ``KChrono-Setup.exe`` (instalador NSIS)
+* Windows → ``KChrono-Setup-<versão>.exe`` (instalador NSIS; a versão
+  entra no nome do arquivo com hífens, ex.: ``KChrono-Setup-1-0-6.exe``)
 * Linux   → ``KChrono-<versao>-x86_64.AppImage`` (troca do AppImage)
 * ISO     → ``KChrono-live-<versao>-amd64.iso`` (pendrive; não é usada
   pelo atualizador — é só o meio de instalar)
@@ -153,8 +154,13 @@ def _mapa_pacotes(assets: Dict[str, Dict]) -> Dict:
         low = nome.lower()
         url = a.get("browser_download_url")
         item = {"url": url, "nome": nome, "tamanho": a.get("size")}
-        if low.endswith(".exe") and not mapa.get("windows"):
-            mapa["windows"] = item
+        if low.endswith(".exe"):
+            # a release leva o instalador (KChrono-Setup-*.exe) e o portátil
+            # (KChrono.exe) — o atualizador deve sempre baixar o instalador
+            setup = "setup" in low
+            atual = mapa.get("windows")
+            if atual is None or (setup and "setup" not in atual["nome"].lower()):
+                mapa["windows"] = item
         elif low.endswith((".tar.gz", ".appimage")) and not mapa.get("linux"):
             mapa["linux"] = item
     return mapa
