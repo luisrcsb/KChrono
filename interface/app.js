@@ -3,6 +3,7 @@
 
 let ws = null;
 let usuario = { nome: "", nivel: "superuser" };
+let voltasSimulador = [];  // acumula passagens do modo simulador (não gravadas no BD)
 
 // ---------------------------------------------------------------- áudio (beep/fala)
 let audioCtx = null;
@@ -282,8 +283,11 @@ function tratarEvento(ev) {
       const fr = document.getElementById("flag-volta-rapida");
       if (fr) { fr.classList.add("pisca"); setTimeout(() => fr.classList.remove("pisca"), 2500); }
       beepVolta();
+      // Acumular volta no modo simulador (non-gravada no BD) para atualização em tempo real
+      voltasSimulador.push({ numero: ev.numero, nome: ev.nome, tempo: ev.tempo });
+      // atualiza gráfico operator se a aba de voltas estiver visível
+      if (document.getElementById("op-voltas")) atualizarGraficoOperador();
       break;
-    case "admin":
       logMsg(`[admin] ${ev.msg}`, "l-admin", "log-operador");
       break;
     case "sync":
@@ -760,6 +764,51 @@ async function desenharGraficoOperador(idx) {
   } else if (idx === 4) {   // track view
     desenharTrackOperador(dados);
   }
+}
+
+function acumuladorVoltasSimulador() {
+  // retorna os dados das voltas simulador acumuladas, ou null se vazio
+  if (!voltasSimulador || !voltasSimulador.length) return null;
+  const pilotosMap = {};
+  voltasSimulador.forEach(v => {
+    if (!pilotosMap[v.nome]) pilotosMap[v.nome] = { nome: v.nome, voltas: [], melhor: Infinity };
+    const p = pilotosMap[v.nome];
+    p.voltas.push({ numero: v.numero, tempo: v.tempo });
+    if (v.tempo < p.melhor) p.melhor = v.tempo;
+  });
+  const pilotos = Object.values(pilotosMap).slice(0, 12);
+  // garantir ordem por número de voltas (mais voltas ao topo)
+  pilotos.sort((a, b) => b.voltas.length - a.voltas.length);
+  return { pilotos, dados: { pilotos } };
+}
+
+function atualizarGraficoOperador() {
+  const dados = acumuladorVoltasSimulador();
+  if (!dados) {
+    // fallback: busca no banco (comportamento original)
+    api("sessao/voltas", "GET").then(dados => {
+      if (dados && dados.pilotos && dados.pilotos.length) renderClassificacao(dados);
+    }).catch(() => {});
+    return;
+  }
+  // idx === 2 = melhor volat (barras), idx === 1 = posições volta a volta
+  // Aqui usaremos idx 2 (melhores voltas) pois temos os tempos
+  if (grafOpVoltas) grafOpVoltas.destroy();
+  const ctx = document.getElementById("op-voltas");
+  if (!ctx) return;
+  grafOpVoltas = new Chart(ctx, {
+    type: "bar",
+    data: {
+      labels: dados.pilotos.map(p => p.nome),
+      datasets: [{ label: "melhor volta (s)", data: dados.pilotos.map(p => p.melhor || 0),
+                   backgroundColor: CORES_OP.slice(0, dados.pilotos.length).map((c, i) => c) }]
+    },
+    options: { responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { color: "#8492a6" }, grid: { color: "#1a2438" } },
+        y: { title: { display: true, text: "segundos", color: "#8492a6" }, ticks: { color: "#8492a6", precision: 0 }, grid: { color: "#1a2438" } } }
+  });
 }
 
 function desenharTrackOperador(dados) {
