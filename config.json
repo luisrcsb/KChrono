@@ -9,15 +9,34 @@
   "pistaId": "krathus",
   "auto_upload": true,
   "tempo_minimo_volta_s": 3,
+  "classificacao_media_n": 3,
+  "atalhos_teclas": {},
   "decoder_tipo": "p3",
   "decoder_host": "192.168.0.50",
   "decoder_porta": 5403,
   "decoder_auto": true,
+  "decoder_redundante": true,
+  "decoder_sem_dados_s": 45,
   "sim_sistema": "p3",
   "sim_velocidade": 1.0,
   "telao_tela": 0,
+  "telao_colunas": [
+    "posicao",
+    "numero",
+    "piloto",
+    "voltas",
+    "total",
+    "intervalo",
+    "gap",
+    "ultima",
+    "melhor",
+    "velocidade",
+    "ritmo",
+    "mediaN",
+    "est"
+  ],
   "voz_contagem": true,
-  "contador_s": 1,
+  "contador_s": 10,
   "atualizacao_repo": "",
   "som": {
     "frases": {
@@ -40,8 +59,8 @@
     },
     "volume": 0.9,
     "velocidade": 180,
-    "intervalo_posicoes": 0.0,
-    "posicoes_topo": 4,
+    "intervalo_posicoes": 30.0,
+    "posicoes_topo": 3,
     "anunciar_volta": true,
     "anunciar_recorde_pessoal": true,
     "anunciar_recorde_pista": true,
@@ -49,7 +68,7 @@
     "audios": {
       "vai": "vai.mp3"
     },
-    "anunciar_a_cada_voltas": 5,
+    "anunciar_a_cada_voltas": 0,
     "habilitados": {
       "atencao": true,
       "vai": true,
@@ -68,11 +87,21 @@
       "ghost_lap": true,
       "gato": true,
       "passagem": true,
-      "lider": false
+      "lider": true,
+      "menor_volta": true,
+      "bip_luz": true,
+      "bip_vai": true
     },
     "voz_neural_adotada": true,
     "som_passagem": true,
-    "som_lider": false
+    "som_lider": true,
+    "anunciar_posicoes_classificacao_durante": true,
+    "anunciar_posicoes_classificacao_depois": false,
+    "anunciar_posicoes_corrida_durante": true,
+    "anunciar_posicoes_corrida_depois": false,
+    "som_menor_volta": true,
+    "bip_luz": true,
+    "bip_vai": true
   },
   "checkin": [
     13,
@@ -149,11 +178,11 @@
     }
   ],
   "gerente_tokens": {
-    "LFtlsMVoTSNPU97so9ZTAVKxNVuKHqOj": {
+    "QMji49Um2Vb589DF5FnLT8j4ejszp6Uh": {
       "usuario": "qrcode",
       "convite": true,
-      "criado_em": 1792015530.3036804,
-      "expira": 1792101930.3036807
+      "criado_em": 1793273681.95255,
+      "expira": 1793360081.9525504
     }
   }
 }

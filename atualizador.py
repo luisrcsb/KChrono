@@ -6,7 +6,7 @@ público). A tag da release é a versão (ex.: ``v1.0.5``) e os assets são
 os pacotes gerados pela CI:
 
 * Windows → ``KChrono-Setup-<versão>.exe`` (instalador NSIS; a versão
-  entra no nome do arquivo com hífens, ex.: ``KChrono-Setup-1-0-6.exe``)
+  entra no nome do arquivo com hífens, ex.: ``KChrono-Setup-1-0-7.exe``)
 * Linux   → ``KChrono-<versao>-x86_64.AppImage`` (troca do AppImage)
 * ISO     → ``KChrono-live-<versao>-amd64.iso`` (pendrive; não é usada
   pelo atualizador — é só o meio de instalar)
@@ -25,7 +25,10 @@ Nos dois casos os dados (banco, config, vozes) ficam em
 %APPDATA% / ~/.local/share e não são tocados.
 
 Publicação (uma vez por versão, automatizada):
-    1. bump da versão em ``empacotamento/versao.json`` + tag ``vX.Y.Z``;
+    1. bump da versão — **obrigatório a cada atualização**:
+       ``python tools/versao.py bump --notas "o que mudou"``
+       (a fonte é ``empacotamento/versao.json``; a ferramenta reescreve
+       todos os espelhos) + tag ``vX.Y.Z``;
     2. ``git push origin vX.Y.Z`` → a CI (.github/workflows/release.yml)
        monta Windows, AppImage e ISO e anexa tudo na release da tag
        (``python empacotar.py`` faz o mesmo localmente para a pasta

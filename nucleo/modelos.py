@@ -90,6 +90,8 @@ class LinhaClassificação:
     media_us: Optional[float] = None        # tempo médio das voltas
     desvio_us: Optional[float] = None       # desvio padrão
     consistencia_pct: Optional[float] = None
+    media_n_us: Optional[float] = None      # melhor média de N voltas consecutivas
+    media_n_voltas: int = 0                 # quantas voltas entraram nessa janela
     transponder: Optional[int] = None
     suspeita: bool = False                  # volta marcada como "gato"
 

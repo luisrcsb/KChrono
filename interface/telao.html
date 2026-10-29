@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>KChrono — Telão</title>
-<link rel="stylesheet" href="/static/telao.css?v=2.2">
+<link rel="stylesheet" href="/static/telao.css?v=1.0.9">
 <link rel="icon" href="/imagens/KCHRONO-LOGO.png">
 <script src="/static/chart.umd.min.js"></script>
 </head>
@@ -60,11 +60,11 @@
     <div class="tabela-wrap">
       <table id="tabela-telao">
         <thead>
-          <tr><th>Pos</th><th>Nº</th><th>Piloto</th><th>Voltas</th><th>Total</th>
-              <th>Intervalo</th><th>Gap</th><th>Última</th><th>Melhor</th>
-              <th>km/h</th><th>Ritmo</th><th>EST</th></tr>
+          <tr><th data-col="posicao">Pos</th><th data-col="numero">Nº</th><th data-col="piloto">Piloto</th><th data-col="voltas">Voltas</th><th data-col="total">Total</th>
+              <th data-col="intervalo">Intervalo</th><th data-col="gap">Gap</th><th data-col="ultima">Última</th><th data-col="melhor">Melhor</th>
+              <th data-col="velocidade">km/h</th><th data-col="ritmo">Ritmo</th><th data-col="mediaN">Média N</th><th data-col="est">EST</th></tr>
         </thead>
-        <tbody><tr><td colspan="12" style="color:var(--mut)">aguardando largada…</td></tr></tbody>
+        <tbody><tr><td colspan="13" style="color:var(--mut)">aguardando largada…</td></tr></tbody>
       </table>
     </div>
   </div>
@@ -79,7 +79,7 @@
   </div>
 </div>
 
-<script src="/static/tracado.js?v=1.1"></script>
-<script src="/static/telao.js?v=2.5"></script>
+<script src="/static/tracado.js?v=1.0.9"></script>
+<script src="/static/telao.js?v=1.0.9"></script>
 </body>
 </html>

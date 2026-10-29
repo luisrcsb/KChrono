@@ -21,6 +21,10 @@ CONFIG_MODELO = {
     "pistaId": "krathus",
     "auto_upload": True,          # envia ao finalizar a sessão
     "tempo_minimo_volta_s": 3,
+    # classificação: média de N voltas consecutivas (3, 5, 7...)
+    "classificacao_media_n": 3,
+    # atalhos F1-F12: piloto_id por tecla (pode ser reatribuído pela interface)
+    "atalhos_teclas": {},
     # driver de cronometragem (Fase 6)
     "decoder_tipo": "p3",         # p3 | easylap | lapwiz
     "decoder_host": "192.168.0.50",
@@ -32,6 +36,10 @@ CONFIG_MODELO = {
     "sim_sistema": "p3",            # fonte simulada: p3 | easylap | lapwiz
     "sim_velocidade": 1.0,          # velocidade da reprodução (0.5 = meio-tempo)
     "telao_tela": 1,                # monitor do telão 2ª tela (0 = principal)
+    # colunas visíveis no feedback do telão (ordem = ordem da tabela)
+    "telao_colunas": ["posicao", "numero", "piloto", "voltas", "total",
+                      "intervalo", "gap", "ultima", "melhor", "velocidade",
+                      "ritmo", "mediaN", "est"],
     "voz_contagem": True,           # voz na contagem regressiva/largada
     "contador_s": 10,               # segundos da contagem antes da largada
     # canal de atualização: repositório GitHub (usuario/repo) com releases

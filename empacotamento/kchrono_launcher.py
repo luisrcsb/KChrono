@@ -99,6 +99,10 @@ class Ponte:
         except Exception:
             return "fechada"
 
+    def telao_aberto(self):
+        """Diz se a janela do telão está viva (o botão alterna abrir/fechar)."""
+        return "aberta" if self._telao_vivo() else "fechada"
+
     def encerrar_filhos(self):
         try:
             if self._telao_vivo():
@@ -120,12 +124,41 @@ class Ponte:
     def telas(self):
         """Monitores disponíveis (para o seletor em Configurações)."""
         try:
-            return [{"indice": i, "x": s.x, "y": s.y,
-                     "largura": s.width, "altura": s.height,
-                     "principal": i == 0}
-                    for i, s in enumerate(webview.screens)]
+            telas = list(webview.screens)
         except Exception:
-            return []
+            telas = []
+        if not telas:
+            # fallback: consulta a plataforma diretamente
+            try:
+                from webview.platforms import winforms as _wf
+                telas = list(_wf.get_screens())
+            except Exception:
+                telas = []
+        # O pywebview ordena por posição (esquerda→direita), NÃO pelo monitor
+        # principal. Descobrimos o principal pelo .NET para rotular direito.
+        principal_idx = 0
+        try:
+            from System.Windows.Forms import Screen as _Screen
+            for i, s in enumerate(_Screen.AllScreens):
+                if s.Primary:
+                    principal_idx = i
+                    break
+        except Exception:
+            pass
+        resultado = []
+        for i, s in enumerate(telas):
+            try:
+                resultado.append({
+                    "indice": i,
+                    "x": getattr(s, "x", 0),
+                    "y": getattr(s, "y", 0),
+                    "largura": getattr(s, "width", 0),
+                    "altura": getattr(s, "height", 0),
+                    "principal": i == principal_idx,
+                })
+            except Exception:
+                continue
+        return resultado
 
 
 def _rodar_servidor(host: str, porta: int, pronto: threading.Event):
@@ -187,10 +220,19 @@ def main() -> int:
     ap.add_argument("--sem-janela", action="store_true", help="roda headless (serviço)")
     ap.add_argument("--largura", type=int, default=1280, help="largura da janela")
     ap.add_argument("--altura", type=int, default=800, help="altura da janela")
-    ap.add_argument("--fullscreen", action="store_true", help="janela em tela cheia (telão)")
+    ap.add_argument("--fullscreen", action="store_true",
+                    help="tela cheia real (sem barra de título — modo kiosk)")
+    ap.add_argument("--janela", dest="janela", action="store_true",
+                    help="abre em janela normal (não maximizada) — para desenvolvimento")
     ap.add_argument("--sem-servidor", action="store_true",
                     help="só abre a janela (usa o servidor já ativo; modo do telão)")
     args = ap.parse_args()
+
+    # Por padrão o app abre MAXIMIZADO (tela cheia útil) porém COM a barra de
+    # título — assim os botões minimizar/maximizar/fechar continuam à mão.
+    # --fullscreen  => tela cheia real, sem barra (kiosk).
+    # --janela      => janela normal, redimensionável (desenvolvimento).
+    args.maximizado = not args.janela and not args.fullscreen
 
     # Monta URL final
     rota = "/telao" if args.telao else ("/gerente" if args.gerente else "/")
@@ -294,7 +336,8 @@ def main() -> int:
             url=url,
             width=args.largura,
             height=args.altura,
-            fullscreen=args.fullscreen,
+            maximized=args.maximizado,   # tela cheia COM barra de título (botão fechar)
+            fullscreen=args.fullscreen,  # tela cheia real, sem barra (--fullscreen)
             min_size=(900, 600),
             resizable=True,
             frameless=False,          # True = sem barra de título (só para telão/kiosk)
@@ -316,10 +359,22 @@ def main() -> int:
         except Exception:
             pass
 
+    # Tela cheia real (kiosk): o fullscreen do pywebview no Windows/WebView2 às
+    # vezes não aplica; repetir após o start cobre esse caso. No modo padrão
+    # (maximizado) NÃO mexemos — a barra de título fica intacta.
+    def _aplicar_tela_cheia():
+        if not args.fullscreen:
+            return
+        try:
+            janela.toggle_fullscreen()
+        except Exception:
+            pass
+
     # Inicia loop da GUI (bloqueante — encerra quando fecha a janela)
     import atexit
     atexit.register(ponte.encerrar_filhos)
-    webview.start(debug=False, private_mode=False, storage_path=None)
+    webview.start(func=_aplicar_tela_cheia, debug=False, private_mode=False,
+                  storage_path=None)
     ponte.encerrar_filhos()
 
     print("Janela fechada — encerrando.")

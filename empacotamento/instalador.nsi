@@ -3,7 +3,7 @@
 ;  Requer: ter compilado KChrono.exe com build-windows.bat
 ;  Compile este arquivo no NSIS (compilador makensis).
 ;
-;  Gera: KChrono-Setup-<versão com hífens>.exe (ex.: KChrono-Setup-1-0-6.exe)
+;  Gera: KChrono-Setup-<versão com hífens>.exe (ex.: KChrono-Setup-1-0-9.exe)
 ;  App nativo com pywebview (WebView2) — NÃO abre navegador.
 ; ============================================================
 !include "MUI2.nsh"
@@ -11,8 +11,8 @@
 !include "LogicLib.nsh"
 
 ; VERSAO e VERSAO_ARQ são sincronizados com versao.json por build.py
-!define VERSAO "1.0.7"
-!define VERSAO_ARQ "1-0-7"
+!define VERSAO "1.0.9"
+!define VERSAO_ARQ "1-0-9"
 !define APP "KChrono"
 !define FABRICANTE "KChrono"
 !define EXE "dist\KChrono.exe"

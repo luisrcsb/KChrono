@@ -77,6 +77,7 @@ function tratarEvento(ev) {
     if (ev.sessao) definirClock(ev.sessao.tempo_s, ev.sessao.pausada, ev.sessao.estado,
                                 ev.sessao.restante_s);
     if (ev.sessao && ev.sessao.parametros) ultimasVoltas.parametros = ev.sessao.parametros;
+    if (ev.telao && ev.telao.colunas) aplicarColunasTelao(ev.telao.colunas);
     renderSessao(ev.sessao);
     renderClassificacao(ev.classificacao || []);
     renderBandeira(ev.pista);
@@ -87,6 +88,9 @@ function tratarEvento(ev) {
     case "tracada":
       tracadaAtual = ev.tracada || null;
       if (tabAtual === "tv-track") desenharTrack();
+      break;
+    case "telao_colunas":
+      aplicarColunasTelao(ev.colunas || []);
       break;
     case "sessao":
       renderSessao(ev);
@@ -227,6 +231,20 @@ function fmtTempo(s) {
   return `${min}:${(s - min * 60).toFixed(3).padStart(6, "0")}`;
 }
 
+// Aplica quais colunas do feedback aparecem na tabela (Configurações → Telão).
+let colunasTelaoAtuais = null;
+function aplicarColunasTelao(colunas) {
+  if (!Array.isArray(colunas) || !colunas.length) return;
+  colunasTelaoAtuais = colunas;
+  const ligadas = new Set(colunas);
+  const tabela = document.getElementById("tabela-telao");
+  if (!tabela) return;
+  tabela.querySelectorAll("[data-col]").forEach(el => {
+    const c = el.getAttribute("data-col");
+    el.style.display = ligadas.has(c) ? "" : "none";
+  });
+}
+
 function renderClassificacao(linhas) {
   ultimaLinhas = linhas;
   const lider = linhas[0];
@@ -260,23 +278,26 @@ function renderClassificacao(linhas) {
       ? parseFloat(l.media.split(":")[0]) * 60 + parseFloat(l.media.split(":")[1]) : null;
     const estS = (totalS != null && ritmoS != null) ? totalS + ritmoS : null;
     return `<tr class="${l.posicao === 1 ? "lider" : ""}">
-      <td class="pos">${l.posicao}º</td>
-      <td>${l.numero || "-"}</td>
-      <td>${l.nome}${l.suspeita ? '<span class="badge" style="background:rgba(230,57,70,.2);color:#e63946">gato</span>' : ""}
+      <td class="pos" data-col="posicao">${l.posicao}º</td>
+      <td data-col="numero">${l.numero || "-"}</td>
+      <td data-col="piloto">${l.nome}${l.suspeita ? '<span class="badge" style="background:rgba(230,57,70,.2);color:#e63946">gato</span>' : ""}
         ${l.posicao === 1 ? '<span class="badge lider">líder</span>' : ""}</td>
-      <td>${l.voltas}</td>
-      <td>${l.tempo || "-"}</td>
-      <td>${l.intervalo || "-"}</td>
-      <td>${l.gap || ""}</td>
-      <td>${l.ultima || "-"}</td>
-      <td>${l.melhor || "-"}${l.melhor_us === record ? '<span class="badge melhor">record</span>' : ""}</td>
-      <td>${l.velocidade || "-"}</td>
-      <td>${l.media && l.media !== "-" ? l.media : "-"}</td>
-      <td>${estS != null ? fmtTempo(estS) : "-"}</td>
+      <td data-col="voltas">${l.voltas}</td>
+      <td data-col="total">${l.tempo || "-"}</td>
+      <td data-col="intervalo">${l.intervalo || "-"}</td>
+      <td data-col="gap">${l.gap || ""}</td>
+      <td data-col="ultima">${l.ultima || "-"}</td>
+      <td data-col="melhor">${l.melhor || "-"}${l.melhor_us === record ? '<span class="badge melhor">record</span>' : ""}</td>
+      <td data-col="velocidade">${l.velocidade || "-"}</td>
+      <td data-col="ritmo">${l.media && l.media !== "-" ? l.media : "-"}</td>
+      <td data-col="mediaN">${l.media_n && l.media_n !== "-" ? l.media_n : "-"}</td>
+      <td data-col="est">${estS != null ? fmtTempo(estS) : "-"}</td>
     </tr>`;
   }).join("");
   document.querySelector("#tabela-telao tbody").innerHTML =
-    corpo || '<tr><td colspan="12" style="color:var(--mut)">aguardando largada…</td></tr>';
+    corpo || '<tr><td colspan="13" style="color:var(--mut)">aguardando largada…</td></tr>';
+  // o tbody foi reconstruído — reaplica as colunas escolhidas
+  if (colunasTelaoAtuais) aplicarColunasTelao(colunasTelaoAtuais);
 }
 
 // ---------------------------------------------------------------- gráficos
@@ -495,3 +516,8 @@ document.addEventListener("keydown", (e) => {
 });
 
 conectarWS();
+
+// Carrega as colunas escolhidas já na abertura (não depende do 1º snapshot).
+fetch("/api/telao/colunas").then(r => r.json())
+  .then(d => { if (d && d.colunas) aplicarColunasTelao(d.colunas); })
+  .catch(() => {});

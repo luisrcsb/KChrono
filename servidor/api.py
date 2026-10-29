@@ -18,6 +18,8 @@ from .qr import (base_url_para_qr as qr_base_url, data_uri as qr_data_uri,
                  disponivel as qr_disponivel)
 from sync import ErroAuth, ErroBanco
 from caminhos import dir_recursos
+# a versão vem da fonte única (empacotamento/versao.json) — nunca fixa aqui
+from atualizador import VERSAO_ATUAL
 
 log = logging.getLogger("kchrono.api")
 
@@ -27,7 +29,7 @@ DIR_IMAGENS = DIR_PROJETO / "imagens"
 
 estado = EstadoApp()
 
-app = FastAPI(title="KChrono", version="1.0.6")
+app = FastAPI(title="KChrono", version=VERSAO_ATUAL)
 
 app.mount("/imagens", StaticFiles(directory=DIR_IMAGENS), name="imagens")
 app.mount("/static", StaticFiles(directory=DIR_INTERFACE), name="static")
@@ -149,6 +151,20 @@ async def api_telao_tela():
 async def api_telao_tela_definir(indice: int = Query(1)):
     try:
         return estado.definir_telao_tela(indice)
+    except ValueError as e:
+        return {"ok": False, "erro": str(e)}
+
+
+@app.get("/api/telao/colunas")
+async def api_telao_colunas():
+    """Colunas visíveis no feedback do telão."""
+    return estado.telao_colunas()
+
+
+@app.post("/api/telao/colunas")
+async def api_telao_colunas_definir(colunas: str = Query("")):
+    try:
+        return estado.definir_telao_colunas(colunas)
     except ValueError as e:
         return {"ok": False, "erro": str(e)}
 
@@ -405,10 +421,12 @@ async def api_som_audio_remover(chave: str = Query(...)):
 @app.post("/api/sessao/iniciar")
 async def api_iniciar(tipo: str = Query("treino"), tempo_minimo_s: float = Query(0),
                       duracao: float = Query(10), criterio: str = Query("tempo"),
-                      contador_s: Optional[int] = Query(None)):
+                      contador_s: Optional[int] = Query(None),
+                      media_n: Optional[int] = Query(None)):
     if contador_s is not None:
         estado.definir_contador_s(contador_s)
-    return {"ok": estado.iniciar_sessao(tipo, tempo_minimo_s, duracao, criterio)}
+    return {"ok": estado.iniciar_sessao(tipo, tempo_minimo_s, duracao, criterio,
+                                        media_n)}
 
 
 @app.get("/api/sessao/contador")
@@ -418,6 +436,19 @@ async def api_contador():
             "voz_contagem": estado.voz_contagem_ativa(),
             "rodando": bool(estado._largada and estado._largada.get("ativa")),
             **(estado._resumo_largada() if estado._largada else {"restante": 0})}
+
+
+@app.get("/api/config/atalhos")
+async def api_atalhos_obter():
+    return {"atalhos": estado.atalhos()}
+
+
+@app.post("/api/config/atalhos")
+async def api_atalhos_definir(atalhos: Dict = Body(...)):
+    try:
+        return estado.definir_atalhos_teclas(atalhos or {})
+    except Exception as e:
+        return {"ok": False, "erro": str(e)}
 
 
 @app.post("/api/sessao/contador")
@@ -459,6 +490,20 @@ async def api_adicionar_volta(piloto_id: int = Query(...), tempo_s: float = Quer
         return {"ok": True}
     return {"ok": False,
             "erro": "piloto fora da sessão (confira o check-in) ou tempo inválido"}
+
+
+@app.post("/api/sessao/volta-tecla")
+async def api_adicionar_volta_tecla(piloto_id: Optional[int] = Query(None),
+                                    tecla: Optional[int] = Query(None)):
+    """Atalho F1..F12: registra a volta do piloto (tempo calculado no servidor)."""
+    if piloto_id is not None:
+        return estado.adicionar_volta_tecla(piloto_id)
+    if tecla is not None:
+        r = estado.adicionar_volta_por_tecla_mapeada(tecla)
+        if r is None:
+            return {"ok": False, "erro": f"F{tecla} sem piloto associado"}
+        return r
+    return {"ok": False, "erro": "informe piloto_id ou tecla"}
 
 
 # ---------------------------------------------------------------- sync (Fase 3)
@@ -836,6 +881,31 @@ async def api_historico_sessao(sessao_id: str):
     if not d["pilotos"]:
         return {"ok": False, "erro": "sessão sem voltas registradas"}
     return {"ok": True, **d}
+
+
+# ---------------------------------------------------------------- auditoria (Ferramenta de Auditoria)
+@app.get("/api/auditoria/baterias")
+async def api_auditoria_baterias():
+    try:
+        return {"ok": True, "baterias": estado.listar_baterias_auditoria()}
+    except Exception as e:
+        return {"ok": False, "erro": str(e)}
+
+
+@app.get("/api/auditoria/bateria/{chave}")
+async def api_auditoria_bateria(chave: str):
+    try:
+        return {"ok": True, **estado.obter_bateria_auditoria(chave)}
+    except Exception as e:
+        return {"ok": False, "erro": str(e)}
+
+
+@app.post("/api/auditoria/bateria/{chave}")
+async def api_auditoria_salvar(chave: str, dados: dict = Body(...)):
+    try:
+        return {"ok": True, **estado.salvar_bateria_auditoria(chave, dados)}
+    except Exception as e:
+        return {"ok": False, "erro": str(e)}
 
 
 @app.delete("/api/sync/fila")

@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>KChrono — Precision Timing System</title>
-<link rel="stylesheet" href="/static/estilo.css?v=2.1">
+<link rel="stylesheet" href="/static/estilo.css?v=1.0.9">
 <link rel="icon" href="/imagens/KCHRONO-LOGO.png">
 <script src="/static/chart.umd.min.js"></script>
 </head>
@@ -35,6 +35,7 @@
       <a data-titulo="Gerente de Pista bandeira check-in" onclick="adminSecao(this,'a-gerente')">🚦 Gerente de Pista</a>
       <a data-titulo="Pista traçado retas curvas largada grid largura comprimento" onclick="adminSecao(this,'a-pista')">🏟️ Pista &amp; Traçado</a>
       <a data-titulo="Voltas histórico sessões central" onclick="adminSecao(this,'a-voltas')">🏁 Voltas</a>
+      <a data-titulo="Auditoria baterias CTAD editar voltas" onclick="adminSecao(this,'a-auditoria')">🧾 Ferramenta de Auditoria</a>
       <a data-titulo="Telão Semáforo colunas" onclick="adminSecao(this,'a-telao')">📺 Telão &amp; Semáforo</a>
       <a data-titulo="Campeonatos etapas ranking" onclick="adminSecao(this,'a-camp')">🏆 Campeonatos <span class="prev">Fase 5</span></a>
       <a data-titulo="Salvamento" onclick="adminSecao(this,'a-salvar')">💾 Salvamento</a>
@@ -52,7 +53,7 @@
       <img id="side-qr-img" alt="QR Code de Gestão Remota" style="display:none">
       <div class="side-qr-info" id="side-qr-info">gerando…</div>
     </div>
-    <div class="admin-rodape"><span id="ws-status">Desconectado do servidor</span><br>KChrono v1.0.6<br>por Raphael Belowodski</div>
+    <div class="admin-rodape"><span id="ws-status">Desconectado do servidor</span><br>KChrono <span class="js-versao">v1.0.9</span><br>por Raphael Belowodski</div>
   </aside>
   <div class="corpo">
 
@@ -65,7 +66,7 @@
         sessão <span id="operador-sessao">—</span> · <span id="operador-estado">sem sessão</span>
         <span class="pill novo" id="operador-sim" hidden>SIMULAÇÃO — não oficial</span></div>
       <div class="acoes-topo">
-        <button class="btn-slide" onclick="abrirTelaoSegundaTela()" title="Abre o telão em janela separada (2ª tela)">
+        <button class="btn-slide" id="btn-telao-2" onclick="abrirTelaoSegundaTela()" title="Abre o telão em janela separada (2ª tela)">
           🖥️ Abrir Telão 2ª Tela
         </button>
       </div>
@@ -115,6 +116,8 @@
         <div><label>Saída</label>
           <select id="cfg-saida"><option>1ª passagem pela meta</option><option>1ª detecção</option></select></div>
         <div><label>Tempo mínimo de volta (s)</label><input id="cfg-tempo-minimo" value="3"></div>
+        <div><label>Média de N voltas</label>
+          <input id="cfg-media-n" value="3" title="Melhor média de N voltas consecutivas (coluna 'Média N' do telão)"></div>
       </div>
 
       <div id="cfg-camp-escolha" style="display:none;margin-top:14px">
@@ -145,21 +148,25 @@
                oninput="renderCheckin()">
         <button class="btn-mini" onclick="marcarTodosCheckin(true)">✔ Todos presentes</button>
         <button class="btn-mini" onclick="marcarTodosCheckin(false)">✖ Limpar</button>
-        <button class="destaque" onclick="checkinToggleForm()">➕ Adicionar piloto</button>
-      </div>
-      <div id="op-checkin-form" class="card" style="display:none; margin:8px 0; padding:12px">
-        <div class="acoes" style="margin:0; flex-wrap:wrap">
-          <input id="op-checkin-novo-nome" class="input-busca" placeholder="Nome do piloto*"
-                 style="flex:1; min-width:180px">
-          <input id="op-checkin-novo-transp" class="input-busca" placeholder="Transponder (ex.: 1234)"
-                 style="flex:1; min-width:140px">
-          <button class="destaque" onclick="checkinAdicionarPiloto()">✔ Salvar e marcar na pista</button>
-        </div>
       </div>
       <div id="op-checkin" class="lista-checkin">carregando…</div>
       <p class="hint" style="margin-top:8px">Marque quem está na pista antes de iniciar a
         sessão: só os pilotos marcados entram na corrida. Se ninguém for marcado, entram
         todos os transponders cadastrados.</p>
+    </div>
+
+    <!-- voltas por atalho (F1..F12) -->
+    <div class="card" style="margin-bottom:16px">
+      <h3>Adicionar volta por atalho <span class="hint">(F1 … F12)</span></h3>
+      <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-bottom:10px">
+        <button class="btn" onclick="abrirAssociacaoAtalhos()">Associar teclas a pilotos</button>
+        <button class="btn" onclick="resetarAssociacaoAtalhos()">Restaurar automático (pela lista)</button>
+        <span class="hint">Associe manualmente cada tecla F1–F12 a um piloto. Com associação manual, só as teclas com piloto definido disparam.</span>
+      </div>
+      <div id="op-atalhos" class="lista-atalhos">marque os pilotos no check-in acima</div>
+      <p class="hint">Cada tecla <b>F1 … F12</b> registra uma volta do piloto
+        associado (também vale clicar no botão). O tempo da volta é medido desde
+        a última volta do piloto — na 1ª volta, desde o início da sessão.</p>
     </div>
 
     <!-- mapa da pista ativa (traçado desenhado no editor) -->
@@ -171,8 +178,8 @@
       <p class="hint" style="margin-top:6px" id="pista-mini-info"></p>
     </div>
 
-    <!-- campeonato em andamento -->
-    <div class="card" style="margin-bottom:16px">
+    <!-- campeonato em andamento (só aparece com o Tipo = Campeonato) -->
+    <div class="card" id="card-camp-ativo" style="margin-bottom:16px; display:none">
       <h3>🏆 Campeonato em andamento</h3>
       <div id="camp-atual" style="margin:10px 0">
         <span class="hint">nenhum campeonato em andamento</span>
@@ -200,8 +207,8 @@
       <h3>Classificação ao vivo <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--text-main)">— clique numa linha para selecionar o piloto (marcar gato / apagar volta)</span></h3>
       <div class="tabela-wrap">
         <table class="tabela-op" id="tabela-classificacao">
-          <tr><th>Pos</th><th>Nº</th><th>Abr</th><th>Piloto</th><th>Voltas</th><th>Total</th><th>Intervalo</th><th>Gap</th><th>Última</th><th>Melhor</th><th>km/h</th><th>Média</th><th>Desvio</th><th>Consist.</th><th>Transponder</th><th>Ações</th></tr>
-          <tr><td colspan="16" style="color:var(--text-muted)">nenhuma volta registrada</td></tr>
+          <tr><th>Pos</th><th>Nº</th><th>Abr</th><th>Piloto</th><th>Voltas</th><th>Total</th><th>Intervalo</th><th>Gap</th><th>Última</th><th>Melhor</th><th>km/h</th><th>Média</th><th>Média N</th><th>Desvio</th><th>Consist.</th><th>Transponder</th><th>Ações</th></tr>
+          <tr><td colspan="17" style="color:var(--text-muted)">nenhuma volta registrada</td></tr>
         </table>
       </div>
     </div>
@@ -500,6 +507,30 @@
         </div>
       </div>
 
+      <!-- ============ FERRAMENTA DE AUDITORIA ============ -->
+      <div class="admin-sec" id="a-auditoria">
+        <div class="admin-secao-tit">Ferramenta de Auditoria</div>
+        <p class="hint" style="margin-bottom:12px">Editar baterias enviadas ao CTAD (Firebase <code>baterias/{chave}</code>). Elimine voltas inválidas, reorganize a ordem.</p>
+        <div class="grid-historico">
+          <div class="card">
+            <h3>Baterias no CTAD</h3>
+            <input id="busca-auditoria" class="input-busca" placeholder="Filtrar por sessão/chave..." oninput="filtrarAuditoria()">
+            <div class="acoes" style="margin:10px 0"><button class="btn-slide" onclick="carregarAuditoria()">🔄 Atualizar</button></div>
+            <div id="lista-auditoria" class="lista-sessoes"></div>
+          </div>
+          <div class="card">
+            <div class="detalhe-topo">
+              <h3 id="auditoria-titulo">Selecione uma bateria</h3>
+              <div id="acoes-auditoria" style="display:none; gap:8px; flex-wrap:wrap">
+                <button class="btn-slide" onclick="salvarAuditoria()">💾 Salvar no CTAD</button>
+              </div>
+            </div>
+            <div id="auditoria-conteudo"></div>
+            <p class="hint" style="margin-top:8px">Para "reorganizar a ordem", você pode mover as linhas para cima/baixo. Para "eliminar uma volta", remova a linha da volta. Ao salvar, voltasTotais, melhorVolta, média e desvio são recalculados.</p>
+          </div>
+        </div>
+      </div>
+
       <!-- ============ NOTIFICAÇÕES ============ -->
       <div class="admin-sec" id="a-notificacoes">
         <div class="admin-secao-tit">O que deve gerar notificação</div>
@@ -752,29 +783,28 @@
             <button class="destaque" onclick="abrirTelao()">📺 Abrir telão</button>
           </div>
         </div>
+        <div class="card">
+          <h3>Telão / segunda tela</h3>
+          <p class="hint">Onde o botão 🖥️ abre o telão (maximizado, em janela própria do app).</p>
+          <div class="frase-input" style="margin-top:12px">
+            <span class="rot">Abrir na tela</span>
+            <select id="cfg-telao" onchange="salvarTelaoTela()">
+              <option value="0">carregando…</option>
+            </select>
+          </div>
+        </div>
         <div class="grid g2">
           <div class="card">
             <h3>Colunas do feedback (selecionáveis)</h3>
-            <div style="columns:2; font-size:13px">
+            <div id="telao-colunas" style="columns:2; font-size:13px">
               <div class="switch"><span class="ck on">✓</span> Posição</div>
-              <div class="switch"><span class="ck on">✓</span> Número</div>
-              <div class="switch"><span class="ck on">✓</span> Cor</div>
-              <div class="switch"><span class="ck on">✓</span> Abreviado</div>
-              <div class="switch"><span class="ck on">✓</span> Piloto</div>
-              <div class="switch"><span class="ck">·</span> Fotografia</div>
-              <div class="switch"><span class="ck">·</span> Bandeira</div>
-              <div class="switch"><span class="ck on">✓</span> Voltas</div>
-              <div class="switch"><span class="ck">·</span> Dif. para o seguinte</div>
-              <div class="switch"><span class="ck">·</span> Dif. para o 1º</div>
-              <div class="switch"><span class="ck on">✓</span> Tempo total</div>
-              <div class="switch"><span class="ck on">✓</span> Última volta</div>
-              <div class="switch"><span class="ck on">✓</span> Melhor volta</div>
-              <div class="switch"><span class="ck">·</span> Tempo médio</div>
-              <div class="switch"><span class="ck">·</span> Est. de voltas</div>
-              <div class="switch"><span class="ck">·</span> Est. de tempo</div>
-              <div class="switch"><span class="ck">·</span> Desvio padrão</div>
-              <div class="switch"><span class="ck on">✓</span> Consistência</div>
             </div>
+            <div class="acoes" style="margin-top:10px">
+              <button onclick="telaoColunasTodas(true)">Marcar todas</button>
+              <button onclick="telaoColunasTodas(false)">Limpar</button>
+            </div>
+            <p class="hint">Clique para ligar/desligar cada coluna do telão. A escolha
+              vale para o telão desta máquina e é aplicada na hora.</p>
           </div>
           <div class="card">
             <h3>Semáforo da largada</h3>
@@ -1125,23 +1155,13 @@
               </select>
             </div>
           </div>
-          <div class="card">
-            <h3>Telão / segunda tela</h3>
-            <p class="hint">Onde o botão 🖥️ abre o telão (maximizado, em janela própria do app).</p>
-            <div class="frase-input" style="margin-top:12px">
-              <span class="rot">Abrir na tela</span>
-              <select id="cfg-telao" onchange="salvarTelaoTela()">
-                <option value="1">Tela 2</option>
-              </select>
-            </div>
-          </div>
         </div>
       </div>
 
       <!-- ============ SOBRE ============ -->
       <div class="admin-sec" id="a-sobre">
         <div class="grid g4">
-          <div class="card"><h3>Versão</h3><div class="big" id="upd-versao">1.0.6</div><div class="sub">Fases 0 → 7 concluídas · atualizações pelo GitHub</div></div>
+          <div class="card"><h3>Versão</h3><div class="big" id="upd-versao">1.0.9</div><div class="sub">Fases 0 → 7 concluídas · atualizações pelo GitHub</div></div>
           <div class="card"><h3>Drivers</h3><div class="big" style="font-size:20px">P3 · EASYLAP · LapWiz</div><div class="sub">TCP · serial · Bluetooth</div></div>
           <div class="card"><h3>Stack</h3><div class="big" style="font-size:20px">Python · FastAPI</div><div class="sub">SQLite · WebSocket · vanilla JS</div></div>
           <div class="card"><h3>Atualizações</h3><div class="sub" id="upd-status">aguardando verificação…</div>
@@ -1157,8 +1177,8 @@
               <button class="btn-slide" onclick="encerrarApp()">⏹ Sair</button>
             </div>
             <p class="hint">Publique a versão nova como <b>release no GitHub</b> com tag igual à
-              versão (ex.: <code>v1.0.6</code>) — a CI anexa sozinha o instalador
-              <code>KChrono-Setup-1-0-6.exe</code>
+              versão (ex.: <code>v1.0.9</code>) — a CI anexa sozinha o instalador
+              <code>KChrono-Setup-1-0-9.exe</code>
               (Windows), o <code>KChrono-*.AppImage</code> (Linux) e a ISO da live. "Instalar agora"
               baixa, fecha o app e atualiza em silêncio — ao reabrir já é a versão nova (os dados
               ficam intactos).</p>
@@ -1186,11 +1206,25 @@
   <div class="dir">
     <span id="rodape-sync">Sincronização CTAD: aguardando</span>
     <span class="pill novo">NOVIDADE</span>
-    <span>KChrono v1.0.6 · por <b>Raphael Belowodski</b></span>
+    <span>KChrono <span class="js-versao">v1.0.9</span> · por <b>Raphael Belowodski</b></span>
   </div>
 </div>
 
-<script src="/static/tracado.js?v=1.1"></script>
-<script src="/static/app.js?v=2.6"></script>
+<script src="/static/tracado.js?v=1.0.9"></script>
+<script src="/static/app.js?v=1.0.9"></script>
+
+<!-- associação manual das teclas F1..F12 -->
+<div id="modal-atalhos" class="modal-fundo" style="display:none">
+  <div class="modal-card">
+    <h3>Associar teclas a pilotos</h3>
+    <p class="hint" style="margin-bottom:10px">Cada tecla F1–F12 registra a volta do piloto escolhido.
+      Deixe em “automático” para usar a ordem do check-in.</p>
+    <div id="modal-atalhos-corpo" class="atalho-assoc-lista"></div>
+    <div class="acoes" style="margin-top:14px; justify-content:flex-end">
+      <button class="btn-slide" onclick="fecharAssociacaoAtalhos()">Cancelar</button>
+      <button class="destaque" onclick="salvarAssociacaoAtalhos()">Salvar associação</button>
+    </div>
+  </div>
+</div>
 </body>
 </html>

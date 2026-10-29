@@ -4,51 +4,66 @@
   ``_pyi_isolated_subprocess``): no Python 3.14 + numpy do Windows o
   subprocesso isolado do PyInstaller morre com ACCESS_VIOLATION ao importar
   ``numpy.typing``.
+· **Confere a versão antes de empacotar** (regra do projeto: toda alteração
+  entregue sobe a versão). Se algum espelho estiver fora de sincronia com
+  ``empacotamento/versao.json`` o build é recusado — assim não sai pacote
+  com versão errada. Use ``python tools/versao.py bump --notas "..."``.
 · Sincroniza o ``!define VERSAO`` do instalador NSIS (empacotamento/instalador.nsi)
   com a fonte única da versão: empacotamento/versao.json.
 
 Uso (qualquer plataforma):
     python empacotamento/build.py
 """
-import json
 import os
-import re
 import sys
 
 # Faz PyInstaller.isolated.Python virar no-op (executa tudo em processo).
 sys._pyi_isolated_subprocess = True
 
 AQUI = os.path.dirname(os.path.abspath(__file__))
+RAIZ = os.path.dirname(AQUI)
+
+
+def _carregar_ferramenta_versao():
+    """Importa tools/versao.py (fonte única da versão)."""
+    if RAIZ not in sys.path:
+        sys.path.insert(0, RAIZ)
+    if os.path.join(RAIZ, "tools") not in sys.path:
+        sys.path.insert(0, os.path.join(RAIZ, "tools"))
+    import versao  # noqa: E402
+    return versao
+
+
+def _checar_versao() -> bool:
+    """True se a versão está em sincronia (senão o build é recusado)."""
+    try:
+        v = _carregar_ferramenta_versao()
+    except Exception as e:
+        print(f"[build] aviso: não consegui checar a versão ({e})")
+        return True
+    problemas = v.verificar()
+    if problemas:
+        print("[build] ERRO: a versão está fora de sincronia:")
+        for p in problemas:
+            print(f"   - {p}")
+        print('[build] rode: python tools/versao.py bump --notas "o que mudou"')
+        return False
+    print(f"[build] versão ok (v{v.versao_atual()})")
+    return True
 
 
 def _sincronizar_versao_nsis():
     """Espelha versao.json nos !define VERSAO e VERSAO_ARQ do instalador NSIS."""
-    vfile = os.path.join(AQUI, "versao.json")
-    nsi = os.path.join(AQUI, "instalador.nsi")
     try:
-        with open(vfile, encoding="utf-8") as f:
-            versao = json.load(f)["versao"]
-        # surrogateescape preserva byte a byte o arquivo (NSIS lê em ACP)
-        with open(nsi, encoding="utf-8", errors="surrogateescape") as f:
-            txt = f.read()
-        novo, n = re.subn(r'(!define VERSAO ")[^"]*(")',
-                          lambda m: m.group(1) + versao + m.group(2),
-                          txt, count=1)
-        # VERSAO_ARQ = versão com hífens → nome do arquivo do instalador
-        novo, n2 = re.subn(r'(!define VERSAO_ARQ ")[^"]*(")',
-                           lambda m: m.group(1) + versao.replace(".", "-")
-                           + m.group(2), novo, count=1)
-        if (n or n2) and novo != txt:
-            with open(nsi, "w", encoding="utf-8",
-                      errors="surrogateescape", newline="") as f:
-                f.write(novo)
-            print(f"[build] instalador.nsi VERSAO = {versao}"
-                  f" (arquivo: KChrono-Setup-{versao.replace('.', '-')}.exe)")
+        v = _carregar_ferramenta_versao()
+        v.sincronizar()
     except Exception as e:
         print(f"[build] aviso: não sincronizei a versão do NSIS ({e})")
 
 
 def main() -> int:
+    if not _checar_versao():
+        return 1
     _sincronizar_versao_nsis()
     os.chdir(AQUI)
     from PyInstaller.__main__ import run

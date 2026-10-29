@@ -5,6 +5,9 @@ import re
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from versao import versao_atual  # noqa: E402  (fonte única: empacotamento/versao.json)
+
 RAIZ = Path(__file__).resolve().parent.parent
 
 # Dicionário base pt_BR -> en_US para strings comuns da UI
@@ -276,7 +279,7 @@ def gerar_po(msgids, saida, idioma):
         '',
         'msgid ""',
         'msgstr ""',
-        f'"Project-Id-Version: KChrono 1.0.6\\n"',
+        f'"Project-Id-Version: KChrono {versao_atual()}\\n"',
         f'"PO-Revision-Date: 2026-10-13\\n"',
         f'"Last-Translator: Auto-generated\\n"',
         f'"Language-Team: KChrono Team\\n"',

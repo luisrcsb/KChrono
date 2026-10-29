@@ -23,6 +23,7 @@ from nucleo.campeonatos import (PADRAO_PILOTOS_POR_CHAVE, PilotoCamp, Regulament
 from nucleo.relogio import MonitorDrift, agora_epoch_us, agora_monotonic_us
 from nucleo.ring_buffer import RingBuffer
 from sync import CtadClient, ErroAuth, Sincronizador
+from sync.sincronizador import gerar_resumo
 from caminhos import dir_dados
 from .config import carregar_config, salvar_config
 from .som import OPCOES_SOM_PADRAO, ModuloSom
@@ -107,6 +108,9 @@ class EstadoApp:
 
         # --- Fase 3: sincronização com o CTAD ---
         self.config = carregar_config()
+        # atalhos F1-F12: mapa tecla -> piloto_id persistido em config.json
+        self.atalhos_teclas: Dict[str, int] = dict(
+            self.config.get("atalhos_teclas") or {})
         # o simulador é escolha de teste — nunca persiste entre aberturas
         if self.config.get("decoder_tipo") == "simulador":
             self.config["decoder_tipo"] = "p3"
@@ -305,6 +309,38 @@ class EstadoApp:
         salvar_config(cfg)
         self.config = cfg
         return {"ok": True, "indice": indice}
+
+    # --- colunas do feedback do telao (ordem canonica) ---
+    COLUNAS_TELAO = ["posicao", "numero", "piloto", "voltas", "total", "intervalo",
+                     "gap", "ultima", "melhor", "velocidade", "ritmo", "mediaN", "est"]
+
+    # colunas visiveis escolhidas pelo operador (ordem canonica no estado)
+    def telao_colunas(self) -> Dict:
+        """Colunas visíveis no feedback do telão (Configurações → Telão)."""
+        bruto = self.config.get("telao_colunas")
+        if not isinstance(bruto, (list, tuple)):
+            bruto = self.COLUNAS_TELAO
+        validas = [c for c in bruto if c in self.COLUNAS_TELAO]
+        # sem repetição e mantendo a ordem canônica
+        escolhidas = [c for c in self.COLUNAS_TELAO if c in set(validas)]
+        if not escolhidas:
+            escolhidas = list(self.COLUNAS_TELAO)
+        return {"colunas": escolhidas, "disponiveis": list(self.COLUNAS_TELAO)}
+
+    def definir_telao_colunas(self, colunas) -> Dict:
+        if isinstance(colunas, str):
+            colunas = [c.strip() for c in colunas.split(",") if c.strip()]
+        if not isinstance(colunas, (list, tuple)):
+            raise ValueError("colunas inválidas")
+        escolhidas = [c for c in self.COLUNAS_TELAO if c in set(colunas)]
+        if not escolhidas:
+            raise ValueError("selecione ao menos uma coluna")
+        cfg = carregar_config()
+        cfg["telao_colunas"] = escolhidas
+        salvar_config(cfg)
+        self.config = cfg
+        self.publicar("telao_colunas", {"colunas": escolhidas}, registrar=False)
+        return {"ok": True, "colunas": escolhidas}
 
     def iniciar_auto_conectar(self):
         """Dispara o loop de conexão do boot (se ligado e ainda desconectado)."""
@@ -620,12 +656,24 @@ class EstadoApp:
 
     def _classificacao(self):
         comp_m = self._comprimento_pista_m()
+        # janela da média (N voltas consecutivas): parâmetro da sessão ou config
+        try:
+            media_n = int((self.parametros or {}).get("media_n") or 0)
+        except Exception:
+            media_n = 0
+        if not media_n:
+            try:
+                media_n = int(self.config.get("classificacao_media_n") or 0)
+            except Exception:
+                media_n = 0
         return [{"posicao": l.posicao, "nome": l.nome, "voltas": l.voltas,
                  "tempo": formatar(l.tempo_total_us), "melhor": formatar(l.melhor_volta_us),
                  "melhor_us": l.melhor_volta_us, "ultima": formatar(l.ultima_volta_us),
                  "gap": l.gap, "abreviado": l.abreviado, "numero": l.numero,
                  "intervalo": formatar(l.intervalo_us) if l.intervalo_us else "",
                  "media": formatar(int(l.media_us)) if l.media_us else "-",
+                 "media_n": (formatar(int(l.media_n_us)) if l.media_n_us else "-"),
+                 "media_n_voltas": l.media_n_voltas,
                  "desvio": formatar(int(l.desvio_us)) if l.desvio_us else "-",
                  "consistencia": f"{l.consistencia_pct:.1f}%" if l.consistencia_pct else "-",
                  "transponder": l.transponder, "suspeita": l.suspeita,
@@ -633,11 +681,10 @@ class EstadoApp:
                  "velocidade": (f"{comp_m / (l.melhor_volta_us / 1e6) * 3.6:.1f}"
                                 if comp_m and l.melhor_volta_us else ""),
                  "piloto_id": l.piloto_id}
-                for l in self.motor.classificacao()]
+                for l in self.motor.classificacao(media_n)]
 
     # ---------------------------------------------------------------- sessão
-    def iniciar_sessao(self, tipo: str, tempo_minimo_s: float = 0,
-                       duracao: float = 10, criterio: str = "tempo") -> bool:
+    def iniciar_sessao(self, tipo: str, tempo_minimo_s: float = 0, duracao: float = 10, criterio: str = "tempo", media_n: int = 0) -> bool:
         if self.motor and self.motor.estado.value not in ("parado", "finalizado"):
             return False
         # simulador ligado = sessão de teste/desenvolvimento (não oficial)
@@ -648,11 +695,17 @@ class EstadoApp:
             pista_id=pista_ativa["id"] if pista_ativa else None,
             tipo=TipoSessao(tipo), simulacao=self.sessao_simulacao)
         self.parametros = {"duracao": duracao, "criterio": criterio,
-                           "tempo_minimo_volta_s": tempo_minimo_s}
+                           "tempo_minimo_volta_s": tempo_minimo_s, "media_n": media_n}
+        # atalhos F1-F12: mapeamento opcional tecla -> piloto_id (persistido em config)
+        try:
+            self.atalhos_teclas = dict(self.config.get("atalhos_teclas") or {})
+        except Exception:
+            self.atalhos_teclas = {}
         self.motor = MotorCorrida(
             banco=self.banco, sessao_id=self.sessao_id,
             tempo_minimo_volta_us=int(tempo_minimo_s * 1_000_000),
             on_rejeicao=self._on_rejeicao,
+            relogio_sessao=self._tempo_sessao_us,
             resolver_piloto=self._resolver_transponder)
         # vínculos transponder -> piloto (todos os cadastrados no Admin)
         vinculos = [(int(t["codigo"]), int(t["piloto_id"]))
@@ -858,6 +911,11 @@ class EstadoApp:
         self.publicar("sessao", {"estado": "pausada" if pausar else "retomada",
                                  "simulacao": self.sessao_simulacao})
         return True
+
+    def _tempo_sessao_us(self) -> Optional[int]:
+        """Cronômetro da sessão em microssegundos (sem pausas)."""
+        s = self.tempo_sessao_s()
+        return None if s is None else int(s * 1_000_000)
 
     def tempo_sessao_s(self) -> Optional[float]:
         """Cronômetro da sessão em segundos (desconta pausas; congela ao fim)."""
@@ -1315,6 +1373,69 @@ class EstadoApp:
             self.publicar("classificacao", {"linhas": self._classificacao()})
             self.publicar("voltas", self.dados_voltas())
         return ok
+
+    # ----- volta por atalho F1..F12 -----
+    def adicionar_volta_tecla(self, piloto_id: int) -> Dict:
+        """Atalho F1..F12 do painel do operador.
+
+        Registra a volta do piloto usando o tempo desde a última volta dele
+        (1ª volta: desde o início da sessão). O tempo é calculado no servidor,
+        de forma que o atalho funciona igual em qualquer monitor.
+        """
+        if not self.motor:
+            return {"ok": False, "erro": "sem sessão ativa"}
+        tempo_us = self.motor.adicionar_volta_por_tecla(piloto_id)
+        if tempo_us is None:
+            return {"ok": False,
+                    "erro": "piloto fora da sessão (confira o check-in) ou tempo inválido"}
+        nome = self._piloto_nome(piloto_id)
+        log.info("atalho: volta de %s registrada (%.3f s)", nome, tempo_us / 1e6)
+        self.publicar("admin", {"msg": f"volta de {nome} via atalho"})
+        self.publicar("classificacao", {"linhas": self._classificacao()})
+        self.publicar("voltas", self.dados_voltas())
+        return {"ok": True, "tempo_s": tempo_us / 1e6, "tempo": formatar(tempo_us),
+                "piloto_id": piloto_id}
+
+    # ----- associação tecla F1..F12 -> piloto -----
+    def atalhos(self) -> Dict[str, int]:
+        """Mapa tecla (1..12) -> piloto_id das associações manuais."""
+        try:
+            return {str(k): int(v) for k, v in (self.atalhos_teclas or {}).items()
+                    if v is not None and str(v) != ""}
+        except Exception:
+            return {}
+
+    def definir_atalhos_teclas(self, atalhos: Dict) -> Dict:
+        """Persiste a associação manual tecla -> piloto (Admin/Operador)."""
+        m: Dict[str, int] = {}
+        for k, v in (atalhos or {}).items():
+            try:
+                tecla = int(k)
+                if tecla < 1 or tecla > 12:
+                    continue
+                if v is None or v == "":
+                    continue
+                m[str(tecla)] = int(v)
+            except Exception:
+                continue
+        self.atalhos_teclas = m
+        cfg = dict(self.config)
+        cfg["atalhos_teclas"] = m
+        self.config = cfg
+        salvar_config(cfg)
+        self.publicar("atalhos_teclas", {"atalhos": m}, registrar=False)
+        return {"ok": True, "atalhos": m}
+
+    def adicionar_volta_por_tecla_mapeada(self, tecla: int) -> Optional[Dict]:
+        """Registra a volta do piloto associado à tecla F1..F12."""
+        try:
+            t = int(tecla)
+        except Exception:
+            return None
+        pid = self.atalhos().get(str(t))
+        if pid is None:
+            return None
+        return self.adicionar_volta_tecla(pid)
 
     def painel_gerente(self) -> Dict:
         """Pacote completo do gerente: sessão + classificação + pilotos + pista."""
@@ -2502,6 +2623,105 @@ class EstadoApp:
                                                   for v in vs]}
                             for n, vs in pilotos]}
 
+    # ---------------------------------------------------------------- auditoria (CTAD)
+    def _cliente_ctad_auditoria(self):
+        if self.sincronizador and self.sincronizador.cliente:
+            return self.sincronizador.cliente
+        cfg = self.config
+        if not (cfg.get("email") and cfg.get("password")):
+            raise ErroAuth("Configure e-mail/senha do CTAD no Admin → Uploads & Sync para auditar baterias.")
+        cliente = CtadClient(cfg)
+        cliente.login()
+        if self.sincronizador:
+            self.sincronizador.cliente = cliente
+        return cliente
+
+    def listar_baterias_auditoria(self) -> List[Dict]:
+        cliente = self._cliente_ctad_auditoria()
+        try:
+            baterias = cliente.rtdb_get("baterias") or {}
+        except Exception:
+            baterias = {}
+        saida: List[Dict] = []
+        for chave, reg in baterias.items():
+            reg = reg or {}
+            saida.append({
+                "chave": chave,
+                "sessao": reg.get("sessao") or chave,
+                "pistaId": reg.get("pistaId") or "",
+                "id": reg.get("id") or "",
+                "uploadedAt": reg.get("uploadedAt") or 0,
+                "origem": reg.get("origem") or "",
+                "dados_n": len(reg.get("dados") or []),
+            })
+        saida.sort(key=lambda x: x.get("uploadedAt") or 0, reverse=True)
+        return saida
+
+    def _recalcular_dados(self, dados: List[Dict]) -> List[Dict]:
+        for d in (dados or []):
+            laps: List[float] = []
+            for l in (d.get("laps") or []):
+                try:
+                    if l is None or l == "":
+                        continue
+                    v = float(l)
+                    if v > 0:
+                        laps.append(round(v, 3))
+                except Exception:
+                    continue
+            d["laps"] = laps
+            n = len(laps)
+            d["voltasTotais"] = n
+            if n == 0:
+                d["melhorVoltaVal"] = None
+                d["melhorVoltaTxt"] = "-"
+                d["mediaVal"] = None
+                d["mediaTxt"] = "-"
+                d["desvioVal"] = None
+                d["desvio"] = "-"
+                continue
+            melhor = min(laps)
+            media = sum(laps) / n
+            if n > 0:
+                desvio = (sum((t - media) ** 2 for t in laps) / n) ** 0.5
+            else:
+                desvio = 0.0
+            d["melhorVoltaVal"] = round(melhor, 3)
+            d["melhorVoltaTxt"] = f"{melhor:.3f}s".replace(".", ",")
+            d["mediaVal"] = round(media, 3)
+            d["mediaTxt"] = f"{media:.3f}s".replace(".", ",")
+            d["desvioVal"] = round(desvio, 3)
+            d["desvio"] = f"±{desvio:.3f}s".replace(".", ",")
+
+        dados_sorted = sorted(dados or [], key=lambda x: (-(x.get("voltasTotais") or 0), x.get("melhorVoltaVal") if x.get("melhorVoltaVal") is not None else 999999))
+        for i, d in enumerate(dados_sorted, start=1):
+            d["pos"] = f"{i}º"
+
+        return dados_sorted
+
+    def obter_bateria_auditoria(self, chave: str) -> Dict:
+        cliente = self._cliente_ctad_auditoria()
+        reg = cliente.rtdb_get(f"baterias/{chave}") or {}
+        return {"chave": chave, "registro": reg}
+
+    def salvar_bateria_auditoria(self, chave: str, dados_body: Dict) -> Dict:
+        cliente = self._cliente_ctad_auditoria()
+        reg = dados_body.get("registro") or dados_body
+        if "dados" not in reg:
+            raise ValueError("registro inválido")
+        dados = reg.get("dados") or []
+        dados = self._recalcular_dados(dados)
+        reg["dados"] = dados
+
+        try:
+            resumo = gerar_resumo(reg)
+            cliente.rtdb_put(f"publicResumo/baterias/{chave}", resumo)
+        except Exception:
+            pass
+        cliente.rtdb_put(f"baterias/{chave}", reg)
+        self.publicar("sync", {"msg": f"Bateria {chave} atualizada na auditoria"})
+        return {"ok": True, "chave": chave}
+
     # ---------------------------------------------------------------- snapshot
     def snapshot(self) -> Dict:
         motor_estado = self.motor.estado.value if self.motor else "parado"
@@ -2532,6 +2752,7 @@ class EstadoApp:
             "tracada": self.tracado_pista(),
             "contadores": self.contadores,
             "classificacao": self._classificacao() if self.motor else [],
+            "telao": self.telao_colunas(),
             "eventos": self.eventos[-30:],
             "campeonato": self.campeonato_estado(),
         }

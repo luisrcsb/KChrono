@@ -10,11 +10,12 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 from decimal import Decimal
-from typing import Callable, Dict, List, Optional
+from typing import Callable, Dict, List, Optional, Tuple
 
 from drivers.base import Passing
 from .modelos import (EstadoSessao, LinhaClassificação, TipoSessao, Volta,
                       formatar_tempo)
+from .relogio import agora_monotonic_us
 
 log = logging.getLogger("kchrono.motor")
 
@@ -55,7 +56,8 @@ class MotorCorrida:
     def __init__(self, banco=None, sessao_id: str = "local",
                  resolver_piloto: Optional[Callable[[int], Optional[tuple]]] = None,
                  tempo_minimo_volta_us: int = 0,
-                 on_rejeicao: Optional[Callable[[int, int, Optional[int]], None]] = None):
+                 on_rejeicao: Optional[Callable[[int, int, Optional[int]], None]] = None,
+                 relogio_sessao: Optional[Callable[[], Optional[int]]] = None):
         self.banco = banco
         self.sessao_id = sessao_id
         self.estado = EstadoSessao.PARADO
@@ -70,8 +72,24 @@ class MotorCorrida:
         self.tempo_minimo_volta_us = tempo_minimo_volta_us  # filtro ghost lap
         self.on_rejeicao = on_rejeicao    # callback(transponder, tempo_us, passing_number)
         self.rejeitados: List[Dict] = []  # ghost laps descartados (auditoria)
+        # instante (µs) da última volta registrada de cada piloto, na coordenada
+        # do cronômetro da sessão — usado pelo atalho F1..F12
+        self._ultimo_passo_us: Dict[int, int] = {}
+        # relógio da sessão (µs decorridos, sem contar pausas); None = monotonic
+        self.relogio_sessao = relogio_sessao
 
     # ----- configuração -----
+    def agora_sessao_us(self) -> int:
+        """Coordenada do cronômetro da sessão (µs decorridos, pausas fora)."""
+        if self.relogio_sessao:
+            try:
+                v = self.relogio_sessao()
+                if v is not None:
+                    return int(v)
+            except Exception:  # relógio do servidor indisponível
+                pass
+        return agora_monotonic_us()
+
     def registrar_transponder(self, codigo: int, piloto_id: int):
         self._mapa_transponders[codigo] = piloto_id
         self._transponder_por_piloto[piloto_id] = codigo
@@ -201,6 +219,7 @@ class MotorCorrida:
                     volta = None  # já existia (idempotente)
                 else:
                     estado.voltas.append(volta)
+                    self._ultimo_passo_us[piloto_id] = self.agora_sessao_us()
 
         # persiste passing cru (auditoria; valido=0 quando rejeitado por ghost lap)
         if self.banco:
@@ -210,10 +229,46 @@ class MotorCorrida:
         return volta
 
     # ----- classificação -----
-    def classificacao(self) -> List[LinhaClassificação]:
+    @staticmethod
+    def melhor_media_consecutiva(tempos: List[int], n: int) -> Optional[Tuple[float, int]]:
+        """Melhor média entre as janelas de N voltas consecutivas.
+
+        Devolve (media_em_us, quantas_voltas_usou) ou None se não há voltas.
+        Se o piloto tiver menos de N voltas, usa todas as que tem.
+        """
+        if not tempos or n <= 0:
+            return None
+        k = min(n, len(tempos))
+        melhor: Optional[Tuple[float, int]] = None
+        for i in range(0, len(tempos) - k + 1):
+            media = sum(tempos[i:i + k]) / k
+            if melhor is None or media < melhor[0]:
+                melhor = (media, k)
+        return melhor
+
+    def classificacao(self, media_n: int = 0,
+                      ordenar_por_media: bool = False) -> List[LinhaClassificação]:
         itens = list(self._pilotos.values())
-        itens.sort(key=lambda e: (-len(e.voltas), e.melhor_volta_us or 0,
-                                  e.tempo_total_us))
+        n = max(1, int(media_n or 0))
+        # melhor média de N voltas consecutivas (para cada piloto)
+        medias_n: Dict[int, Optional[Tuple[float, int]]] = {}
+        for e in itens:
+            medias_n[e.piloto_id] = self.melhor_media_consecutiva(
+                [v.tempo_us for v in e.voltas], n)
+
+        if ordenar_por_media:
+            # ranking pela média de N voltas consecutivas: quem já tem a janela
+            # completa vem primeiro (ordenado pela média); os demais, atrás.
+            def _chave(e):
+                janela = medias_n.get(e.piloto_id)
+                completo = 1 if (janela and janela[1] >= n) else 0
+                media = janela[0] if janela else float("inf")
+                return (-completo, media, e.melhor_volta_us or 0)
+        else:
+            def _chave(e):
+                return (-len(e.voltas), e.melhor_volta_us or 0, e.tempo_total_us)
+
+        itens.sort(key=_chave)
         linhas: List[LinhaClassificação] = []
         lider = itens[0] if itens else None
         for pos, estado in enumerate(itens, start=1):
@@ -229,6 +284,7 @@ class MotorCorrida:
             desvio = ((sum((t - media) ** 2 for t in tempos) / len(tempos)) ** 0.5
                       if tempos else None)
             consistencia = max(0.0, 100 * (1 - desvio / media)) if media else None
+            janela = medias_n.get(estado.piloto_id)
             linhas.append(LinhaClassificação(
                 posicao=pos, piloto_id=estado.piloto_id, nome=estado.nome,
                 voltas=len(estado.voltas),
@@ -238,6 +294,8 @@ class MotorCorrida:
                 gap=gap,
                 abreviado=estado.nome[:3].upper(),
                 media_us=media, desvio_us=desvio, consistencia_pct=consistencia,
+                media_n_us=janela[0] if janela else None,
+                media_n_voltas=janela[1] if janela else 0,
                 transponder=estado.transponder,
                 suspeita=len(estado.suspeitas) > 0))
         # intervalo: diferença de tempo para o piloto seguinte (mesma volta)
@@ -313,3 +371,27 @@ class MotorCorrida:
         log.info("volta manual #%s (%d us) adicionada para %s",
                  numero, tempo_us, estado.nome)
         return True
+
+    def adicionar_volta_por_tecla(self, piloto_id: int, agora_us: Optional[int] = None,
+                                  base_us: Optional[int] = None) -> Optional[int]:
+        """Atalho F1..F12: registra a volta do piloto usando o tempo desde a
+        última volta dele (ou desde o início da sessão, se for a primeira).
+
+        Devolve o tempo da volta em microssegundos, ou None se não der
+        para registrar (piloto fora da sessão / tempo inválido).
+        """
+        estado = self._pilotos.get(piloto_id)
+        if not estado:
+            return None
+        if agora_us is None:
+            agora_us = self.agora_sessao_us()
+        if base_us is None:
+            base_us = 0
+        referencia = self._ultimo_passo_us.get(piloto_id, base_us)
+        tempo_us = int(agora_us - referencia)
+        if tempo_us <= 0:
+            return None
+        if not self.adicionar_volta(piloto_id, tempo_us):
+            return None
+        self._ultimo_passo_us[piloto_id] = agora_us
+        return tempo_us

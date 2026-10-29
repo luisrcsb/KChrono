@@ -93,6 +93,20 @@ build-windows.bat          # compila KChrono.exe com PyInstaller
 
 **Requisitos**: Python 3.11+, WebView2 Runtime (já incluso no Windows 10/11 atualizado).
 
+### Versão — toda atualização sobe a versão
+
+A versão tem **fonte única** (`empacotamento/versao.json`) e a ferramenta
+`tools/versao.py` mantém tudo em sincronia (instalador NSIS, interface, i18n,
+documentação). O `empacotamento/build.py` recusa o build se a versão estiver
+dessincronizada.
+
+```bash
+python tools/versao.py bump --notas "o que mudou"   # sobe a versão
+python tools/versao.py check                        # confere a sincronia
+```
+
+Detalhes em [`empacotamento/LEIA-ME.md`](empacotamento/LEIA-ME.md#versão--toda-atualização-sobe-a-versão).
+
 ### Build Linux (instalação usuário)
 
 ```bash

@@ -5,6 +5,9 @@ import re
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from versao import versao_atual  # noqa: E402  (fonte única: empacotamento/versao.json)
+
 RAIZ = Path(__file__).resolve().parent.parent
 
 # padrões para achar strings user-facing
@@ -128,7 +131,7 @@ def main():
               '',
               'msgid ""',
               'msgstr ""',
-              '"Project-Id-Version: KChrono 1.0.6\\n"',
+              f'"Project-Id-Version: KChrono {versao_atual()}\\n"',
               '"POT-Creation-Date: 2026-10-13\\n"',
               '"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\\n"',
               '"Last-Translator: FULL NAME <EMAIL@ADDRESS>\\n"',

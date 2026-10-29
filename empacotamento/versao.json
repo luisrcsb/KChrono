@@ -1,10 +1,10 @@
 {
-  "versao": "1.0.7",
+  "versao": "1.0.9",
   "canal": "estavel",
   "url_base": "",
-  "notas": "Versão 1.0.7 — Corrige bugs reportados em validação v1.0.6: corretivo de importação de pilotos do site (Firebase krathus-telemetria), botão adicionar piloto no check-in, redesenho da pista (cinza escuro, bordas internas xadrez vermelho/branco 1m, setas de sentido, grid/finish-line melhorado), área de design do telão ampliada, e controles de pausa/stop no simulador. Decoder robustecido com canais duais TCP, validação TLV e auto-recuperação.",
+  "notas": "Versão 1.0.9 — correção do app.js (erro de sintaxe), atalhos F1-F12 com lista de corrida, classificação por média de N voltas consecutivas",
   "arquivos": {
-    "windows": "KChrono-Setup-1-0-7.exe",
-    "linux": "KChrono-1.0.7-x86_64.AppImage"
+    "windows": "KChrono-Setup-1-0-9.exe",
+    "linux": "KChrono-1.0.9-x86_64.AppImage"
   }
 }

@@ -3,7 +3,6 @@
 
 let ws = null;
 let usuario = { nome: "", nivel: "superuser" };
-let voltasSimulador = [];  // acumula passagens do modo simulador (não gravadas no BD)
 
 // ---------------------------------------------------------------- áudio (beep/fala)
 let audioCtx = null;
@@ -131,27 +130,114 @@ async function salvarVozContagem() {
   logMsg(`voz na contagem: ${r.ativa ? "ligada" : "desligada"}`,
     "l-sistema", "log-operador");
 }
+// O bridge do pywebview (window.pywebview.api) só existe depois do evento
+// "pywebviewready"; tentar antes disso devolve vazio e o seletor ficava com
+// uma única opção — sem como escolher a 2ª tela. Aqui esperamos o bridge.
+function esperarBridgeTelas(timeoutMs = 4000) {
+  return new Promise(resolve => {
+    const pronto = () => !!(window.pywebview && window.pywebview.api && window.pywebview.api.telas);
+    if (pronto()) return resolve(true);
+    let decorrido = 0;
+    const passo = 100;
+    const t = setInterval(() => {
+      decorrido += passo;
+      if (pronto()) { clearInterval(t); resolve(true); }
+      else if (decorrido >= timeoutMs) { clearInterval(t); resolve(false); }
+    }, passo);
+  });
+}
 async function carregarTelaoTela() {
   const sel = document.getElementById("cfg-telao");
   if (!sel) return;
+  const guardado = sel.value;              // preserva a escolha se já houver
+  const temBridge = await esperarBridgeTelas();
   let telas = [];
-  try {
-    if (window.pywebview && window.pywebview.api && window.pywebview.api.telas)
+  if (temBridge) {
+    try {
       telas = await window.pywebview.api.telas() || [];
-  } catch (e) {}
-  if (!telas.length) telas = [{ indice: 0, largura: 0, altura: 0, principal: true }];
+    } catch (e) {}
+  }
+  // Sem bridge (navegador puro) só existe a tela atual.
+  if (!telas.length) {
+    telas = [{ indice: 0, largura: 0, altura: 0, principal: true }];
+  }
+  const anterior = sel.value || guardado;
   sel.innerHTML = telas.map(t =>
     `<option value="${t.indice}">Tela ${t.indice + 1}${t.principal ? " (principal)" : ""}` +
     `${t.largura ? ` — ${t.largura}x${t.altura}` : ""}</option>`).join("");
   try {
     const r = await api("telao/tela", "GET");
-    sel.value = String(r.indice ?? 1);
-  } catch (e) {}
+    const idx = String(r.indice ?? 0);
+    if ([...sel.options].some(o => o.value === idx)) sel.value = idx;
+    else if (anterior && [...sel.options].some(o => o.value === anterior)) sel.value = anterior;
+  } catch (e) {
+    if (anterior && [...sel.options].some(o => o.value === anterior)) sel.value = anterior;
+  }
+  sel.disabled = telas.length <= 1;        // só 1 monitor → nada a escolher
+  if (temBridge && telas.length <= 1) {
+    const sel2 = sel;                      // reconsulta quando a janela move de tela
+    if (!sel2.dataset.repetir) {
+      sel2.dataset.repetir = "1";
+      setTimeout(carregarTelaoTela, 1500);
+    }
+  }
 }
 async function salvarTelaoTela() {
   const i = parseInt((document.getElementById("cfg-telao") || {}).value, 10) || 0;
   const r = await api(`telao/tela?indice=${i}`);
   if (r.ok) logMsg(`telão abre na Tela ${r.indice + 1} (maximizado)`, "l-sistema", "log-operador");
+}
+
+// --- Colunas do feedback do telão (Configurações → Telão & Semáforo) ---
+const TELAO_COLUNAS_ROTULO = {
+  posicao: "Posição", numero: "Número", piloto: "Piloto", voltas: "Voltas",
+  total: "Tempo total", intervalo: "Dif. para o seguinte", gap: "Dif. para o 1º",
+  ultima: "Última volta", melhor: "Melhor volta", velocidade: "km/h",
+  ritmo: "Tempo médio (ritmo)", mediaN: "Média de N voltas", est: "Est. de tempo",
+};
+let telaoColunasAtuais = null;      // array das colunas ligadas
+async function carregarTelaoColunas() {
+  const box = document.getElementById("telao-colunas");
+  if (!box) return;
+  let dados = { colunas: [], disponiveis: [] };
+  try {
+    dados = await api("telao/colunas", "GET");
+  } catch (e) {}
+  const disponiveis = (dados.disponiveis && dados.disponiveis.length)
+    ? dados.disponiveis : Object.keys(TELAO_COLUNAS_ROTULO);
+  const ligadas = new Set((dados.colunas || []).length ? dados.colunas : disponiveis);
+  telaoColunasAtuais = disponiveis.filter(c => ligadas.has(c));
+  box.innerHTML = disponiveis.map(c => {
+    const on = ligadas.has(c);
+    const rot = TELAO_COLUNAS_ROTULO[c] || c;
+    return `<div class="switch telao-col" data-col="${c}" onclick="telaoColunaAlternar('${c}')" `
+      + `style="cursor:pointer" title="Ligar/desligar a coluna ${rot}">`
+      + `<span class="ck${on ? " on" : ""}">${on ? "✓" : "·"}</span> ${rot}</div>`;
+  }).join("");
+}
+async function telaoColunaAlternar(col) {
+  const el = document.querySelector(`.telao-col[data-col="${col}"]`);
+  if (!el) return;
+  const ck = el.querySelector(".ck");
+  const ligada = ck.classList.contains("on");
+  await telaoColunasDefinir(telaoColunasAtuais.filter(c => c !== col).concat(
+    ligada ? [] : [col]));
+}
+async function telaoColunasTodas(ligar) {
+  const todas = Object.keys(TELAO_COLUNAS_ROTULO);
+  await telaoColunasDefinir(ligar ? todas : [todas[0]]);
+}
+async function telaoColunasDefinir(lista) {
+  const unica = [...new Set(lista)];
+  if (!unica.length) { logMsg("mantenha ao menos uma coluna ligada", "l-aviso", "log-operador"); return; }
+  const r = await api("telao/colunas?colunas=" + encodeURIComponent(unica.join(",")));
+  if (r.ok) {
+    telaoColunasAtuais = r.colunas;
+    carregarTelaoColunas();
+    logMsg(`colunas do telão: ${r.colunas.length} ligada(s)`, "l-sistema", "log-operador");
+  } else if (r.erro) {
+    logMsg(`colunas do telão: ${r.erro}`, "l-aviso", "log-operador");
+  }
 }
 async function detectarPortas() {
   const r = await api("decoder/portas", "GET");
@@ -211,6 +297,9 @@ async function carregarSessoesCTAD() {
   if (anterior && [...sel.options].some(o => o.value === anterior)) sel.value = anterior;
 }
 // Telão em janela NATIVA do app (via Python); fora do app, cai no window.open.
+// Um único botão alterna abrir/fechar — o rótulo reflete o estado real.
+let telaoAberto = false;
+let janelaTelaoNavegador = null;   // fora do app (navegador): guarda a janela aberta
 function telaoNativo(segundaTela) {
   try {
     const api = window.pywebview && window.pywebview.api;
@@ -220,13 +309,57 @@ function telaoNativo(segundaTela) {
   } catch (e) { return false; }
 }
 const abrirTelao = () => { if (!telaoNativo(false)) window.open("/telao", "_blank"); };
-function abrirTelaoSegundaTela() {
-  if (telaoNativo(true)) return;
-  const w = window.open("/telao", "telao-2", "noopener,noreferrer");
-  if (w) {
-    // Tenta maximizar na segunda tela
-    try { w.moveTo(screen.width, 0); w.resizeTo(screen.width, screen.height); } catch (e) {}
+async function telaoEstaAberto() {
+  try {
+    const api = window.pywebview && window.pywebview.api;
+    if (api && api.telao_aberto) return (await api.telao_aberto()) === "aberta";
+  } catch (e) {}
+  // fora do app: usa a referência da janela aberta por window.open
+  return !!(janelaTelaoNavegador && !janelaTelaoNavegador.closed);
+}
+function rotularBotaoTelao() {
+  const btn = document.getElementById("btn-telao-2");
+  if (!btn) return;
+  btn.textContent = telaoAberto ? "🛑 Fechar Telão 2ª Tela" : "🖥️ Abrir Telão 2ª Tela";
+  btn.title = telaoAberto
+    ? "Fecha a janela do telão aberta na 2ª tela"
+    : "Abre o telão em janela separada (2ª tela)";
+}
+async function sincronizarBotaoTelao() {
+  telaoAberto = await telaoEstaAberto();
+  rotularBotaoTelao();
+}
+async function abrirTelaoSegundaTela() {
+  // Se já está aberto, o botão fecha.
+  if (await telaoEstaAberto()) {
+    await fecharTelaoSegundaTela();
+    return;
   }
+  if (telaoNativo(true)) {
+    telaoAberto = true;
+    rotularBotaoTelao();
+    return;
+  }
+  janelaTelaoNavegador = window.open("/telao", "telao-2", "noopener,noreferrer");
+  if (janelaTelaoNavegador) {
+    // Tenta maximizar na segunda tela
+    try {
+      janelaTelaoNavegador.moveTo(screen.width, 0);
+      janelaTelaoNavegador.resizeTo(screen.width, screen.height);
+    } catch (e) {}
+  }
+  telaoAberto = !!janelaTelaoNavegador;
+  rotularBotaoTelao();
+}
+async function fecharTelaoSegundaTela() {
+  try {
+    const api = window.pywebview && window.pywebview.api;
+    if (api && api.fechar_telao) await api.fechar_telao();
+  } catch (e) {}
+  try { if (janelaTelaoNavegador && !janelaTelaoNavegador.closed) janelaTelaoNavegador.close(); } catch (e) {}
+  janelaTelaoNavegador = null;
+  telaoAberto = false;
+  rotularBotaoTelao();
 }
 const iniciarSessao = (tipo) => api("sessao/iniciar?tipo=" + tipo);
 const largada = () => {
@@ -283,11 +416,8 @@ function tratarEvento(ev) {
       const fr = document.getElementById("flag-volta-rapida");
       if (fr) { fr.classList.add("pisca"); setTimeout(() => fr.classList.remove("pisca"), 2500); }
       beepVolta();
-      // Acumular volta no modo simulador (non-gravada no BD) para atualização em tempo real
-      voltasSimulador.push({ numero: ev.numero, nome: ev.nome, tempo: ev.tempo });
-      // atualiza gráfico operator se a aba de voltas estiver visível
-      if (document.getElementById("op-voltas")) atualizarGraficoOperador();
       break;
+    case "admin":
       logMsg(`[admin] ${ev.msg}`, "l-admin", "log-operador");
       break;
     case "sync":
@@ -396,6 +526,136 @@ function renderSnapshot(s) {
     logMsg(`[${e.ts}] ${e.msg || e.tipo}${e.nome ? " " + e.nome : ""}`, classe, "log-operador");
     logMsg(`[${e.ts}] ${e.msg || e.tipo}${e.nome ? " " + e.nome : ""}`, classe, "log-dashboard");
   });
+}
+
+// Atalhos F1..F12: adicionar volta ao piloto da lista de corrida.
+// A lista e' montada pelo check-in (painel do operador); o tempo da volta e'
+// calculado pelo servidor (desde a ultima volta do piloto / desde o inicio).
+// Uma associação manual (Admin) tem prioridade sobre a ordem da lista.
+let atalhosTeclas = {};            // { "1": piloto_id, ... } vindo do servidor
+
+function atalhosManuais() {
+  return Object.keys(atalhosTeclas || {}).length > 0;
+}
+
+function pilotoPorId(id) {
+  return (checkinCache.pilotos || []).find(p => Number(p.id) === Number(id)) || null;
+}
+
+// Piloto associado à tecla F<n>: associação manual ou posição na lista de corrida.
+function pilotoDaTecla(n) {
+  if (atalhosManuais()) {
+    const id = atalhosTeclas[String(n)];
+    if (id === undefined || id === null || id === "") return null;
+    return pilotoPorId(id) || { id: Number(id), nome: `Piloto ${id}` };
+  }
+  return listaPilotosCorrida()[n - 1] || null;
+}
+
+document.addEventListener("keydown", (e) => {
+  if (e.ctrlKey || e.altKey || e.metaKey) return;
+  // não dispara enquanto o operador digita num campo de texto
+  const tag = (e.target && e.target.tagName || "").toLowerCase();
+  if (tag === "input" || tag === "select" || tag === "textarea") return;
+  const m = /^F(\d{1,2})$/.exec(e.key || "");
+  if (!m) return;
+  const n = parseInt(m[1], 10);
+  if (n < 1 || n > 12) return;
+  e.preventDefault();
+  adicionarVoltaPorAtalho(n);
+});
+
+async function adicionarVoltaPorAtalho(n) {
+  if (!sessaoAtiva) {
+    logMsg(`F${n}: nao ha sessao ativa`, "l-aviso", "log-operador");
+    return;
+  }
+  const piloto = pilotoDaTecla(n);
+  if (!piloto) {
+    logMsg(`F${n}: nenhum piloto associado a esta tecla`, "l-aviso", "log-operador");
+    return;
+  }
+  const r = await api(`sessao/volta-tecla?piloto_id=${piloto.id}`);
+  if (r.ok) {
+    logMsg(`F${n} -> volta de ${piloto.nome} (${r.tempo || "-"})`, "l-volta", "log-operador");
+    piscarAtalho(n);
+  } else {
+    logMsg(`F${n} -> ${r.erro || "nao foi possivel registrar a volta"}`, "l-erro", "log-operador");
+  }
+}
+
+function piscarAtalho(n) {
+  const el = document.querySelector(`[data-atalho="${n}"]`);
+  if (!el) return;
+  el.classList.add("flash");
+  setTimeout(() => el.classList.remove("flash"), 600);
+}
+
+// ---------------------------------------------------------------- associação F1..F12
+async function carregarAtalhosAssociados() {
+  try {
+    const r = await api("config/atalhos", "GET");
+    atalhosTeclas = (r && r.atalhos) || {};
+  } catch (e) {
+    atalhosTeclas = {};
+  }
+  renderAtalhos();
+}
+
+function abrirAssociacaoAtalhos() {
+  const modal = document.getElementById("modal-atalhos");
+  if (!modal) return;
+  const pilotos = (checkinCache.pilotos || []);
+  const lista = listaPilotosCorrida();
+  const html = [];
+  for (let n = 1; n <= 12; n++) {
+    const atual = atalhosTeclas[String(n)];
+    const opts = ['<option value="">— automático (pela lista) —</option>']
+      .concat(pilotos.map(p =>
+        `<option value="${p.id}"${Number(atual) === Number(p.id) ? " selected" : ""}>` +
+        `${_esc(p.nome)}${lista.some(x => x.id === p.id) ? " (na lista)" : ""}</option>`));
+    html.push(`<div class="atalho-assoc-linha">
+      <span class="atalho-tecla">F${n}</span>
+      <select data-tecla="${n}">${opts.join("")}</select>
+    </div>`);
+  }
+  const corpo = document.getElementById("modal-atalhos-corpo");
+  if (corpo) corpo.innerHTML = html.join("");
+  modal.style.display = "flex";
+}
+
+function fecharAssociacaoAtalhos() {
+  const modal = document.getElementById("modal-atalhos");
+  if (modal) modal.style.display = "none";
+}
+
+async function salvarAssociacaoAtalhos() {
+  const modal = document.getElementById("modal-atalhos");
+  if (!modal) return;
+  const mapa = {};
+  modal.querySelectorAll("select[data-tecla]").forEach(sel => {
+    if (sel.value) mapa[sel.dataset.tecla] = parseInt(sel.value, 10);
+  });
+  const r = await api("config/atalhos", "POST", "", mapa);
+  if (r.ok) {
+    atalhosTeclas = r.atalhos || {};
+    fecharAssociacaoAtalhos();
+    renderAtalhos();
+    logMsg(`atalhos: ${Object.keys(atalhosTeclas).length} tecla(s) associada(s)`,
+      "l-sistema", "log-operador");
+  } else {
+    alert("Erro ao salvar os atalhos: " + (r.erro || "desconhecido"));
+  }
+}
+
+async function resetarAssociacaoAtalhos() {
+  if (!confirm("Voltar à associação automática (F1..F12 pela ordem do check-in)?")) return;
+  const r = await api("config/atalhos", "POST", "", {});
+  if (r.ok) {
+    atalhosTeclas = {};
+    renderAtalhos();
+    logMsg("atalhos: associação automática restaurada", "l-sistema", "log-operador");
+  }
 }
 
 function renderDecoder(d) {
@@ -585,8 +845,8 @@ function renderStatus(st) {
     sideSub.textContent = `${st.temperatura ?? "?"}°C · ${st.tensao ?? "?"}V · ruído ${st.ruido ?? "?"}`;
 }
 
-const HEADER_OP = "<tr><th>Pos</th><th>Nº</th><th>Abr</th><th>Piloto</th><th>Voltas</th><th>Total</th><th>Intervalo</th><th>Gap</th><th>Última</th><th>Melhor</th><th>km/h</th><th>Média</th><th>Desvio</th><th>Consist.</th><th>Transponder</th><th>Ações</th></tr>";
-const VAZIO_OP = '<tr><td colspan="16" style="color:var(--text-muted)">nenhuma volta registrada</td></tr>';
+const HEADER_OP = "<tr><th>Pos</th><th>Nº</th><th>Abr</th><th>Piloto</th><th>Voltas</th><th>Total</th><th>Intervalo</th><th>Gap</th><th>Última</th><th>Melhor</th><th>km/h</th><th>Média</th><th>Média N</th><th>Desvio</th><th>Consist.</th><th>Transponder</th><th>Ações</th></tr>";
+const VAZIO_OP = '<tr><td colspan="17" style="color:var(--text-muted)">nenhuma volta registrada</td></tr>';
 let linhaSel = null;
 
 function renderClassificacao(ev) {
@@ -596,7 +856,7 @@ function renderClassificacao(ev) {
        <td>${l.posicao}</td><td>${l.numero || "-"}</td><td>${l.abreviado || ""}</td>
        <td>${l.nome}${l.suspeita ? '<span class="gato">gato</span>' : ""}</td>
        <td>${l.voltas}</td><td>${l.tempo || "-"}</td><td>${l.intervalo || "-"}</td><td>${l.gap || ""}</td>
-       <td>${l.ultima || "-"}</td><td>${l.melhor || "-"}</td><td>${l.velocidade || "-"}</td><td>${l.media || "-"}</td>
+       <td>${l.ultima || "-"}</td><td>${l.melhor || "-"}</td><td>${l.velocidade || "-"}</td><td>${l.media || "-"}</td><td>${l.media_n || "-"}</td>
        <td>${l.desvio || "-"}</td><td>${l.consistencia || "-"}</td><td>${l.transponder ?? "-"}</td>
        <td><span class="acao" title="marcar gato" onclick="event.stopPropagation();marcarGato()">🚫</span> <span class="acao" title="apagar" onclick="event.stopPropagation();apagarVolta()">🗑</span></td></tr>`).join("");
 
@@ -651,9 +911,10 @@ function iniciarSessaoConfigurada() {
   const duracao = parseFloat(document.getElementById("cfg-duracao").value) || 10;
   const tmin = parseFloat(document.getElementById("cfg-tempo-minimo").value) || 0;
   const contador = parseInt(document.getElementById("cfg-contador").value, 10) || 10;
+  const mediaN = parseInt((document.getElementById("cfg-media-n") || {}).value, 10) || 0;
   api(`sessao/iniciar?tipo=${tipo}&tempo_minimo_s=${tmin}` +
       `&duracao=${duracao}&criterio=${encodeURIComponent(criterio)}` +
-      `&contador_s=${contador}`).then(r => {
+      `&contador_s=${contador}&media_n=${mediaN}`).then(r => {
     if (r.ok === false) { logMsg(`sessão: ${r.erro || "não iniciada"}`, "l-erro", "log-operador"); return; }
     logMsg(`sessão iniciada (${tipo}, ${duracao} min, contador ${contador}s)`, "l-sistema", "log-operador");
     abrirOperador();
@@ -764,51 +1025,6 @@ async function desenharGraficoOperador(idx) {
   } else if (idx === 4) {   // track view
     desenharTrackOperador(dados);
   }
-}
-
-function acumuladorVoltasSimulador() {
-  // retorna os dados das voltas simulador acumuladas, ou null se vazio
-  if (!voltasSimulador || !voltasSimulador.length) return null;
-  const pilotosMap = {};
-  voltasSimulador.forEach(v => {
-    if (!pilotosMap[v.nome]) pilotosMap[v.nome] = { nome: v.nome, voltas: [], melhor: Infinity };
-    const p = pilotosMap[v.nome];
-    p.voltas.push({ numero: v.numero, tempo: v.tempo });
-    if (v.tempo < p.melhor) p.melhor = v.tempo;
-  });
-  const pilotos = Object.values(pilotosMap).slice(0, 12);
-  // garantir ordem por número de voltas (mais voltas ao topo)
-  pilotos.sort((a, b) => b.voltas.length - a.voltas.length);
-  return { pilotos, dados: { pilotos } };
-}
-
-function atualizarGraficoOperador() {
-  const dados = acumuladorVoltasSimulador();
-  if (!dados) {
-    // fallback: busca no banco (comportamento original)
-    api("sessao/voltas", "GET").then(dados => {
-      if (dados && dados.pilotos && dados.pilotos.length) renderClassificacao(dados);
-    }).catch(() => {});
-    return;
-  }
-  // idx === 2 = melhor volat (barras), idx === 1 = posições volta a volta
-  // Aqui usaremos idx 2 (melhores voltas) pois temos os tempos
-  if (grafOpVoltas) grafOpVoltas.destroy();
-  const ctx = document.getElementById("op-voltas");
-  if (!ctx) return;
-  grafOpVoltas = new Chart(ctx, {
-    type: "bar",
-    data: {
-      labels: dados.pilotos.map(p => p.nome),
-      datasets: [{ label: "melhor volta (s)", data: dados.pilotos.map(p => p.melhor || 0),
-                   backgroundColor: CORES_OP.slice(0, dados.pilotos.length).map((c, i) => c) }]
-    },
-    options: { responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { display: false } },
-      scales: {
-        x: { ticks: { color: "#8492a6" }, grid: { color: "#1a2438" } },
-        y: { title: { display: true, text: "segundos", color: "#8492a6" }, ticks: { color: "#8492a6", precision: 0 }, grid: { color: "#1a2438" } } }
-  });
 }
 
 function desenharTrackOperador(dados) {
@@ -1784,7 +2000,166 @@ function adminSecao(btn, id) {
   if (id === "a-pista") carregarEditorPista();
   if (id === "a-relatorio") carregarRelatorioResumo();
   if (id === "a-voltas") carregarHistorico();
+  if (id === "a-auditoria") carregarAuditoria();
   if (id === "a-notificacoes") carregarNotificacoes();
+}
+
+// ---------------------------------------------------------------- ferramenta de auditoria (baterias CTAD)
+let auditoriaCache = [];
+let auditoriaAtual = null;
+let auditoriaRegistro = null;
+
+async function carregarAuditoria() {
+  const r = await api("auditoria/baterias", "GET");
+  if (!r.ok) {
+    document.getElementById("lista-auditoria").innerHTML = `<p class="hint" style="color:var(--accent-red)">${r.erro || "erro"}</p>`;
+    return;
+  }
+  auditoriaCache = r.baterias || [];
+  filtrarAuditoria();
+}
+
+function filtrarAuditoria() {
+  const q = (document.getElementById("busca-auditoria")?.value || "").toLowerCase();
+  const lista = auditoriaCache.filter(b =>
+    !q || `${b.chave} ${b.sessao} ${b.pistaId}`.toLowerCase().includes(q));
+  document.getElementById("lista-auditoria").innerHTML = lista.map(b => {
+    const quando = b.uploadedAt ? new Date(b.uploadedAt).toLocaleString("pt-BR") : "—";
+    return `<div class="item-sessao ${auditoriaAtual === b.chave ? "on" : ""}" onclick="abrirAuditoria('${b.chave}')">
+      <div class="t">${_esc(b.sessao || b.chave)}</div>
+      <div class="m">${b.chave} · ${b.dados_n || 0} pilotos · ${quando}</div>
+    </div>`;
+  }).join("") || '<p class="hint">nenhuma bateria encontrada</p>';
+}
+
+async function abrirAuditoria(chave) {
+  auditoriaAtual = chave;
+  filtrarAuditoria();
+  const r = await api(`auditoria/bateria/${encodeURIComponent(chave)}`, "GET");
+  if (!r.ok) {
+    document.getElementById("auditoria-conteudo").innerHTML = `<p class="hint" style="color:var(--accent-red)">${r.erro || "erro"}</p>`;
+    return;
+  }
+  auditoriaRegistro = JSON.parse(JSON.stringify(r.registro || {}));
+  document.getElementById("auditoria-titulo").textContent = `Auditoria — ${r.registro?.sessao || chave}`;
+  document.getElementById("acoes-auditoria").style.display = "flex";
+  renderAuditoria();
+}
+
+function renderAuditoria() {
+  const reg = auditoriaRegistro || {};
+  const dados = reg.dados || [];
+  if (!dados.length) {
+    document.getElementById("auditoria-conteudo").innerHTML = '<p class="hint">Sem pilotos nesta bateria</p>';
+    return;
+  }
+  let html = `<div style="margin-bottom:10px; display:flex; gap:8px; flex-wrap:wrap">
+    <button class="btn-mini" onclick="auditoriaRecalcular()">🔁 Recalcular estatísticas</button>
+  </div>`;
+  dados.forEach((d, idx) => {
+    const laps = d.laps || [];
+    html += `<div class="card" style="margin-bottom:12px" data-aud-idx="${idx}">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px">
+        <div><b>${_esc(d.piloto || ("Piloto " + (idx+1)))}</b> · <span class="hint">${d.pos || ""} · ${laps.length} volta(s)</span></div>
+        <div style="display:flex; gap:6px">
+          <button class="btn-mini" onclick="auditoriaMover(${idx}, -1)">⬆ Mover</button>
+          <button class="btn-mini" onclick="auditoriaMover(${idx}, 1)">⬇ Mover</button>
+        </div>
+      </div>
+      <div class="tabela-wrap">
+        <table class="tabela-voltas" style="min-width:600px">
+          <tr><th>#</th><th>Tempo (s)</th><th>Ações</th></tr>
+          ${laps.map((t, lidx) => `<tr>
+            <td>${lidx+1}º</td>
+            <td><input type="number" step="0.001" value="${t}" style="width:110px" onchange="auditoriaEditarLap(${idx}, ${lidx}, this.value)"></td>
+            <td><button class="btn-mini perigo" onclick="auditoriaRemoverLap(${idx}, ${lidx})">🗑 Eliminar volta</button></td>
+          </tr>`).join("")}
+        </table>
+      </div>
+      <div style="margin-top:6px; font-size:12px" class="hint">Melhor: ${d.melhorVoltaTxt || "-"} · Média: ${d.mediaTxt || "-"} · Desvio: ${d.desvio || "-"}</div>
+    </div>`;
+  });
+  document.getElementById("auditoria-conteudo").innerHTML = html;
+}
+
+function auditoriaRemoverLap(pIdx, lIdx) {
+  if (!auditoriaRegistro) return;
+  const laps = auditoriaRegistro.dados[pIdx].laps || [];
+  if (laps.length <= 1 && !confirm("Remover a última volta deste piloto?")) return;
+  laps.splice(lIdx, 1);
+  auditoriaRegistro.dados[pIdx].laps = laps;
+  auditoriaRecalcular();
+  renderAuditoria();
+}
+
+function auditoriaEditarLap(pIdx, lIdx, val) {
+  if (!auditoriaRegistro) return;
+  let v = parseFloat(val);
+  if (isNaN(v) || v <= 0) { alert("Tempo inválido"); renderAuditoria(); return; }
+  auditoriaRegistro.dados[pIdx].laps[lIdx] = Math.round(v * 1000) / 1000;
+  auditoriaRecalcular();
+  renderAuditoria();
+}
+
+function auditoriaMover(pIdx, dir) {
+  if (!auditoriaRegistro) return;
+  const arr = auditoriaRegistro.dados;
+  const novo = pIdx + dir;
+  if (novo < 0 || novo >= arr.length) return;
+  const tmp = arr[pIdx]; arr[pIdx] = arr[novo]; arr[novo] = tmp;
+  renderAuditoria();
+}
+
+function auditoriaRecalcular() {
+  if (!auditoriaRegistro) return;
+  const dados = auditoriaRegistro.dados || [];
+  for (let d of dados) {
+    let laps = [];
+    for (let l of (d.laps || [])) {
+      let v = parseFloat(l);
+      if (!isNaN(v) && v > 0) laps.push(Math.round(v * 1000) / 1000);
+    }
+    d.laps = laps;
+    const n = laps.length;
+    d.voltasTotais = n;
+    if (n == 0) {
+      d.melhorVoltaVal = null; d.melhorVoltaTxt = "-";
+      d.mediaVal = null; d.mediaTxt = "-";
+      d.desvioVal = null; d.desvio = "-";
+      continue;
+    }
+    const melhor = Math.min(...laps);
+    const media = laps.reduce((a,b)=>a+b,0)/n;
+    const desvio = Math.sqrt(laps.reduce((s,t)=>s + Math.pow(t-media,2), 0)/n);
+    d.melhorVoltaVal = Math.round(melhor*1000)/1000;
+    d.melhorVoltaTxt = melhor.toFixed(3).replace(".", ",") + "s";
+    d.mediaVal = Math.round(media*1000)/1000;
+    d.mediaTxt = media.toFixed(3).replace(".", ",") + "s";
+    d.desvioVal = Math.round(desvio*1000)/1000;
+    d.desvio = "±" + desvio.toFixed(3).replace(".", ",") + "s";
+  }
+  dados.sort((a,b) => {
+    const va = a.voltasTotais || 0, vb = b.voltasTotais || 0;
+    if (vb != va) return vb - va;
+    const ma = a.melhorVoltaVal == null ? 999999 : a.melhorVoltaVal;
+    const mb = b.melhorVoltaVal == null ? 999999 : b.melhorVoltaVal;
+    return ma - mb;
+  });
+  dados.forEach((d,i) => { d.pos = (i+1) + "º"; });
+}
+
+async function salvarAuditoria() {
+  if (!auditoriaAtual || !auditoriaRegistro) return;
+  if (!confirm("Salvar alterações nesta bateria no CTAD?")) return;
+  auditoriaRecalcular();
+  renderAuditoria();
+  const r = await api(`auditoria/bateria/${encodeURIComponent(auditoriaAtual)}`, "POST", "", { registro: auditoriaRegistro });
+  if (r.ok) {
+    alert("Bateria atualizada com sucesso!");
+    carregarAuditoria();
+  } else {
+    alert("Erro ao salvar: " + (r.erro || "desconhecido"));
+  }
 }
 
 // ---------------------------------------------------------------- busca global (topbar)
@@ -2248,6 +2623,41 @@ async function carregarCheckin() {
   if (sel) sel.innerHTML = checkinCache.pilotos.map(x => `<option value="${x.id}">${_esc(x.nome)}</option>`).join("");
   renderCheckin();
 }
+// Lista de pilotos da corrida (base do atalho F1..F12).
+// Se o check-in tiver alguém marcado, entram só eles; se ninguém estiver
+// marcado, entram todos os pilotos ativos (mesma regra do servidor).
+function listaPilotosCorrida() {
+  const todos = checkinCache.pilotos || [];
+  const presentes = checkinCache.presentes || [];
+  const ids = presentes.length ? presentes : todos.map(p => p.id);
+  return todos.filter(p => ids.includes(p.id)).slice(0, 12);
+}
+
+// Botoes de atalho: um por piloto/tecla associada (F1..F12).
+function renderAtalhos() {
+  const el = document.getElementById("op-atalhos");
+  if (!el) return;
+  const manual = atalhosManuais();
+  const itens = [];
+  for (let n = 1; n <= 12; n++) {
+    const p = pilotoDaTecla(n);
+    if (!p) continue;
+    itens.push(`
+      <button class="atalho-btn" data-atalho="${n}" onclick="adicionarVoltaPorAtalho(${n})"
+              title="Registrar volta de ${_esc(p.nome)} (tecla F${n})">
+        <span class="atalho-tecla">F${n}</span>
+        <span class="atalho-nome">${_esc(p.nome)}</span>
+      </button>`);
+  }
+  if (!itens.length) {
+    el.innerHTML = manual
+      ? '<p class="hint">nenhuma tecla associada — use “Associar teclas a pilotos”</p>'
+      : '<p class="hint">marque os pilotos no check-in acima para montar a lista de corrida</p>';
+    return;
+  }
+  el.innerHTML = itens.join("");
+}
+
 function renderCheckin() {
   const el = document.getElementById("op-checkin");
   if (!el) return;
@@ -2261,6 +2671,7 @@ function renderCheckin() {
   }).join("") || '<p class="hint">nenhum piloto</p>';
   const n = document.getElementById("op-checkin-n");
   if (n) n.textContent = checkinCache.presentes.length;
+  renderAtalhos();
 }
 async function toggleCheckin(id, presente) {
   const r = await api(`checkin?piloto_id=${id}&presente=${presente}`);
@@ -2270,29 +2681,6 @@ async function marcarTodosCheckin(todos) {
   const ids = todos ? checkinCache.pilotos.map(p => p.id) : [];
   const r = await api("checkin/lote", "POST", "", { presentes: ids });
   if (r.ok) { checkinCache.presentes = r.presentes; renderCheckin(); }
-}
-function checkinToggleForm() {
-  const f = document.getElementById("op-checkin-form");
-  if (!f) return;
-  const abrir = f.style.display === "none";
-  f.style.display = abrir ? "" : "none";
-  if (abrir) {
-    const n = document.getElementById("op-checkin-novo-nome");
-    if (n) n.focus();
-  }
-}
-async function checkinAdicionarPiloto() {
-  const nome = (document.getElementById("op-checkin-novo-nome").value || "").trim();
-  if (!nome) { alert("Informe o nome do piloto."); return; }
-  const transp = (document.getElementById("op-checkin-novo-transp").value || "").trim();
-  const params = `nome=${encodeURIComponent(nome)}&transponders=${encodeURIComponent(transp)}`;
-  const r = await api(`pilotos/criar?${params}`);
-  if (!r.ok) { alert(`Não foi possível salvar: ${r.erro || "erro"}`); return; }
-  logMsg(`piloto criado no check-in: ${nome}`, "l-sistema", "log-operador");
-  document.getElementById("op-checkin-novo-nome").value = "";
-  document.getElementById("op-checkin-novo-transp").value = "";
-  await carregarCheckin();
-  if (r.id) await toggleCheckin(r.id, true);   // já marca na pista
 }
 async function anunciarGerente() {
   const texto = document.getElementById("ger-anuncio").value.trim();
@@ -2358,6 +2746,9 @@ function tipoSessaoMudou() {
   const tipo = document.getElementById("cfg-tipo").value;
   const camp = tipo === "campeonato";
   if (escolha) escolha.style.display = camp ? "block" : "none";
+  // o card "Campeonato em andamento" só faz sentido no tipo Campeonato
+  const cardCamp = document.getElementById("card-camp-ativo");
+  if (cardCamp) cardCamp.style.display = camp ? "block" : "none";
   if (camp) carregarCampeonatosOperador();
   // Treino livre por padrão: tempo corre pra cima, sem limite.
   // (Ao sair do treino, volta para "Tempo" se estava em livre.)
@@ -2658,6 +3049,16 @@ async function encerrarCampeonato() {
 
 
 // ---------------------------------------------------------------- atualizações
+// Preenche a versão em todos os pontos da interface (rodapés e card "Sobre").
+// O valor vem do servidor (fonte única: empacotamento/versao.json), então a
+// tela nunca mostra uma versão diferente da que está rodando.
+function aplicarVersaoInterface(versao) {
+  if (!versao) return;
+  document.querySelectorAll(".js-versao").forEach(el => { el.textContent = "v" + versao; });
+  const el = document.getElementById("upd-versao");
+  if (el) el.textContent = versao;
+}
+
 async function verificarVersao() {
   const st = document.getElementById("upd-status");
   const versaoEl = document.getElementById("upd-versao");
@@ -2666,7 +3067,7 @@ async function verificarVersao() {
   // restaura o repositório salvo no campo (sem apagar o que está sendo digitado)
   const repo = document.getElementById("upd-repo");
   if (repo && !repo.value && r.repo) repo.value = r.repo;
-  if (versaoEl && r.versao_atual) versaoEl.textContent = r.versao_atual;
+  if (r.versao_atual) aplicarVersaoInterface(r.versao_atual);
   if (!st) return;
   if (r.disponivel) {
     const mb = r.arquivos?.windows?.tamanho;
@@ -2836,8 +3237,14 @@ atualizarBotaoPausa();
 carregarAutoConectar();
 carregarVozContagem();
 carregarTelaoTela();
+carregarTelaoColunas();
+// Se o bridge do pywebview ficar pronto depois do load, repopula o seletor.
+window.addEventListener("pywebviewready", () => carregarTelaoTela());
+sincronizarBotaoTelao();          // botão do telão reflete se já está aberto
+setInterval(sincronizarBotaoTelao, 2000);   // + ESC dentro do telão atualiza o botão
 conectarWS();
 carregarCheckin();   // painel do operador: checkboxes de quem está na pista
+carregarAtalhosAssociados();   // F1..F12: associação manual (se houver)
 carregarNotificacoes();
 mostrar("operador");
 gerarQRSessao();
