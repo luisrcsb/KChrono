@@ -1757,10 +1757,12 @@ function rotuloVelocidade() {
 }
 
 function ajustesSom() {
+  const vol = parseInt((document.getElementById("som-volume") || {}).value, 10);
+  const vel = parseInt((document.getElementById("som-velocidade") || {}).value, 10);
   return {
-    volume: parseInt(document.getElementById("som-volume").value, 10) / 100,
-    velocidade: parseInt(document.getElementById("som-velocidade").value, 10),
-    voz: document.getElementById("som-voz").value || null,
+    volume: Number.isFinite(vol) ? vol / 100 : 0.9,
+    velocidade: Number.isFinite(vel) ? vel : 180,
+    voz: (document.getElementById("som-voz") || {}).value || null,
   };
 }
 
@@ -2006,6 +2008,7 @@ async function testarBipVai() {
 }
 
 async function salvarSom(silencioso) {
+  if (!document.getElementById("som-volume")) return;   // seção ainda não carregada
   const frases = {};
   document.querySelectorAll("#som-frases input[id^='frase-']").forEach(inp => {
     frases[inp.id.replace("frase-", "")] = inp.value;
