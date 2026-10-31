@@ -348,21 +348,24 @@ class MotorCorrida:
         return True
 
     def adicionar_volta(self, piloto_id: int, tempo_us: int,
-                        numero_volta: Optional[int] = None) -> bool:
+                        numero_volta: Optional[int] = None) -> Optional[Volta]:
         """Insere uma volta manual (correção do gerente) para o piloto.
 
         A volta entra no fim (ou no número indicado) e é gravada no banco,
-        para aparecer na classificação e nos gráficos.
+        para aparecer na classificação e nos gráficos. Devolve a volta
+        criada (ou None em caso de falha) — o chamador usa o objeto para
+        publicar eventos e disparar a locução/bipes como nas passagens
+        reais do transponder.
         """
         estado = self._pilotos.get(piloto_id)
         if not estado or tempo_us <= 0:
-            return False
+            return None
         melhor = estado.melhor_volta_us is None or tempo_us < estado.melhor_volta_us
         numero = numero_volta or (len(estado.voltas) + 1)
         volta = Volta(sessao_id=self.sessao_id, piloto_id=piloto_id,
                       numero=numero, tempo_us=tempo_us, melhor=melhor)
         if self.banco and not self.banco.registrar_volta(volta):
-            return False
+            return None
         estado.voltas.append(volta)
         estado.voltas.sort(key=lambda v: v.numero)
         if melhor:
@@ -370,15 +373,15 @@ class MotorCorrida:
                 v.melhor = (v is volta)
         log.info("volta manual #%s (%d us) adicionada para %s",
                  numero, tempo_us, estado.nome)
-        return True
+        return volta
 
     def adicionar_volta_por_tecla(self, piloto_id: int, agora_us: Optional[int] = None,
-                                  base_us: Optional[int] = None) -> Optional[int]:
+                                  base_us: Optional[int] = None) -> Optional[Volta]:
         """Atalho F1..F12: registra a volta do piloto usando o tempo desde a
         última volta dele (ou desde o início da sessão, se for a primeira).
 
-        Devolve o tempo da volta em microssegundos, ou None se não der
-        para registrar (piloto fora da sessão / tempo inválido).
+        Devolve a volta criada, ou None se não der para registrar (piloto
+        fora da sessão / tempo inválido).
         """
         estado = self._pilotos.get(piloto_id)
         if not estado:
@@ -391,7 +394,8 @@ class MotorCorrida:
         tempo_us = int(agora_us - referencia)
         if tempo_us <= 0:
             return None
-        if not self.adicionar_volta(piloto_id, tempo_us):
+        volta = self.adicionar_volta(piloto_id, tempo_us)
+        if not volta:
             return None
         self._ultimo_passo_us[piloto_id] = agora_us
-        return tempo_us
+        return volta

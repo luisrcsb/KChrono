@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>KChrono — Precision Timing System</title>
-<link rel="stylesheet" href="/static/estilo.css?v=1.0.9">
+<link rel="stylesheet" href="/static/estilo.css?v=1.0.10">
 <link rel="icon" href="/imagens/KCHRONO-LOGO.png">
 <script src="/static/chart.umd.min.js"></script>
 </head>
@@ -53,7 +53,7 @@
       <img id="side-qr-img" alt="QR Code de Gestão Remota" style="display:none">
       <div class="side-qr-info" id="side-qr-info">gerando…</div>
     </div>
-    <div class="admin-rodape"><span id="ws-status">Desconectado do servidor</span><br>KChrono <span class="js-versao">v1.0.9</span><br>por Raphael Belowodski</div>
+    <div class="admin-rodape"><span id="ws-status">Desconectado do servidor</span><br>KChrono <span class="js-versao">v1.0.10</span><br>por Raphael Belowodski</div>
   </aside>
   <div class="corpo">
 
@@ -213,32 +213,19 @@
       </div>
     </div>
 
-    <!-- console + abas -->
+    <!-- console + volta-a-volta -->
     <div class="grid g2">
       <div class="card">
         <h3>Console de eventos</h3>
         <div class="console-op" id="log-operador"></div>
       </div>
       <div class="card">
-        <div class="abas">
-          <button class="on" onclick="aba(this,0)">Tempos</button>
-          <button onclick="aba(this,1)">Gráfico Posições</button>
-          <button onclick="aba(this,2)">Voltas Rápidas</button>
-          <button onclick="aba(this,3)">Melhores</button>
-          <button onclick="aba(this,4)">Track View</button>
+        <h3>Volta-a-volta
+          <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--text-main)">
+            — tempos de cada volta por piloto e gap para o líder</span></h3>
+        <div class="volta-volta-wrap" id="volta-a-volta">
+          <p class="hint">aguardando a primeira volta…</p>
         </div>
-        <div class="aba-conteudo on" id="aba-0">
-          <div class="tabela-wrap">
-            <table class="tabela-op" style="min-width:520px" id="tabela-voltas">
-              <tr><th>Piloto</th><th>Voltas</th><th>Tempo</th></tr>
-              <tr><td colspan="3" style="color:var(--text-muted)">sem voltas na sessão</td></tr>
-            </table>
-          </div>
-        </div>
-        <div class="aba-conteudo" id="aba-1"><canvas id="op-posicoes"></canvas></div>
-        <div class="aba-conteudo" id="aba-2"><canvas id="op-voltas"></canvas></div>
-        <div class="aba-conteudo" id="aba-3"><div class="placeholder-aba">🏆 Melhores resultados da pista (recorde por categoria) — chega com os campeonatos (Fase 5)</div></div>
-        <div class="aba-conteudo" id="aba-4"><canvas id="op-track"></canvas></div>
       </div>
     </div>
   </div>
@@ -288,12 +275,7 @@
             <button class="btn-mini" onclick="edLimpar()">🗑 Limpar</button>
           </div>
 
-          <canvas id="ed-canvas"
-                  style="width:100%; height:430px; display:block; background:#0d1424;
-                         border:1px solid var(--border, #1a2438); border-radius:8px;
-                         cursor:crosshair; touch-action:none"></canvas>
-
-          <div class="acoes" style="margin-top:10px; flex-wrap:wrap">
+          <div class="acoes" style="margin-bottom:8px; flex-wrap:wrap">
             <label class="rot">vértice <b id="ed-sel-info">nenhum</b></label>
             <label class="rot">raio da curva (m)
               <input type="range" id="ed-raio" min="0" max="250" step="1" value="0"
@@ -301,9 +283,6 @@
             </label>
             <span id="ed-angulo-info" class="hint"></span>
             <button class="btn-mini" onclick="edCurvaAuto()">✨ Curva automática (sistema escolhe o raio)</button>
-          </div>
-
-          <div class="acoes" style="margin-top:8px; flex-wrap:wrap">
             <button class="btn-mini" onclick="edLargada()">📍 Marcar largada no vértice</button>
             <button class="btn-mini" onclick="edGrid()">🏁 Marcar grid no vértice</button>
             <label class="rot">colunas
@@ -313,6 +292,12 @@
               <input type="number" id="ed-grid-vagas" value="10" min="2" max="60" style="width:60px"
                      onchange="edGridOpcoes()"></label>
           </div>
+
+          <canvas id="ed-canvas"
+                  style="width:100%; height:calc(100vh - 300px); min-height:460px; display:block;
+                         background:#0d1424; border:1px solid var(--border, #1a2438);
+                         border-radius:8px; cursor:crosshair; touch-action:none"></canvas>
+
           <p class="hint" style="margin-top:10px">
             <b>Como usar:</b> clique no canvas para criar as retas (ângulo encaixa em 45°/90°;
             <i>livre</i> desliga o encaixe). Selecione um vértice e clique em
@@ -533,6 +518,20 @@
 
       <!-- ============ NOTIFICAÇÕES ============ -->
       <div class="admin-sec" id="a-notificacoes">
+        <div class="admin-secao-tit">O que é esta ferramenta</div>
+        <div class="card">
+          <h3>Notificações do KChrono</h3>
+          <p class="hint" style="font-size:12.5px; line-height:1.55">
+            As notificações são os <b>avisos rápidos</b> que aparecem no sino <b>🔔</b> da barra
+            superior. Elas registram o que aconteceu na pista (decoder caiu, ghost lap, fila de
+            upload, novo recorde) para você conferir depois, sem precisar procurar no Console de
+            eventos. Nada é enviado para a internet: os avisos ficam só neste computador.</p>
+          <p class="hint" style="font-size:12.5px; line-height:1.55">
+            <b>Eventos</b> liga/desliga cada tipo de aviso no sino. <b>Tocar som de alerta</b>
+            faz um bipe curto a cada notificação. <b>Notificações do navegador</b> mostra o aviso
+            também como balão do Windows, mesmo com o KChrono em segundo plano — para isso use
+            “Permitir no navegador”. As escolhas são salvas automaticamente.</p>
+        </div>
         <div class="admin-secao-tit">O que deve gerar notificação</div>
         <div class="grid g2">
           <div class="card">
@@ -1161,7 +1160,7 @@
       <!-- ============ SOBRE ============ -->
       <div class="admin-sec" id="a-sobre">
         <div class="grid g4">
-          <div class="card"><h3>Versão</h3><div class="big" id="upd-versao">1.0.9</div><div class="sub">Fases 0 → 7 concluídas · atualizações pelo GitHub</div></div>
+          <div class="card"><h3>Versão</h3><div class="big" id="upd-versao">1.0.10</div><div class="sub">Fases 0 → 7 concluídas · atualizações pelo GitHub</div></div>
           <div class="card"><h3>Drivers</h3><div class="big" style="font-size:20px">P3 · EASYLAP · LapWiz</div><div class="sub">TCP · serial · Bluetooth</div></div>
           <div class="card"><h3>Stack</h3><div class="big" style="font-size:20px">Python · FastAPI</div><div class="sub">SQLite · WebSocket · vanilla JS</div></div>
           <div class="card"><h3>Atualizações</h3><div class="sub" id="upd-status">aguardando verificação…</div>
@@ -1177,8 +1176,8 @@
               <button class="btn-slide" onclick="encerrarApp()">⏹ Sair</button>
             </div>
             <p class="hint">Publique a versão nova como <b>release no GitHub</b> com tag igual à
-              versão (ex.: <code>v1.0.9</code>) — a CI anexa sozinha o instalador
-              <code>KChrono-Setup-1-0-9.exe</code>
+              versão (ex.: <code>v1.0.10</code>) — a CI anexa sozinha o instalador
+              <code>KChrono-Setup-1-0-10.exe</code>
               (Windows), o <code>KChrono-*.AppImage</code> (Linux) e a ISO da live. "Instalar agora"
               baixa, fecha o app e atualiza em silêncio — ao reabrir já é a versão nova (os dados
               ficam intactos).</p>
@@ -1186,7 +1185,6 @@
         </div>
         <div class="admin-secao-tit">Créditos</div>
         <div class="card sobre-credito">
-          <img src="/imagens/Raphael.jpeg" alt="Raphael Belowodski" class="credito-foto">
           <div>
             <div class="credito-nome">Raphael Belowodski</div>
             <div class="credito-cargo">Criador e desenvolvedor do KChrono</div>
@@ -1206,12 +1204,12 @@
   <div class="dir">
     <span id="rodape-sync">Sincronização CTAD: aguardando</span>
     <span class="pill novo">NOVIDADE</span>
-    <span>KChrono <span class="js-versao">v1.0.9</span> · por <b>Raphael Belowodski</b></span>
+    <span>KChrono <span class="js-versao">v1.0.10</span> · por <b>Raphael Belowodski</b></span>
   </div>
 </div>
 
-<script src="/static/tracado.js?v=1.0.9"></script>
-<script src="/static/app.js?v=1.0.9"></script>
+<script src="/static/tracado.js?v=1.0.10"></script>
+<script src="/static/app.js?v=1.0.10"></script>
 
 <!-- associação manual das teclas F1..F12 -->
 <div id="modal-atalhos" class="modal-fundo" style="display:none">

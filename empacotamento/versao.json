@@ -1,10 +1,10 @@
 {
-  "versao": "1.0.9",
+  "versao": "1.0.10",
   "canal": "estavel",
   "url_base": "",
-  "notas": "Versão 1.0.9 — correção do app.js (erro de sintaxe), atalhos F1-F12 com lista de corrida, classificação por média de N voltas consecutivas",
+  "notas": "Versão 1.0.10 — Volta-a-volta no painel do operador; atalhos F1-F12 para todos os pilotos do check-in (som e classificação); editor de pista com canvas ampliado e ferramentas no topo; Voz & Som com salvamento automático; notificações explicadas e com som; relógio do operador sincronizado com o telão; destaque da linha do piloto no telão a cada volta; foto do criador removida dos créditos",
   "arquivos": {
-    "windows": "KChrono-Setup-1-0-9.exe",
-    "linux": "KChrono-1.0.9-x86_64.AppImage"
+    "windows": "KChrono-Setup-1-0-10.exe",
+    "linux": "KChrono-1.0.10-x86_64.AppImage"
   }
 }

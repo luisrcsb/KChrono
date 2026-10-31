@@ -26,6 +26,7 @@ function beep(freq = 880, dur = 0.08, vol = 0.18) {
 function beepPassing() { beep(1200, 0.06, 0.15); }   // bip curto ao passar
 function beepVolta() { beep(880, 0.12, 0.22); }       // bip volta completada
 function beepRecorde() { beep(1500, 0.2, 0.25); }      // bip recorde
+function beepNotificacao() { beep(660, 0.1, 0.16); setTimeout(() => beep(990, 0.1, 0.16), 120); }
 
 // ---------------------------------------------------------------- navegação
 // Shell persistente: o menu lateral está sempre visível; aqui só alterna o
@@ -422,10 +423,12 @@ function tratarEvento(ev) {
       break;
     case "sync":
       logMsg(`[sync] ${ev.msg}`, "l-admin", "log-operador");
+      if (/enfileirad|fila|falh|erro/i.test(ev.msg || ""))
+        notificar("fila_upload", ev.msg, "📤");
       break;
     case "classificacao": renderClassificacao(ev); break;
     case "voltas":
-      if (abaOperadorAtiva && [1, 2, 4].includes(abaOperadorAtiva)) desenharGraficoOperador(abaOperadorAtiva);
+      renderVoltaAVolta(ev);
       break;
     case "ghost_lap":
       logMsg(`GHOST LAP descartado — transponder ${ev.transponder}`, "l-aviso", "log-operador");
@@ -503,10 +506,12 @@ function refreshDecoderPainel() {
 }
 
 let ultimaClassificacao = { linhas: [] };
+let ultimasVoltasData = { pilotos: [], parametros: {} };
 
 // ---------------------------------------------------------------- render
 function renderSnapshot(s) {
   ultimaClassificacao = { linhas: s.classificacao || [] };
+  ultimasVoltasData = s.voltas || { pilotos: [], parametros: {} };
   renderDecoder(s.decoder);
   renderSessao(s.sessao);
   const cp = document.getElementById("card-passings");
@@ -773,6 +778,8 @@ function renderSessao(s) {
     pausada: !!s.pausada, finalizada: s.estado === "finalizado",
     recebidoEm: Date.now(),
   };
+  // atualiza já (não espera o timer local, que pode estar freado em 2º plano)
+  tickRelogioSessao();
 }
 
 // cronômetro da sessão no display "Tempo" enquanto não há líder com voltas.
@@ -882,12 +889,8 @@ function renderClassificacao(ev) {
   set("disp-tempo", lider ? lider.tempo : "0:00.000");
   set("flag-primeiro", lider ? `1º: ${lider.nome.split(" ")[0]}` : "1º: —");
 
-  // aba "Tempos"
-  const tv = document.getElementById("tabela-voltas");
-  if (tv) {
-    tv.innerHTML = "<tr><th>Piloto</th><th>Voltas</th><th>Tempo</th></tr>" +
-      (linhas || '<tr><td colspan="3" style="color:var(--text-muted)">sem voltas na sessão</td></tr>');
-  }
+  // Volta-a-volta (matriz de tempos + gap)
+  renderVoltaAVolta();
 
   // líder da sessão (cartões de resumo)
   const el = document.getElementById("card-lider");
@@ -896,6 +899,75 @@ function renderClassificacao(ev) {
   if (sub) sub.textContent = lider ? `${lider.voltas} voltas · ${lider.melhor || "-"}` : "líder da sessão";
   const voltas = document.getElementById("d-voltas");
   if (voltas && lider) voltas.innerHTML = `${lider.voltas}<span class="un">voltas</span>`;
+}
+
+// "Volta-a-volta": todos os pilotos participantes lado a lado; cada coluna
+// lista os tempos das voltas (linhas) e o gap para o líder.
+function renderVoltaAVolta(dados) {
+  if (dados) ultimasVoltasData = dados;
+  const box = document.getElementById("volta-a-volta");
+  if (!box) return;
+  const voltasPorId = {};
+  (ultimasVoltasData.pilotos || []).forEach(p => {
+    voltasPorId[String(p.piloto_id ?? p.nome)] = p;
+  });
+  // classificação = todos os pilotos da sessão (mesmo os que ainda não voltaram)
+  const linhas = (ultimaClassificacao.linhas || []).slice();
+  if (!linhas.length) {
+    (ultimasVoltasData.pilotos || []).forEach(p => {
+      linhas.push({ piloto_id: p.piloto_id, nome: p.nome,
+                    voltas: (p.voltas || []).length, gap: "" });
+    });
+  }
+  if (!linhas.length) {
+    box.innerHTML = '<p class="hint">aguardando a primeira volta…</p>';
+    return;
+  }
+  const maxVoltas = Math.max(
+    0,
+    ...(ultimasVoltasData.pilotos || []).map(p => (p.voltas || []).length),
+    ...linhas.map(l => l.voltas || 0));
+  const cols = linhas.map(l => {
+    const dadosP = voltasPorId[String(l.piloto_id)] || {};
+    const porNum = {};
+    (dadosP.voltas || []).forEach(v => { porNum[v.numero] = v; });
+    const celulas = [];
+    for (let n = 1; n <= maxVoltas; n++) {
+      const v = porNum[n];
+      celulas.push(v
+        ? `<div class="vv-cel${v.melhor ? " vv-melhor" : ""}" title="volta ${n}">${fmtVolta(v.tempo)}</div>`
+        : '<div class="vv-cel vv-vazia">—</div>');
+    }
+    const gap = l.gap ? `<div class="vv-gap" title="gap para o líder">${_esc(l.gap)}</div>` : "";
+    return `<div class="vv-piloto">
+      <div class="vv-cab">
+        <div class="vv-pos">${l.posicao || ""}</div>
+        <div class="vv-nome" title="${_esc(l.nome)}">${_esc(l.nome)}</div>
+        <div class="vv-total">${l.voltas || 0} volta(s)</div>
+        ${gap}
+      </div>
+      ${celulas.join("")}
+    </div>`;
+  });
+  const numeros = [];
+  for (let n = 1; n <= maxVoltas; n++)
+    numeros.push(`<div class="vv-cel vv-num">${n}</div>`);
+  box.innerHTML = `<div class="vv-tabela">
+    <div class="vv-piloto vv-fixa">
+      <div class="vv-cab"><div class="vv-nome">Volta</div></div>
+      ${numeros.join("")}
+    </div>
+    ${cols.join("")}
+  </div>`;
+}
+
+function fmtVolta(t) {
+  if (t == null || isNaN(t)) return "—";
+  const ms = Math.round(t * 1000);
+  const m = Math.floor(ms / 60000);
+  const s = Math.floor((ms % 60000) / 1000);
+  const mm = String(ms % 1000).padStart(3, "0");
+  return `${m}:${String(s).padStart(2, "0")}.${mm}`;
 }
 
 function selecionarLinha(tr) {
@@ -1933,7 +2005,7 @@ async function testarBipVai() {
   else alert("Não foi possível testar: " + (r.erro || "erro"));
 }
 
-async function salvarSom() {
+async function salvarSom(silencioso) {
   const frases = {};
   document.querySelectorAll("#som-frases input[id^='frase-']").forEach(inp => {
     frases[inp.id.replace("frase-", "")] = inp.value;
@@ -1965,10 +2037,32 @@ async function salvarSom() {
   };
   const r = await api("som/salvar", "POST", "", { frases, habilitados, ...ajustesSom(), ...opcoes });
   if (r.ok) {
-    logMsg("preferências de voz/som salvas", "l-sistema", "log-operador");
-  } else {
+    if (!silencioso) logMsg("preferências de voz/som salvas", "l-sistema", "log-operador");
+  } else if (!silencioso) {
     alert(`Não foi possível salvar: ${r.erro || "erro"}`);
   }
+}
+
+// Toda mudança em Voz & Som é persistida automaticamente (config.json),
+// para valer também nas próximas vezes em que o programa for aberto.
+let _somAutoTimer = null;
+function somAutoSalvar() {
+  clearTimeout(_somAutoTimer);
+  _somAutoTimer = setTimeout(() => { salvarSom(true); }, 700);
+}
+function configurarAutoSalvarSom() {
+  const sec = document.getElementById("a-voz");
+  if (!sec || sec.dataset.autoSalvar === "1") return;
+  sec.dataset.autoSalvar = "1";
+  // checkboxes/selects/textos: salva ao confirmar a mudança
+  sec.addEventListener("change", (e) => {
+    if (e.target && e.target.closest("#a-voz")) somAutoSalvar();
+  });
+  // sliders e digitação: salva com debounce
+  sec.addEventListener("input", (e) => {
+    if (e.target && (e.target.type === "range" || e.target.tagName === "INPUT"))
+      somAutoSalvar();
+  });
 }
 
 async function anunciarPosicoes() {
@@ -2294,6 +2388,8 @@ function buscaIr(tipo, valor) {
 let notifPrefs = { decoder_offline: true, ghost_lap: true, fila_upload: true,
                    recorde: true, navegador: false, som_alerta: true };
 let notifLista = [];
+let _notifAutoTimer = null;
+let _notifListenersOk = false;
 
 async function carregarNotificacoes() {
   try {
@@ -2304,8 +2400,21 @@ async function carregarNotificacoes() {
     const el = document.getElementById("ntf-" + k);
     if (el) el.checked = !!notifPrefs[k];
   });
+  // qualquer mudança é salva sozinha (sem precisar clicar em "Salvar")
+  if (!_notifListenersOk) {
+    const sec = document.getElementById("a-notificacoes");
+    if (sec) {
+      sec.addEventListener("change", (e) => {
+        if (e.target && e.target.id && e.target.id.startsWith("ntf-")) {
+          clearTimeout(_notifAutoTimer);
+          _notifAutoTimer = setTimeout(() => salvarNotificacoes(true), 400);
+        }
+      });
+      _notifListenersOk = true;
+    }
+  }
 }
-async function salvarNotificacoes() {
+async function salvarNotificacoes(silencioso) {
   const vals = {};
   Object.keys(notifPrefs).forEach(k => {
     const el = document.getElementById("ntf-" + k);
@@ -2314,9 +2423,11 @@ async function salvarNotificacoes() {
   const r = await api("notificacoes", "POST", "", vals);
   if (r.ok) {
     notifPrefs = r.notificacoes;
-    logMsg("notificações: preferências salvas", "l-admin", "log-operador");
-    notificar("sistema", "Preferências de notificação salvas.", "🔔");
-  } else alert(r.erro || "erro");
+    if (!silencioso) {
+      logMsg("notificações: preferências salvas", "l-admin", "log-operador");
+      notificar("sistema", "Preferências de notificação salvas.", "🔔");
+    }
+  } else if (!silencioso) alert(r.erro || "erro");
 }
 function pedirPermissaoNotificacoes() {
   if (!("Notification" in window)) { alert("Este navegador não suporta notificações."); return; }
@@ -2331,6 +2442,9 @@ function notificar(tipo, texto, icone) {
                        ts: new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) });
   notifLista = notifLista.slice(0, 30);
   renderNotificacoes();
+  if (notifPrefs.som_alerta) {
+    try { beepNotificacao(); } catch (e) {}
+  }
   if (notifPrefs.navegador && "Notification" in window && Notification.permission === "granted") {
     try { new Notification("KChrono", { body: texto }); } catch (e) {}
   }
@@ -3236,6 +3350,7 @@ tipoSessaoMudou();   // treino começa em "Tempo livre" (conta pra cima, sem lim
 atualizarBotaoPausa();
 carregarAutoConectar();
 carregarVozContagem();
+configurarAutoSalvarSom();
 carregarTelaoTela();
 carregarTelaoColunas();
 // Se o bridge do pywebview ficar pronto depois do load, repopula o seletor.
@@ -3747,4 +3862,10 @@ function desenharPistaMini() {
   TC.desenhar(ctx, c.width = c.clientWidth, c.height = c.clientHeight, tracadaAtual);
 }
 
-window.addEventListener("resize", () => desenharPistaMini());
+window.addEventListener("resize", () => {
+  desenharPistaMini();
+  // o canvas do editor ocupa quase toda a tela — redesenha ao redimensionar
+  if (document.getElementById("a-pista")?.classList.contains("on")) {
+    try { edDesenhar(); } catch (e) {}
+  }
+});

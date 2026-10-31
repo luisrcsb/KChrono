@@ -147,6 +147,29 @@ label.btn-slide{line-height:1.4}
 .placeholder-aba{border:1px dashed var(--border-card); border-radius:8px; padding:26px;
   text-align:center; color:var(--text-muted); font-size:13px}
 
+/* ===== Volta-a-volta (matriz de tempos por piloto) ===== */
+.volta-volta-wrap{overflow:auto; max-height:300px; border:1px solid var(--border-card);
+  border-radius:8px; background:rgba(0,0,0,.18)}
+.vv-tabela{display:flex; align-items:stretch; min-width:max-content}
+.vv-piloto{display:flex; flex-direction:column; flex:none; min-width:104px;
+  border-right:1px solid var(--border-card)}
+.vv-piloto.vv-fixa{min-width:54px; position:sticky; left:0; z-index:2;
+  background:var(--bg-card,#141a24)}
+.vv-cab{padding:7px 8px; border-bottom:1px solid var(--border-card); min-height:70px;
+  display:flex; flex-direction:column; justify-content:center; gap:1px}
+.vv-pos{font-size:10px; color:var(--accent-gold); font-weight:700}
+.vv-nome{font-size:11.5px; font-weight:700; color:var(--text-title);
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:118px}
+.vv-total{font-size:10px; color:var(--text-muted)}
+.vv-gap{font-size:10.5px; color:var(--accent-gap,#ff8c42); font-variant-numeric:tabular-nums}
+.vv-cel{padding:5px 8px; font-size:11.5px; font-variant-numeric:tabular-nums;
+  text-align:right; border-bottom:1px solid rgba(255,255,255,.04); color:var(--text-main)}
+.vv-cel.vv-num{color:var(--text-muted); font-size:10px; text-align:center;
+  background:rgba(255,255,255,.03); border-bottom:1px solid rgba(255,255,255,.04)}
+.vv-cel.vv-vazia{color:#4a5568}
+.vv-cel.vv-melhor{color:var(--accent-green); font-weight:700}
+.vv-piloto:hover .vv-cab{background:rgba(58,134,255,.08)}
+
 /* ===== ADMIN (menu lateral, referência: Biblioteca da Steam) ===== */
 .admin-shell{display:flex; min-height:calc(100vh - 34px)}
 .menu{width:250px; background:#171a21; border-right:1px solid #000;

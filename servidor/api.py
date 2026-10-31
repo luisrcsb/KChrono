@@ -70,6 +70,8 @@ async def _auto_conectar_sync():
             log.warning("sync não reconectado no boot: %s", e)
     # auto-conexão do decoder em loop (checkbox 'Conectar ao abrir', padrão on)
     estado.iniciar_auto_conectar()
+    # tick do cronômetro para as janelas (operador/telão) — ver issue 8
+    estado.iniciar_tick_sessao()
     # aviso discreto de versão nova (uma vez por abertura, sem travar o boot)
     asyncio.create_task(_checar_atualizacao_boot())
 

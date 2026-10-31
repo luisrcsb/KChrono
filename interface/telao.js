@@ -94,7 +94,11 @@ function tratarEvento(ev) {
       break;
     case "sessao":
       renderSessao(ev);
-      atualizarClockViaStatus();   // o evento não traz tempo_s — busca a base
+      if (typeof ev.tempo_s === "number" || typeof ev.restante_s === "number") {
+        definirClock(ev.tempo_s, ev.pausada, ev.estado, ev.restante_s);
+      } else {
+        atualizarClockViaStatus();   // evento antigo sem tempo_s — busca a base
+      }
       if (ev.classificacao) renderClassificacao(ev.classificacao);
       break;
     case "bandeira":
@@ -107,6 +111,7 @@ function tratarEvento(ev) {
       // bip sonoro no telão a cada volta completada
       if (ev.recorde) beepRecorde();
       else beepVolta();
+      if (!ev.recorde) destacarVolta(ev.piloto_id);
       break;
     case "voltas":
       ultimasVoltas = ev;
@@ -277,7 +282,7 @@ function renderClassificacao(linhas) {
     const ritmoS = l.media && l.media !== "-"
       ? parseFloat(l.media.split(":")[0]) * 60 + parseFloat(l.media.split(":")[1]) : null;
     const estS = (totalS != null && ritmoS != null) ? totalS + ritmoS : null;
-    return `<tr class="${l.posicao === 1 ? "lider" : ""}">
+    return `<tr class="${l.posicao === 1 ? "lider" : ""}" data-piloto="${l.piloto_id}">
       <td class="pos" data-col="posicao">${l.posicao}º</td>
       <td data-col="numero">${l.numero || "-"}</td>
       <td data-col="piloto">${l.nome}${l.suspeita ? '<span class="badge" style="background:rgba(230,57,70,.2);color:#e63946">gato</span>' : ""}
@@ -298,6 +303,20 @@ function renderClassificacao(linhas) {
     corpo || '<tr><td colspan="13" style="color:var(--mut)">aguardando largada…</td></tr>';
   // o tbody foi reconstruído — reaplica as colunas escolhidas
   if (colunasTelaoAtuais) aplicarColunasTelao(colunasTelaoAtuais);
+}
+
+// Pisca o quadro (linha) do piloto quando uma volta é contada — junto com o bip.
+function destacarVolta(pilotoId) {
+  if (pilotoId == null) return;
+  const tr = document.querySelector(
+    `#tabela-telao tbody tr[data-piloto="${pilotoId}"]`);
+  if (!tr) return;
+  tr.classList.remove("volta-flash");
+  // reinicia a animação se a volta anterior ainda estiver piscando
+  void tr.offsetWidth;
+  tr.classList.add("volta-flash");
+  clearTimeout(tr._voltaFlashTimer);
+  tr._voltaFlashTimer = setTimeout(() => tr.classList.remove("volta-flash"), 1700);
 }
 
 // ---------------------------------------------------------------- gráficos

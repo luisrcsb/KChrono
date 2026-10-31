@@ -94,6 +94,9 @@ class EstadoApp:
         self._recorde_pessoal: Dict[int, int] = {}
         self._ultima_leitura_voltas = 0
         self._task_posicoes: Optional[asyncio.Task] = None
+        #: tick periódico do cronômetro da sessão (mantém operador e telão
+        #: sincronizados mesmo quando a janela em segundo plano é freada)
+        self._task_tick: Optional[asyncio.Task] = None
 
         # --- Gerente de pista: estado da pista + check-in dos pilotos ---
         #: bandeira atual: verde | amarela | vermelha | fechada
@@ -556,15 +559,20 @@ class EstadoApp:
             self.publicar("voltas", self.dados_voltas())
             self._anunciar_volta(volta)
 
-    def _som_passagem(self, passing):
-        """Bip a cada passagem; o líder da sessão tem um bip especial."""
+    def _som_passagem(self, passing=None, piloto_id=None):
+        """Bip a cada passagem; o líder da sessão tem um bip especial.
+
+        Vale tanto para passagens de transponder (``passing``) quanto para
+        voltas lançadas por atalho (``piloto_id``) — os sons são os mesmos.
+        """
         if not self.motor:
             return
         eh_lider = False
         if self.som.habilitado("lider"):
             try:
-                # o motor já resolveu/cacheou transponder -> piloto na passagem
-                piloto_id = self.motor._mapa_transponders.get(passing.transponder)
+                if piloto_id is None and passing is not None:
+                    # o motor já resolveu/cacheou transponder -> piloto na passagem
+                    piloto_id = self.motor._mapa_transponders.get(passing.transponder)
                 linhas = self.motor.classificacao()
                 if piloto_id is not None and linhas and piloto_id == linhas[0].piloto_id:
                     eh_lider = True
@@ -640,19 +648,21 @@ class EstadoApp:
                 self._anunciar_posicoes()
 
     def dados_voltas(self) -> Dict:
-        """Voltas volta a volta da sessão atual (para gráficos)."""
+        """Voltas volta a volta da sessão atual (para gráficos e Volta-a-volta)."""
         if not self.motor or not self.sessao_id:
             return {"pilotos": [], "parametros": self.parametros}
         voltas = self.banco.voltas_da_sessao(self.sessao_id)
-        por: Dict[str, list] = {}
+        por: Dict[int, Dict] = {}
         for v in voltas:
-            nome = self._piloto_nome(v.piloto_id)
-            por.setdefault(nome, []).append(
+            item = por.setdefault(v.piloto_id, {
+                "piloto_id": v.piloto_id,
+                "nome": self._piloto_nome(v.piloto_id),
+                "voltas": []})
+            item["voltas"].append(
                 {"numero": v.numero, "tempo": round(v.tempo_us / 1e6, 3),
                  "melhor": bool(v.melhor)})
-        pilotos = sorted(por.items(), key=lambda kv: -len(kv[1]))
-        return {"pilotos": [{"nome": n, "voltas": vs} for n, vs in pilotos],
-                "parametros": self.parametros}
+        pilotos = sorted(por.values(), key=lambda p: -len(p["voltas"]))
+        return {"pilotos": pilotos, "parametros": self.parametros}
 
     def _classificacao(self):
         comp_m = self._comprimento_pista_m()
@@ -719,6 +729,22 @@ class EstadoApp:
             self.motor.registrar_transponder(codigo, piloto_id)
         for piloto_id in {pid for _, pid in vinculos}:
             self.motor.vincular_piloto(piloto_id, self._piloto_nome(piloto_id))
+        # Todos os pilotos do evento entram no motor, mesmo sem transponder:
+        # sem isso os atalhos F1..F12 só funcionavam para quem tinha
+        # transponder e esses pilotos não apareciam na "Classificação ao vivo".
+        # Regra: se há check-in, entram os presentes; senão, todos os ativos
+        # (mesma regra usada pela lista de atalhos no painel do operador).
+        try:
+            todos = self.listar_pilotos()
+        except Exception:
+            todos = []
+        if self.presentes:
+            ids_sessao = [p["id"] for p in todos if p["id"] in self.presentes]
+        else:
+            ids_sessao = [p["id"] for p in todos if p.get("ativo", True)]
+        for piloto_id in ids_sessao:
+            if piloto_id not in self.motor._pilotos:
+                self.motor.vincular_piloto(piloto_id, self._piloto_nome(piloto_id))
         log.info("sessão %s (%s): %d vínculo(s) transponder->piloto, %d piloto(s) no motor",
                  self.sessao_id[:8], tipo, len(vinculos), len(self.motor._pilotos))
         self.motor.iniciar(TipoSessao(tipo))
@@ -744,8 +770,10 @@ class EstadoApp:
         self._recorde_pessoal = self.banco.melhores_por_piloto()
         self._ultima_leitura_voltas = 0
         self._iniciar_anuncios()
-        self.publicar("sessao", {"estado": self.motor.estado.value, "tipo": tipo,
-                                 "simulacao": self.sessao_simulacao})
+        self.publicar("sessao", {"id": self.sessao_id, "estado": self.motor.estado.value,
+                                 "tipo": tipo, "simulacao": self.sessao_simulacao,
+                                 "tempo_s": 0.0, "restante_s": None,
+                                 "pausada": False})
         return True
 
     def _resolver_transponder(self, transponder: int):
@@ -761,6 +789,44 @@ class EstadoApp:
             return
         if self._task_posicoes is None or self._task_posicoes.done():
             self._task_posicoes = asyncio.create_task(self._loop_posicoes())
+
+    # ------------------------------------------------- tick do cronômetro
+    def iniciar_tick_sessao(self):
+        """Inicia o envio periódico do estado do cronômetro para as janelas.
+
+        O WebView2 freia timers de janelas em segundo plano; quando o telão
+        (2ª tela) abre, o painel do operador deixava de animar o relógio.
+        Com o servidor empurrando o tempo a cada 0,5 s, o display continua
+        correto independentemente do timer local.
+        """
+        try:
+            asyncio.get_running_loop()
+        except RuntimeError:
+            return
+        if self._task_tick is None or self._task_tick.done():
+            self._task_tick = asyncio.create_task(self._loop_tick_sessao())
+
+    async def _loop_tick_sessao(self):
+        try:
+            while True:
+                await asyncio.sleep(0.5)
+                if not self.motor or not self.sessao_id:
+                    continue
+                estado = self.motor.estado.value
+                if estado in ("parado", "finalizado"):
+                    continue
+                self.publicar("sessao", {
+                    "id": self.sessao_id, "estado": estado,
+                    "tipo": self.motor.tipo.value if self.motor.tipo else None,
+                    "simulacao": self.sessao_simulacao,
+                    "pausada": self.pausado,
+                    "tempo_s": self.tempo_sessao_s(),
+                    "restante_s": self.restante_sessao_s(),
+                }, registrar=False)
+        except asyncio.CancelledError:
+            pass
+        except Exception as e:
+            log.debug("tick da sessão encerrado: %s", e)
 
     def _posicoes_durante_ok(self) -> bool:
         """Pode anunciar posições DURANTE a sessão?
@@ -854,8 +920,11 @@ class EstadoApp:
             self._pausa_inicio_us = None
             self._pausado_total_us = 0
             self.pausado = False
-            self.publicar("sessao", {"estado": "correndo",
-                                     "simulacao": self.sessao_simulacao})
+            self.publicar("sessao", {"id": self.sessao_id, "estado": "correndo",
+                                     "simulacao": self.sessao_simulacao,
+                                     "tempo_s": self.tempo_sessao_s(),
+                                     "restante_s": self.restante_sessao_s(),
+                                     "pausada": False})
             return True
         except RuntimeError:
             return False
@@ -908,8 +977,12 @@ class EstadoApp:
             self.som.pausada()
         else:
             self.som.retomada()
-        self.publicar("sessao", {"estado": "pausada" if pausar else "retomada",
-                                 "simulacao": self.sessao_simulacao})
+        self.publicar("sessao", {"id": self.sessao_id,
+                                 "estado": "pausada" if pausar else "retomada",
+                                 "simulacao": self.sessao_simulacao,
+                                 "tempo_s": self.tempo_sessao_s(),
+                                 "restante_s": self.restante_sessao_s(),
+                                 "pausada": self.pausado})
         return True
 
     def _tempo_sessao_us(self) -> Optional[int]:
@@ -1143,8 +1216,11 @@ class EstadoApp:
         self.pausado = False
         # bip forte e alto no verde — sinal sonoro da largada (sem locução)
         self.som.bip_largada()
-        self.publicar("sessao", {"estado": "correndo",
-                                 "simulacao": self.sessao_simulacao})
+        self.publicar("sessao", {"id": self.sessao_id, "estado": "correndo",
+                                 "simulacao": self.sessao_simulacao,
+                                 "tempo_s": self.tempo_sessao_s(),
+                                 "restante_s": self.restante_sessao_s(),
+                                 "pausada": False})
         self._publicar_semaforo({"fase": "verde", "acesas": 0, "numero": None,
                                  "restante_ms": 0, "total_ms": 0})
 
@@ -1221,8 +1297,11 @@ class EstadoApp:
                 self.publicar("sync", {"msg": "sessão enfileirada para o CTAD (auto-upload)"})
             except Exception as e:
                 log.warning("auto-upload falhou: %s", e)
-        self.publicar("sessao", {"estado": "finalizada",
+        self.publicar("sessao", {"id": self.sessao_id, "estado": "finalizada",
                                  "simulacao": self.sessao_simulacao,
+                                 "tempo_s": self.tempo_sessao_s(),
+                                 "restante_s": self.restante_sessao_s(),
+                                 "pausada": self.pausado,
                                  "classificacao": self._classificacao()})
         return True
 
@@ -1384,16 +1463,22 @@ class EstadoApp:
         """
         if not self.motor:
             return {"ok": False, "erro": "sem sessão ativa"}
-        tempo_us = self.motor.adicionar_volta_por_tecla(piloto_id)
-        if tempo_us is None:
+        volta = self.motor.adicionar_volta_por_tecla(piloto_id)
+        if volta is None:
             return {"ok": False,
                     "erro": "piloto fora da sessão (confira o check-in) ou tempo inválido"}
         nome = self._piloto_nome(piloto_id)
-        log.info("atalho: volta de %s registrada (%.3f s)", nome, tempo_us / 1e6)
+        log.info("atalho: volta de %s registrada (%.3f s)", nome, volta.tempo_s)
+        # Mesmo caminho de uma passagem real: bip (líder x passagem), evento
+        # "volta" (usado pelo telão para destacar a linha) e locução/recordes.
+        self._som_passagem(piloto_id=piloto_id)
         self.publicar("admin", {"msg": f"volta de {nome} via atalho"})
+        self.publicar("volta", {"piloto_id": piloto_id, "nome": nome,
+                                "numero": volta.numero, "tempo": volta.tempo_s})
         self.publicar("classificacao", {"linhas": self._classificacao()})
         self.publicar("voltas", self.dados_voltas())
-        return {"ok": True, "tempo_s": tempo_us / 1e6, "tempo": formatar(tempo_us),
+        self._anunciar_volta(volta)
+        return {"ok": True, "tempo_s": volta.tempo_s, "tempo": formatar(volta.tempo_us),
                 "piloto_id": piloto_id}
 
     # ----- associação tecla F1..F12 -> piloto -----
@@ -2752,6 +2837,7 @@ class EstadoApp:
             "tracada": self.tracado_pista(),
             "contadores": self.contadores,
             "classificacao": self._classificacao() if self.motor else [],
+            "voltas": self.dados_voltas(),
             "telao": self.telao_colunas(),
             "eventos": self.eventos[-30:],
             "campeonato": self.campeonato_estado(),

@@ -85,7 +85,7 @@ KChrono.exe --sem-janela    REM headless (serviço)
 1. Instale o [NSIS](https://nsis.sourceforge.io/).
 2. Abra `instalador.nsi` e compile (`makensis instalador.nsi`).
 3. Resultado: `empacotamento\KChrono-Setup-<versão>.exe` (ex.:
-   `KChrono-Setup-1-0-9.exe` — a versão entra no nome com hífens).
+   `KChrono-Setup-1-0-10.exe` — a versão entra no nome com hífens).
 
 O instalador cria atalhos no Menu Iniciar e na Área de Trabalho, registra a
 desinstalação e oferece a opção de iniciar com o Windows.
