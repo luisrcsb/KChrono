@@ -3,7 +3,7 @@
 ;  Requer: ter compilado KChrono.exe com build-windows.bat
 ;  Compile este arquivo no NSIS (compilador makensis).
 ;
-;  Gera: KChrono-Setup-<versão com hífens>.exe (ex.: KChrono-Setup-1-0-11.exe)
+;  Gera: KChrono-Setup-<versão com hífens>.exe (ex.: KChrono-Setup-1-0-12.exe)
 ;  App nativo com pywebview (WebView2) — NÃO abre navegador.
 ; ============================================================
 !include "MUI2.nsh"
@@ -11,8 +11,8 @@
 !include "LogicLib.nsh"
 
 ; VERSAO e VERSAO_ARQ são sincronizados com versao.json por build.py
-!define VERSAO "1.0.11"
-!define VERSAO_ARQ "1-0-11"
+!define VERSAO "1.0.12"
+!define VERSAO_ARQ "1-0-12"
 !define APP "KChrono"
 !define FABRICANTE "KChrono"
 !define EXE "dist\KChrono.exe"
@@ -49,6 +49,17 @@ Section "KChrono" SecPrincipal
   Pop $0
   Sleep 800
 
+  ; ATUALIZAÇÃO LIMPA: remove a versão anterior (arquivos, atalhos e
+  ; registro) antes de copiar a nova. Feito aqui, sem chamar o desinstalador
+  ; antigo, para não abrir diálogos no meio da instalação. Os dados do
+  ; usuário (APPDATA\KChrono: banco, config, capturas) são preservados.
+  Delete "$INSTDIR\${APP}.exe"
+  Delete "$INSTDIR\Desinstalar.exe"
+  RMDir /r "$SMPROGRAMS\${APP}"
+  Delete "$DESKTOP\${APP}*.lnk"
+  DeleteRegValue HKLM "Software\Microsoft\Windows\CurrentVersion\Run" "${APP}_service"
+  DeleteRegKey HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${APP}"
+
   SetOutPath "$INSTDIR"
   File "${EXE}"
   WriteRegStr HKLM "Software\${APP}" "InstallDir" "$INSTDIR"
@@ -56,7 +67,8 @@ Section "KChrono" SecPrincipal
   WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${APP}" "DisplayName" "${APP}"
   WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${APP}" "DisplayVersion" "${VERSAO}"
   WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${APP}" "Publisher" "${FABRICANTE}"
-  WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${APP}" "UninstallString" "$INSTDIR\Desinstalar.exe"
+  WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${APP}" "UninstallString" '"$INSTDIR\Desinstalar.exe"'
+  WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${APP}" "QuietUninstallString" '"$INSTDIR\Desinstalar.exe" /S'
   WriteUninstaller "$INSTDIR\Desinstalar.exe"
 
   CreateDirectory "$SMPROGRAMS\${APP}"
@@ -86,28 +98,39 @@ SectionEnd
 
 ; ==================== Desinstalação ====================
 Section "Uninstall"
+  ; fecha o app para poder apagar o exe
+  nsExec::ExecToStack 'taskkill /IM ${APP}.exe /T /F'
+  Pop $0
+  Sleep 500
+
+  ; guarda a pasta de telemetria ANTES de apagar o registro
+  ReadRegStr $1 HKLM "Software\${APP}" "TelemetriaDir"
+
   Delete "$INSTDIR\${APP}.exe"
   Delete "$INSTDIR\Desinstalar.exe"
   Delete "$SMPROGRAMS\${APP}\${APP} (Operador).lnk"
   Delete "$SMPROGRAMS\${APP}\${APP} (Telão).lnk"
   Delete "$SMPROGRAMS\${APP}\${APP} (Gerente de Pista).lnk"
   Delete "$SMPROGRAMS\${APP}\${APP} (Serviço / Headless).lnk"
+  RMDir "$SMPROGRAMS\${APP}"
   Delete "$DESKTOP\${APP}.lnk"
   Delete "$DESKTOP\${APP} (Telão).lnk"
-  RMDir "$SMPROGRAMS\${APP}"
 
   DeleteRegKey HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${APP}"
   DeleteRegKey HKLM "Software\${APP}"
   DeleteRegValue HKLM "Software\Microsoft\Windows\CurrentVersion\Run" "${APP}_service"
   RMDir "$INSTDIR"
 
-  MessageBox MB_YESNO "Deseja apagar também o histórico e a configuração em APPDATA\KChrono?" IDNO fim
-    RMDir /r "$APPDATA\KChrono"
-  fim:
-  ReadRegStr $0 HKLM "Software\${APP}" "TelemetriaDir"
-  ${If} $0 != ""
-    MessageBox MB_YESNO "Deseja apagar também a pasta de telemetria $0?" IDNO fim2
-      RMDir /r "$0"
-    fim2:
+  ; em modo silencioso (/S) nunca pergunta nada — só o desinstalador manual
+  ; oferece apagar os dados do usuário
+  ${IfNot} ${Silent}
+    MessageBox MB_YESNO "Deseja apagar também o histórico e a configuração em APPDATA\KChrono?" IDNO fim
+      RMDir /r "$APPDATA\KChrono"
+    fim:
+    ${If} $1 != ""
+      MessageBox MB_YESNO "Deseja apagar também a pasta de telemetria $1?" IDNO fim2
+        RMDir /r "$1"
+      fim2:
+    ${EndIf}
   ${EndIf}
 SectionEnd

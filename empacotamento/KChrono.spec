@@ -19,6 +19,10 @@ RAIZ = os.path.abspath(os.path.join(SPECPATH, ".."))
 LINUX = sys.platform != "win32"
 
 HIDDEN = [
+    # cliente HTTP do sync com o CTAD (sync/ctad_client.py). Sem isso o
+    # PyInstaller pode deixar o requests de fora e o app empacotado quebra no
+    # boot ("No module named 'requests'").
+    "requests", "urllib3", "certifi", "charset_normalizer", "idna",
     # uvicorn (carrega back-ends por import dinâmico)
     "uvicorn.logging", "uvicorn.loops", "uvicorn.loops.auto",
     "uvicorn.protocols", "uvicorn.protocols.http", "uvicorn.protocols.http.auto",

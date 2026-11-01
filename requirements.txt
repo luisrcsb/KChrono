@@ -2,6 +2,10 @@
 fastapi>=0.110
 uvicorn[standard]>=0.29
 
+# Cliente HTTP do sync com o CTAD (sync/ctad_client.py) — precisa entrar no
+# pacote: sem ele o app empacotado morre no boot com "No module named requests".
+requests>=2.31
+
 # QR Code da área do Gerente de Pista (puro Python, sem binários)
 segno>=1.5
 

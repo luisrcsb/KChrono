@@ -8,7 +8,10 @@ from __future__ import annotations
 
 import time
 
-import requests
+try:
+    import requests
+except Exception:  # instalação empacotada sem a dependência
+    requests = None
 
 
 class ErroAuth(Exception):
@@ -19,11 +22,19 @@ class ErroBanco(Exception):
     pass
 
 
+#: erro de rede do requests (ou um substituto inofensivo se ele não existir)
+_ERRO_HTTP = requests.RequestException if requests is not None else OSError
+
+
 NIVEIS_UPLOAD = ("superuser", "admin", "gestor")
 
 
 class CtadClient:
     def __init__(self, cfg):
+        if requests is None:
+            raise ErroBanco(
+                "o módulo 'requests' não está disponível nesta instalação — "
+                "instale o KChrono novamente (versão 1.0.12 ou mais nova)")
         fb = cfg.get("firebase", {})
         urls = cfg.get("auth_urls", {})
         self.apikey = fb.get("apiKey", "")
@@ -49,7 +60,7 @@ class CtadClient:
                             json={"email": self.email, "password": self.password,
                                   "returnSecureToken": True},
                             timeout=self.timeout)
-        except requests.RequestException as e:
+        except _ERRO_HTTP as e:
             raise ErroAuth(f"Sem conexão com o Auth: {e}")
         if r.status_code != 200:
             detalhe = ""
@@ -92,7 +103,7 @@ class CtadClient:
                 self.id_token = js["id_token"]
                 self.refresh_token = js.get("refresh_token", self.refresh_token)
                 self.expira_em = time.time() + int(js.get("expires_in", "3600"))
-            except requests.RequestException:
+            except _ERRO_HTTP:
                 self.login()
         return self.id_token
 
@@ -101,7 +112,7 @@ class CtadClient:
         q["auth"] = self._token()
         try:
             r = self.s.get(f"{self.db}/{caminho}.json", params=q, timeout=self.timeout)
-        except requests.RequestException as e:
+        except _ERRO_HTTP as e:
             raise ErroBanco(f"Falha de conexão ao ler {caminho}: {e}")
         if r.status_code in (401, 403):
             self.login()
@@ -115,7 +126,7 @@ class CtadClient:
         try:
             r = self.s.put(f"{self.db}/{caminho}.json", params={"auth": self._token()},
                            json=dados, timeout=self.timeout)
-        except requests.RequestException as e:
+        except _ERRO_HTTP as e:
             raise ErroBanco(f"Falha de conexão ao gravar {caminho}: {e}")
         if r.status_code in (401, 403):
             self.login()
