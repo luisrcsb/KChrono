@@ -54,6 +54,10 @@ log = logging.getLogger("kchrono.atualizador")
 #: o GitHub exige User-Agent em toda requisição
 UA = "KChrono-Updater"
 
+#: canal de atualização padrão (usado quando o config.json não define outro).
+#: Assim o app checa versão nova já na primeira abertura, sem configuração.
+REPO_PADRAO = "luisrcsb/KChrono"
+
 
 def _versao_atual() -> str:
     """Versão embutida no app (empacotamento/versao.json vai dentro do .exe)."""
@@ -82,12 +86,17 @@ def _maior(a: str, b: str) -> bool:
 
 
 def _repo() -> str:
-    """Repositório GitHub configurado (usuario/repo) — lido do config.json."""
+    """Repositório GitHub configurado (usuario/repo) — lido do config.json.
+
+    Sem valor gravado (instalação nova ou config antigo vazio) usa o canal
+    padrão do projeto, para que a checagem de versão funcione na 1ª abertura.
+    """
     try:
         with open(dir_dados() / "config.json", encoding="utf-8-sig") as f:
-            return str((json.load(f) or {}).get("atualizacao_repo") or "").strip().strip("/")
+            repo = str((json.load(f) or {}).get("atualizacao_repo") or "").strip().strip("/")
     except Exception:
-        return ""
+        repo = ""
+    return repo or REPO_PADRAO
 
 
 def _chave_plataforma() -> str:

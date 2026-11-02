@@ -1,10 +1,10 @@
 {
-  "versao": "1.0.12",
+  "versao": "1.0.13",
   "canal": "estavel",
   "url_base": "",
-  "notas": "Versão 1.0.12 — corrige o erro 'No module named requests' que impedia o app de abrir (o módulo HTTP do sync agora entra no pacote); o instalador remove a versão anterior antes de instalar e o desinstalador aceita modo silencioso. Inclui o que veio na 1.0.11: Volta-a-volta no painel, atalhos F1–F12 para todos os pilotos do check-in (com som e classificação), editor de pista com canvas ampliado e ferramentas no topo, Voz & Som salvo automaticamente, notificações explicadas e com som, relógio do operador sincronizado com o telão e destaque da linha do piloto a cada volta no telão",
+  "notas": "Versão 1.0.13 — telão: reabre sozinho em tela cheia na 2ª tela; atualização: caixa de diálogo ao abrir; telão ao vivo (snapshot a cada 1,5s + watchdog); finalizar congela o relógio; 1ª passagem é só abertura de volta",
   "arquivos": {
-    "windows": "KChrono-Setup-1-0-12.exe",
-    "linux": "KChrono-1.0.12-x86_64.AppImage"
+    "windows": "KChrono-Setup-1-0-13.exe",
+    "linux": "KChrono-1.0.13-x86_64.AppImage"
   }
 }

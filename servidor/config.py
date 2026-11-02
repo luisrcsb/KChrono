@@ -36,6 +36,10 @@ CONFIG_MODELO = {
     "sim_sistema": "p3",            # fonte simulada: p3 | easylap | lapwiz
     "sim_velocidade": 1.0,          # velocidade da reprodução (0.5 = meio-tempo)
     "telao_tela": 1,                # monitor do telão 2ª tela (0 = principal)
+    # estado do telão: salvamos o que estava aberto para reabrir igual no boot
+    "telao_aberto": False,          # telão estava aberto na última execução
+    "telao_autostart": False,       # abre o telão sozinho ao iniciar o app
+    "telao_fullscreen": True,       # telão em tela cheia (kiosk) em vez de maximizado
     # colunas visíveis no feedback do telão (ordem = ordem da tabela)
     "telao_colunas": ["posicao", "numero", "piloto", "voltas", "total",
                       "intervalo", "gap", "ultima", "melhor", "velocidade",
@@ -43,7 +47,7 @@ CONFIG_MODELO = {
     "voz_contagem": True,           # voz na contagem regressiva/largada
     "contador_s": 10,               # segundos da contagem antes da largada
     # canal de atualização: repositório GitHub (usuario/repo) com releases
-    "atualizacao_repo": "",
+    "atualizacao_repo": "luisrcsb/KChrono",
 }
 
 

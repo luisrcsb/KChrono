@@ -148,8 +148,14 @@ class EstadoApp:
             self._piloto_demo_id = demo.id if demo else None
 
     # ---------------------------------------------------------------- websocket
+    #: limite de eventos pendentes por cliente. Um telão lento/em 2º plano não
+    #: pode fazer a fila crescer sem fim (era a causa do "lag de minutos"): ao
+    #: encher, o evento MAIS ANTIGO é descartado e o /ws reenvia um snapshot
+    #: periódico para recompor o estado.
+    FILA_MAX = 400
+
     def assinar(self) -> asyncio.Queue:
-        fila: asyncio.Queue = asyncio.Queue()
+        fila: asyncio.Queue = asyncio.Queue(maxsize=self.FILA_MAX)
         self._filas.append(fila)
         return fila
 
@@ -172,7 +178,17 @@ class EstadoApp:
             try:
                 fila.put_nowait(evento)
             except asyncio.QueueFull:
-                pass
+                # cliente atrasado: joga fora o mais antigo e mantém o atual
+                # (ao vivo > histórico). O snapshot periódico do /ws recompõe
+                # o que tiver sido descartado.
+                try:
+                    fila.get_nowait()
+                except asyncio.QueueEmpty:
+                    pass
+                try:
+                    fila.put_nowait(evento)
+                except asyncio.QueueFull:
+                    pass
 
     def _publicar_semaforo(self, dados: Dict):
         """Publica o estado do semáforo sem registrar no log Recente."""
@@ -312,6 +328,27 @@ class EstadoApp:
         salvar_config(cfg)
         self.config = cfg
         return {"ok": True, "indice": indice}
+
+    def telao_prefs(self) -> Dict:
+        """Preferências de abertura do telão (autostart / tela cheia / estava aberto)."""
+        return {
+            "indice": self.telao_tela()["indice"],
+            "aberto": bool(self.config.get("telao_aberto", False)),
+            "autostart": bool(self.config.get("telao_autostart", False)),
+            "fullscreen": bool(self.config.get("telao_fullscreen", True)),
+        }
+
+    def definir_telao_prefs(self, autostart=None, fullscreen=None) -> Dict:
+        """Salva as preferências de abertura do telão em config.json."""
+        cfg = carregar_config()
+        if autostart is not None:
+            cfg["telao_autostart"] = bool(autostart)
+        if fullscreen is not None:
+            cfg["telao_fullscreen"] = bool(fullscreen)
+        salvar_config(cfg)
+        self.config = cfg
+        prefs = self.telao_prefs()
+        return {"ok": True, **prefs}
 
     # --- colunas do feedback do telao (ordem canonica) ---
     COLUNAS_TELAO = ["posicao", "numero", "piloto", "voltas", "total", "intervalo",
@@ -1254,13 +1291,15 @@ class EstadoApp:
     def finalizar(self) -> bool:
         if not self.motor:
             return False
+        # 1) congela o cronômetro ANTES de tudo: o evento de fim já sai com o
+        #    tempo final e nenhum tick posterior volta a avançar o relógio.
+        if self._tempo_final_s is None:
+            self._tempo_final_s = self.tempo_sessao_s()
         self.motor.finalizar()
         # simulador de CTAD: corta a reprodução junto com a sessão
         if hasattr(self.driver, "parar_replay"):
             self.driver.parar_replay()
         self.pausado = False
-        # congela o cronômetro no tempo final da sessão
-        self._tempo_final_s = self.tempo_sessao_s()
         self._pausa_inicio_us = None
         self._cancelar_regressiva()
         self._cancelar_largada()
@@ -1268,9 +1307,19 @@ class EstadoApp:
         classificacao = self._classificacao()  # lista de dicts com posicao/nome
         # tipo de sessão para o anúncio
         tipo_motor = (self.motor.tipo or "").value if self.motor and self.motor.tipo else ""
-        # anúncio de fim de sessão: bips + frase sempre; posições (grid e
-        # resultados) SÓ se o checkbox "depois" do tipo de sessão estiver
-        # ligado — no treino, nunca
+        # 2) publica o FIM imediatamente — telão e operador congelam o relógio
+        #    na hora, mesmo que a locução ou o upload demorem/falhem depois.
+        self.publicar("sessao", {"id": self.sessao_id, "estado": "finalizado",
+                                 "simulacao": self.sessao_simulacao,
+                                 "tempo_s": self.tempo_sessao_s(),
+                                 "restante_s": None,
+                                 "pausada": False,
+                                 "classificacao": classificacao})
+        self.publicar("classificacao", {"linhas": classificacao}, registrar=False)
+        # 3) anúncio de fim de sessão: bips + frase sempre; posições (grid e
+        #    resultados) SÓ se o checkbox "depois" do tipo de sessão estiver
+        #    ligado — no treino, nunca. Qualquer falha de áudio não pode
+        #    impedir o encerramento.
         inverter_grid = bool(self.config.get("inverter_grid", False))
         grid_ordenado = None
         resultados = None
@@ -1279,13 +1328,15 @@ class EstadoApp:
             grid_ordenado = [c["posicao"] for c in classificacao] if classificacao else None
             # resultados da corrida (mesma estrutura da classificação)
             resultados = classificacao[:] if classificacao else None
-        # anúncio de fim de sessão com bips + frases + grid/resultados
-        self.som.finalizada(
-            tipo_motor,
-            grid_ordenado=grid_ordenado,
-            grid_invertido=inverter_grid,
-            resultados=resultados,
-        )
+        try:
+            self.som.finalizada(
+                tipo_motor,
+                grid_ordenado=grid_ordenado,
+                grid_invertido=inverter_grid,
+                resultados=resultados,
+            )
+        except Exception as e:
+            log.warning("anúncio de fim de sessão falhou: %s", e)
         # auto-upload (Fase 3): enfileira a sessão completa para o CTAD
         # (sessão de simulação nunca vai ao CTAD — é teste/desenvolvimento)
         if (self.config.get("auto_upload") and self.sincronizador.configurado
@@ -1297,12 +1348,6 @@ class EstadoApp:
                 self.publicar("sync", {"msg": "sessão enfileirada para o CTAD (auto-upload)"})
             except Exception as e:
                 log.warning("auto-upload falhou: %s", e)
-        self.publicar("sessao", {"id": self.sessao_id, "estado": "finalizada",
-                                 "simulacao": self.sessao_simulacao,
-                                 "tempo_s": self.tempo_sessao_s(),
-                                 "restante_s": self.restante_sessao_s(),
-                                 "pausada": self.pausado,
-                                 "classificacao": self._classificacao()})
         return True
 
     # ---------------------------------------------------------------- gerente de pista

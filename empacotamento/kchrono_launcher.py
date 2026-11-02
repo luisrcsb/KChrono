@@ -63,7 +63,18 @@ class Ponte:
         return (self._proc_telao is not None
                 and self._proc_telao.poll() is None)
 
-    def _abrir_processo_telao(self):
+    @staticmethod
+    def _salvar_pref(**campos):
+        """Persiste o estado do telão (config.json) para reabrir igual no boot."""
+        try:
+            from servidor.config import carregar_config, salvar_config
+            cfg = carregar_config()
+            cfg.update(campos)
+            salvar_config(cfg)
+        except Exception:
+            pass
+
+    def _abrir_processo_telao(self, fullscreen: bool = False):
         import os
         import subprocess
         if getattr(sys, "frozen", False):
@@ -73,6 +84,8 @@ class Ponte:
                    os.path.join(os.path.dirname(os.path.abspath(__file__)),
                                 "kchrono_launcher.py"),
                    "--sem-servidor", "--telao"]
+        if fullscreen:
+            cmd.append("--fullscreen")
         self._proc_telao = subprocess.Popen(cmd)
 
     def abrir_telao(self):
@@ -80,7 +93,13 @@ class Ponte:
         try:
             if self._telao_vivo():
                 return "ja-aberta"
-            self._abrir_processo_telao()
+            try:
+                from servidor.config import carregar_config
+                fullscreen = bool(carregar_config().get("telao_fullscreen", True))
+            except Exception:
+                fullscreen = True
+            self._abrir_processo_telao(fullscreen)
+            self._salvar_pref(telao_aberto=True)
             return "ok"
         except Exception:
             return "falhou"
@@ -94,6 +113,7 @@ class Ponte:
         try:
             if self._telao_vivo():
                 self._proc_telao.terminate()
+                self._salvar_pref(telao_aberto=False)
                 return "ok"
             return "fechada"
         except Exception:
@@ -113,6 +133,10 @@ class Ponte:
     # ------------------------------------------------ lado filho (telão)
     def fechar_janela(self):
         """Fecha a própria janela (ESC no telão)."""
+        try:
+            self._salvar_pref(telao_aberto=False)
+        except Exception:
+            pass
         try:
             if self.janela is not None:
                 self.janela.destroy()
@@ -208,6 +232,19 @@ def _abrir_navegador(url: str) -> bool:
     return False
 
 
+def _num_telas() -> int:
+    """Quantidade de monitores (para só abrir o telão se houver 2ª tela)."""
+    try:
+        from System.Windows.Forms import Screen
+        return len(Screen.AllScreens)
+    except Exception:
+        pass
+    try:
+        return len(list(webview.screens))
+    except Exception:
+        return 1
+
+
 def main() -> int:
     multiprocessing.freeze_support()
     configurar_log()
@@ -299,27 +336,36 @@ def main() -> int:
         "global.quitConfirmation": "Deseja realmente sair do KChrono?",
     }
     if args.telao and args.sem_servidor:
-        # modo telão: janela maximizada na tela das Configurações
+        # modo telão: janela na tela das Configurações, em tela cheia (kiosk)
+        # quando a preferência estiver ligada (padrão) ou --fullscreen vier.
+        largura_t, altura_t = args.largura, args.altura
         try:
             from servidor.config import carregar_config
-            indice = max(0, int(carregar_config().get("telao_tela", 1)))
+            cfg_t = carregar_config()
+            indice = max(0, int(cfg_t.get("telao_tela", 1)))
+            tela_cheia = bool(args.fullscreen or cfg_t.get("telao_fullscreen", True))
         except Exception:
             indice = 1
+            tela_cheia = bool(args.fullscreen)
         x = y = None
         try:
             telas = webview.screens
             alvo = telas[indice] if 0 <= indice < len(telas) else telas[0]
             x, y = alvo.x, alvo.y
+            # geometria do monitor escolhido (a janela nasce já do tamanho certo)
+            if getattr(alvo, "width", 0) and getattr(alvo, "height", 0):
+                largura_t, altura_t = alvo.width, alvo.height
         except Exception:
             pass
         janela = webview.create_window(
             title=TITULO_TELAO,
             url=url,
-            width=args.largura,
-            height=args.altura,
+            width=largura_t,
+            height=altura_t,
             x=x,
             y=y,
-            maximized=True,
+            maximized=True,          # garante que a janela nasce na tela escolhida
+            fullscreen=False,        # real é aplicado após o start (kiosk)
             resizable=True,
             frameless=False,
             on_top=False,
@@ -331,6 +377,7 @@ def main() -> int:
             localization=localizacao_pt,
         )
     else:
+        tela_cheia = bool(args.fullscreen)
         janela = webview.create_window(
             title=TITULO_JANELA,
             url=url,
@@ -363,17 +410,47 @@ def main() -> int:
     # vezes não aplica; repetir após o start cobre esse caso. No modo padrão
     # (maximizado) NÃO mexemos — a barra de título fica intacta.
     def _aplicar_tela_cheia():
-        if not args.fullscreen:
+        if not tela_cheia:
             return
         try:
             janela.toggle_fullscreen()
         except Exception:
             pass
 
+    def _abrir_telao_inicial():
+        """Reabre o telão na 2ª tela, no estado salvo da última execução.
+
+        Só abre quando o operador deixou o telão aberto (ou ligou "abrir ao
+        iniciar") E existe um segundo monitor — assim o app nunca cobre a
+        própria janela do operador numa máquina de tela única.
+        """
+        if args.telao or args.sem_servidor:
+            return
+        try:
+            from servidor.config import carregar_config
+            cfg = carregar_config()
+        except Exception:
+            return
+        if not (cfg.get("telao_aberto") or cfg.get("telao_autostart")):
+            return
+        if _num_telas() < 2:
+            return
+        try:
+            ponte.abrir_telao()
+            print("  Telão reaberto na segunda tela.")
+        except Exception:
+            pass
+
+    def _ao_iniciar():
+        _aplicar_tela_cheia()
+        if not args.telao:
+            # deixa a janela principal aparecer antes de subir o processo filho
+            threading.Timer(1.2, _abrir_telao_inicial).start()
+
     # Inicia loop da GUI (bloqueante — encerra quando fecha a janela)
     import atexit
     atexit.register(ponte.encerrar_filhos)
-    webview.start(func=_aplicar_tela_cheia, debug=False, private_mode=False,
+    webview.start(func=_ao_iniciar, debug=False, private_mode=False,
                   storage_path=None)
     ponte.encerrar_filhos()
 

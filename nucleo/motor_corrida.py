@@ -19,6 +19,14 @@ from .relogio import agora_monotonic_us
 
 log = logging.getLogger("kchrono.motor")
 
+#: piso absoluto de uma volta válida (1 s). Mesmo com o filtro de ghost lap
+#: desligado (tempo mínimo = 0), nenhuma "volta" de milésimos é registrada:
+#: isso acontecia quando o decoder repetia a própria passagem de abertura.
+TEMPO_MINIMO_ABSOLUTO_US = 1_000_000
+#: deltas abaixo disso são ruído/retransmissão do MESMO laço (não é volta
+#: nem ghost lap de verdade — não vale avisar o operador).
+TEMPO_RUIDO_US = 300_000
+
 
 @dataclass
 class _EstadoPiloto:
@@ -27,6 +35,9 @@ class _EstadoPiloto:
     voltas: List[Volta] = field(default_factory=list)
     primeiro_rtc: Optional[int] = None   # rtc da 1ª passagem (largada/saída)
     ultimo_rtc: Optional[int] = None
+    #: True depois que o piloto cruzou o laço pela 1ª vez na sessão. A primeira
+    #: passagem é SEMPRE abertura de volta (nunca conta volta concluída).
+    aberto: bool = False
     transponder: Optional[int] = None
     suspeitas: set = field(default_factory=set)  # nº de voltas marcadas como "gato"
 
@@ -188,38 +199,73 @@ class MotorCorrida:
                                    transponder=self._transponder_por_piloto.get(piloto_id))
             self._pilotos[piloto_id] = estado
 
+        # sem RTC não há como medir tempo: registra para auditoria e ignora
+        if passing.rtc_time is None:
+            if self.banco:
+                self.banco.registrar_passing(self.sessao_id, passing.transponder,
+                                             0, passing.passing_number,
+                                             passing.strength, passing.hits, valido=0)
+            return None
+
         # consolida volta (com filtro de tempo mínimo / ghost lap)
         volta = None
         valido = 1
-        if estado.ultimo_rtc is None:
-            # primeira passagem = saída/largada: ainda não é volta
+        if not estado.aberto:
+            # primeira passagem do piloto = ABERTURA de volta (nunca conta
+            # volta). Só a partir da 2ª passagem o tempo é fechado.
+            estado.aberto = True
             estado.primeiro_rtc = passing.rtc_time
             estado.ultimo_rtc = passing.rtc_time
         else:
-            tempo_us = passing.rtc_time - estado.ultimo_rtc
-            if self.tempo_minimo_volta_us and tempo_us < self.tempo_minimo_volta_us:
-                # GHOST LAP: descarta a volta, mas mantém o passing para auditoria
+            if passing.rtc_time is None or estado.ultimo_rtc is None:
                 valido = 0
-                self.rejeitados.append({"transponder": passing.transponder,
-                                        "tempo_us": tempo_us,
-                                        "passing_number": passing.passing_number})
-                log.warning("ghost lap: transponder %s, delta %d us < mínimo %d us "
-                            "(passing #%s)",
-                            passing.transponder, tempo_us, self.tempo_minimo_volta_us,
-                            passing.passing_number)
-                if self.on_rejeicao:
-                    self.on_rejeicao(passing.transponder, tempo_us, passing.passing_number)
+            elif passing.rtc_time <= estado.ultimo_rtc:
+                # RTC fora de ordem / retransmissão da mesma passagem: ignorar
+                # sem mexer na referência (senão nasce uma volta de milésimos
+                # ou até negativa).
+                valido = 0
+                log.debug("passing fora de ordem ignorado: transponder %s "
+                          "(rtc %s <= %s)", passing.transponder,
+                          passing.rtc_time, estado.ultimo_rtc)
             else:
-                estado.ultimo_rtc = passing.rtc_time
-                numero = len(estado.voltas) + 1
-                melhor = estado.melhor_volta_us is None or tempo_us < estado.melhor_volta_us
-                volta = Volta(sessao_id=self.sessao_id, piloto_id=piloto_id,
-                              numero=numero, tempo_us=tempo_us, melhor=melhor)
-                if self.banco and not self.banco.registrar_volta(volta):
-                    volta = None  # já existia (idempotente)
+                tempo_us = passing.rtc_time - estado.ultimo_rtc
+                # piso absoluto: mesmo sem tempo mínimo configurado, uma volta
+                # jamais pode ter menos de 1 s (proteção contra duplicatas do
+                # decoder na abertura).
+                minimo = max(int(self.tempo_minimo_volta_us or 0),
+                             TEMPO_MINIMO_ABSOLUTO_US)
+                if tempo_us < minimo:
+                    # GHOST LAP: descarta a volta, mas mantém o passing para
+                    # auditoria. Não atualiza a referência: a próxima passagem
+                    # real é medida desde a última volta válida.
+                    valido = 0
+                    self.rejeitados.append({"transponder": passing.transponder,
+                                            "tempo_us": tempo_us,
+                                            "passing_number": passing.passing_number})
+                    if tempo_us >= TEMPO_RUIDO_US:
+                        log.warning("ghost lap: transponder %s, delta %d us < mínimo "
+                                    "%d us (passing #%s)",
+                                    passing.transponder, tempo_us, minimo,
+                                    passing.passing_number)
+                        if self.on_rejeicao:
+                            self.on_rejeicao(passing.transponder, tempo_us,
+                                             passing.passing_number)
+                    else:
+                        log.debug("ruído de laço ignorado: transponder %s, "
+                                  "delta %d us (passing #%s)",
+                                  passing.transponder, tempo_us,
+                                  passing.passing_number)
                 else:
-                    estado.voltas.append(volta)
-                    self._ultimo_passo_us[piloto_id] = self.agora_sessao_us()
+                    estado.ultimo_rtc = passing.rtc_time
+                    numero = len(estado.voltas) + 1
+                    melhor = estado.melhor_volta_us is None or tempo_us < estado.melhor_volta_us
+                    volta = Volta(sessao_id=self.sessao_id, piloto_id=piloto_id,
+                                  numero=numero, tempo_us=tempo_us, melhor=melhor)
+                    if self.banco and not self.banco.registrar_volta(volta):
+                        volta = None  # já existia (idempotente)
+                    else:
+                        estado.voltas.append(volta)
+                        self._ultimo_passo_us[piloto_id] = self.agora_sessao_us()
 
         # persiste passing cru (auditoria; valido=0 quando rejeitado por ghost lap)
         if self.banco:

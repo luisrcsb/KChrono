@@ -216,6 +216,27 @@ async function carregarTelaoColunas() {
       + `<span class="ck${on ? " on" : ""}">${on ? "✓" : "·"}</span> ${rot}</div>`;
   }).join("");
 }
+// Carrega preferências de autostart/fullscreen do telão
+let telaoPrefsCache = { autostart: false, fullscreen: true };
+async function carregarTelaoPrefs() {
+  try {
+    telaoPrefsCache = await api("telao/prefs", "GET") || telaoPrefsCache;
+  } catch (e) {}
+  const a = document.getElementById("cfg-telao-autostart-ck");
+  const f = document.getElementById("cfg-telao-fullscreen-ck");
+  if (a) { a.textContent = telaoPrefsCache.autostart ? "✓" : "·"; a.classList.toggle("on", !!telaoPrefsCache.autostart); }
+  if (f) { f.textContent = telaoPrefsCache.fullscreen ? "✓" : "·"; f.classList.toggle("on", telaoPrefsCache.fullscreen !== false); }
+}
+async function alternarPreferenciaTelao(chave) {
+  if (chave === "autostart") {
+    telaoPrefsCache.autostart = !telaoPrefsCache.autostart;
+    await api(`telao/prefs?autostart=${telaoPrefsCache.autostart}`, "POST");
+  } else if (chave === "fullscreen") {
+    telaoPrefsCache.fullscreen = telaoPrefsCache.fullscreen === false ? true : false;
+    await api(`telao/prefs?fullscreen=${telaoPrefsCache.fullscreen}`, "POST");
+  }
+  carregarTelaoPrefs();
+}
 async function telaoColunaAlternar(col) {
   const el = document.querySelector(`.telao-col[data-col="${col}"]`);
   if (!el) return;
@@ -440,6 +461,8 @@ function tratarEvento(ev) {
         const stU = document.getElementById("upd-status");
         if (stU) stU.innerHTML = `<b style="color:var(--accent-green)">v${ev.versao_remota} disponível</b>` +
           ` (atual v${ev.versao_atual}) — use "Instalar agora"`;
+        // Caixa de diálogo na abertura: avisa e já oferece a atualização.
+        mostrarDialogoAtualizacao(ev);
       }
       break;
     case "erro":
@@ -467,7 +490,9 @@ function tratarEvento(ev) {
       document.getElementById("operador-estado").textContent = ev.estado;
       if (ev.classificacao) renderClassificacao({ linhas: ev.classificacao });
       // estado otimista imediato (o refresh abaixo confirma pelo snapshot)
-      if (ev.estado === "finalizada") { sessaoAtiva = false; estadoSessao = "finalizado"; }
+      if (ev.estado === "finalizada" || ev.estado === "finalizado") {
+        sessaoAtiva = false; estadoSessao = "finalizado";
+      }
       else if (["iniciada", "correndo", "largada", "treino",
                 "classificacao"].includes(ev.estado)) sessaoAtiva = true;
       if (typeof ev.pausada === "boolean") sessaoPausada = ev.pausada;
@@ -3191,6 +3216,8 @@ async function verificarVersao() {
     st.innerHTML = `<b style="color:var(--accent-green)">v${r.versao_remota} disponível</b>` +
       ` (atual v${r.versao_atual})${mb ? ` · ${(mb / 1e6).toFixed(0)} MB` : ""}` +
       (r.canal ? ` · ${r.canal}` : "");
+    // o app abriu com versão anterior: mostra a caixa de diálogo na hora
+    mostrarDialogoAtualizacao(r);
   } else if (r.erro) {
     st.textContent = `não foi possível verificar: ${r.erro}`;
   } else if (r.motivo) {
@@ -3199,6 +3226,38 @@ async function verificarVersao() {
     st.textContent = `${r.versao_atual} · já é a versão mais recente` +
       (r.canal ? ` · ${r.canal}` : "");
   }
+  return r;
+}
+
+// ---- caixa de diálogo "nova versão disponível" (abertura do app) ----
+let dialogoAtualizacaoMostrado = false;
+function mostrarDialogoAtualizacao(r) {
+  const modal = document.getElementById("modal-atualizacao");
+  if (!modal || !r || !r.disponivel || dialogoAtualizacaoMostrado) return;
+  dialogoAtualizacaoMostrado = true;
+  const titulo = document.getElementById("upd-dlg-titulo");
+  const atual = document.getElementById("upd-dlg-atual");
+  const notas = document.getElementById("upd-dlg-notas");
+  const status = document.getElementById("upd-dlg-status");
+  if (titulo) titulo.textContent = `Nova versão v${r.versao_remota} disponível`;
+  if (atual) atual.textContent = `Este computador está na v${r.versao_atual}. ` +
+    "A atualização mantém o banco de dados, a configuração e as vozes.";
+  if (notas) {
+    notas.textContent = (r.notas || "").trim()
+      || "Atualização recomendada — corrige falhas e melhora o sistema.";
+  }
+  if (status) status.textContent = "";
+  modal.style.display = "flex";
+}
+function fecharDialogoAtualizacao() {
+  const modal = document.getElementById("modal-atualizacao");
+  if (modal) modal.style.display = "none";
+}
+async function atualizarAgoraPeloDialogo() {
+  const status = document.getElementById("upd-dlg-status");
+  if (status) status.textContent = "baixando e preparando a atualização…";
+  const r = await instalarAtualizacao(false);
+  if (status && r && !r.ok) status.textContent = `falha: ${r.erro || "não foi possível atualizar"}`;
 }
 
 async function salvarRepoAtualizacao() {
@@ -3227,21 +3286,27 @@ async function baixarAtualizacao() {
   }
 }
 
-async function instalarAtualizacao() {
+async function instalarAtualizacao(confirmar = true) {
   const st = document.getElementById("upd-status");
-  if (!confirm("Instalar a versão nova agora?\n\nO KChrono baixa a atualização, encerra e " +
+  const stDlg = document.getElementById("upd-dlg-status");
+  if (confirmar && !confirm("Instalar a versão nova agora?\n\nO KChrono baixa a atualização, encerra e " +
     "instala em silêncio (Windows: instalador; Linux: troca do AppImage). Reabra o app em " +
-    "instantes — banco, config e vozes não são afetados.")) return;
+    "instantes — banco, config e vozes não são afetados.")) return { ok: false };
   if (st) st.textContent = "baixando e preparando a atualização…";
+  if (stDlg) stDlg.textContent = "baixando e preparando a atualização…";
   const r = await api("versao/instalar", "POST");
   if (!r.ok) {
     if (st) st.textContent = `falha: ${r.erro}`;
-    return;
+    if (stDlg) stDlg.textContent = `falha: ${r.erro}`;
+    return r;
   }
   if (st) st.innerHTML = `<b style="color:var(--accent-green)">atualizando para v${r.versao}…</b>` +
     ` o app vai fechar — abra novamente em alguns segundos`;
+  if (stDlg) stDlg.innerHTML = `<b style="color:var(--accent-green)">atualizando para v${r.versao}…</b>` +
+    ` o app vai fechar — abra novamente em alguns segundos`;
   logMsg(`atualização para v${r.versao} em andamento — o app vai encerrar`,
     "l-admin", "log-operador");
+  return r;
 }
 
 async function encerrarApp() {
@@ -3356,6 +3421,7 @@ carregarVozContagem();
 configurarAutoSalvarSom();
 carregarTelaoTela();
 carregarTelaoColunas();
+carregarTelaoPrefs();
 // Se o bridge do pywebview ficar pronto depois do load, repopula o seletor.
 window.addEventListener("pywebviewready", () => carregarTelaoTela());
 sincronizarBotaoTelao();          // botão do telão reflete se já está aberto

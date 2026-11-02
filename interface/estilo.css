@@ -352,6 +352,10 @@ label.btn-slide{line-height:1.4}
 .modal-card{background:var(--bg-card,#141d2e); border:1px solid rgba(58,134,255,.35);
   border-radius:12px; padding:20px; width:min(680px,96vw); max-height:88vh; overflow:auto;
   box-shadow:0 18px 50px rgba(0,0,0,.55)}
+/* notas da versão exibidas na caixa de atualização */
+.upd-notas{white-space:pre-wrap; font-size:13px; line-height:1.45; max-height:180px;
+  overflow:auto; background:rgba(255,255,255,.04); border:1px solid rgba(58,134,255,.25);
+  border-radius:8px; padding:10px}
 .atalho-assoc-lista{display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:8px}
 .atalho-assoc-linha{display:flex; align-items:center; gap:10px}
 .atalho-assoc-linha select{flex:1; min-width:0; padding:7px 9px; border-radius:7px;

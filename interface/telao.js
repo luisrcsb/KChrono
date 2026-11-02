@@ -18,7 +18,9 @@ function definirClock(tempo_s, pausada, estado, restante_s) {
   clockRestanteS = (typeof restante_s === "number" ? restante_s : null);
   clockEm = Date.now();
   clockPausada = !!pausada;
-  clockFim = estado === "finalizado";
+  // "finalizado" é o estado do motor; "finalizada" é o nome do evento de fim
+  // enviado pelo servidor (as duas grafias congelam o relógio do telão).
+  clockFim = estado === "finalizado" || estado === "finalizada" || estado === "parado";
 }
 function atualizarClockViaStatus() {
   fetch("/api/status").then(r => r.json()).then(s => {
@@ -59,18 +61,64 @@ function beepVolta() { beep(880, 0.12, 0.22); }
 function beepRecorde() { beep(1500, 0.2, 0.25); }
 
 // ---------------------------------------------------------------- WebSocket
+// O servidor reenvia um snapshot completo a cada ~1,5 s (mesmo sem eventos):
+// além de manter os dados sempre ao vivo, serve de heartbeat. Se nenhuma
+// mensagem chegar em 6 s, o telão marca "offline" e força a reconexão — o
+// selo nunca fica mentindo com dados velhos na tela.
+let ultimoMsgEm = 0;
+let reconexaoTimer = null;
+function marcarBadge(vivo) {
+  const st = document.getElementById("ws-st");
+  if (!st) return;
+  st.textContent = vivo ? "● ao vivo" : "● offline";
+  st.classList.toggle("on", vivo);
+}
+function agendarReconexao(ms) {
+  if (reconexaoTimer) return;
+  reconexaoTimer = setTimeout(() => {
+    reconexaoTimer = null;
+    conectarWS();
+  }, ms || 1500);
+}
 function conectarWS() {
   if (ws && ws.readyState <= 1) return;
   const proto = location.protocol === "https:" ? "wss" : "ws";
-  ws = new WebSocket(`${proto}://${location.host}/ws`);
-  const st = document.getElementById("ws-st");
-  ws.onopen = () => { st.textContent = "● ao vivo"; st.classList.add("on"); };
-  ws.onclose = () => {
-    st.textContent = "● offline"; st.classList.remove("on");
-    setTimeout(conectarWS, 2000);
+  try {
+    ws = new WebSocket(`${proto}://${location.host}/ws`);
+  } catch (e) {
+    agendarReconexao(1000);
+    return;
+  }
+  ws.onopen = () => { ultimoMsgEm = Date.now(); marcarBadge(true); };
+  ws.onclose = () => { marcarBadge(false); agendarReconexao(1500); };
+  ws.onerror = () => {
+    marcarBadge(false);
+    try { ws.close(); } catch (e) {}
   };
-  ws.onmessage = (ev) => tratarEvento(JSON.parse(ev.data));
+  ws.onmessage = (ev) => {
+    ultimoMsgEm = Date.now();
+    try { tratarEvento(JSON.parse(ev.data)); } catch (e) { /* ignora frame ruim */ }
+  };
 }
+setInterval(() => {
+  const aberto = !!(ws && ws.readyState === 1);
+  const vivo = aberto && (Date.now() - ultimoMsgEm) < 6000;
+  marcarBadge(vivo);
+  if (vivo) return;
+  if (aberto) {
+    // conexão "zumbi": fecha para o onclose reconectar
+    try { ws.close(); } catch (e) {}
+  } else {
+    agendarReconexao(800);
+  }
+  atualizarClockViaStatus();   // dados podem estar velhos: busca a base
+}, 1000);
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden) {
+    conectarWS();
+    atualizarClockViaStatus();
+  }
+});
 
 function tratarEvento(ev) {
   if (ev.tipo === "snapshot") {

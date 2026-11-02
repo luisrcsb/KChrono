@@ -77,8 +77,13 @@ async def _auto_conectar_sync():
 
 
 async def _checar_atualizacao_boot():
-    """Verifica o canal de atualização e avisa no log/painel se há versão nova."""
-    await asyncio.sleep(20)
+    """Verifica o canal de atualização logo na abertura.
+
+    Se houver versão nova, publica o evento ``atualizacao`` — a interface
+    mostra na hora a caixa de diálogo oferecendo atualizar (além do aviso
+    discreto em Admin → Sobre).
+    """
+    await asyncio.sleep(3)
     try:
         from atualizador import verificar
         ver = await asyncio.to_thread(verificar)
@@ -86,10 +91,15 @@ async def _checar_atualizacao_boot():
         log.debug("verificação de atualização falhou: %s", e)
         return
     if ver.get("disponivel"):
-        msg = (f"v{ver['versao_remota']} disponível (atual v{ver['versao_atual']})"
-               " — Admin → Sobre → Atualizações")
-        log.info("atualização: %s", msg)
-        estado.publicar("aviso", {"msg": msg})
+        log.info("atualização disponível: v%s (atual v%s)",
+                 ver.get("versao_remota"), ver.get("versao_atual"))
+        estado.publicar("atualizacao", {
+            "disponivel": True,
+            "versao_atual": ver.get("versao_atual"),
+            "versao_remota": ver.get("versao_remota"),
+            "canal": ver.get("canal"),
+            "notas": ver.get("notas") or "",
+        })
 
 
 @app.get("/api/status")
@@ -155,6 +165,18 @@ async def api_telao_tela_definir(indice: int = Query(1)):
         return estado.definir_telao_tela(indice)
     except ValueError as e:
         return {"ok": False, "erro": str(e)}
+
+
+@app.get("/api/telao/prefs")
+async def api_telao_prefs():
+    """Preferências do telão (abre ao iniciar, tela cheia, estava aberto)."""
+    return estado.telao_prefs()
+
+
+@app.post("/api/telao/prefs")
+async def api_telao_prefs_definir(autostart: Optional[bool] = Query(None),
+                                  fullscreen: Optional[bool] = Query(None)):
+    return estado.definir_telao_prefs(autostart, fullscreen)
 
 
 @app.get("/api/telao/colunas")
@@ -1205,16 +1227,30 @@ async def gerente_anunciar(dados: dict = Body(default={}),
         return {"ok": False, "erro": str(e)}
 
 
+async def _bombear_ws(websocket: WebSocket, fila: asyncio.Queue):
+    """Envia os eventos da sessão e mantém o cliente SEMPRE atualizado.
+
+    Se passar 1,5 s sem evento, reenvia um snapshot completo. Isso:
+      · garante que telão/operador/gerente fiquem no máximo ~1,5 s atrasados,
+        mesmo que a fila limitada tenha descartado algum evento antigo;
+      · serve de heartbeat (o cliente detecta conexão morta e reconecta).
+    """
+    while True:
+        try:
+            evento = await asyncio.wait_for(fila.get(), timeout=1.5)
+        except asyncio.TimeoutError:
+            evento = {"tipo": "snapshot", **estado.snapshot()}
+        await websocket.send_json(evento)
+
+
 @app.websocket("/ws")
 async def ws(websocket: WebSocket):
     await websocket.accept()
     fila = estado.assinar()
     try:
         await websocket.send_json({"tipo": "snapshot", **estado.snapshot()})
-        while True:
-            evento = await fila.get()
-            await websocket.send_json(evento)
-    except WebSocketDisconnect:
+        await _bombear_ws(websocket, fila)
+    except (WebSocketDisconnect, RuntimeError):
         pass
     finally:
         estado.cancelar(fila)
@@ -1245,10 +1281,9 @@ async def ws_gerente(websocket: WebSocket):
     fila = estado.assinar()
     try:
         await websocket.send_json({"tipo": "snapshot", **estado.snapshot()})
-        while True:
-            evento = await fila.get()
-            await websocket.send_json(evento)
-    except WebSocketDisconnect:
+        await _bombear_ws(websocket, fila)
+    except (WebSocketDisconnect, RuntimeError):
         pass
     finally:
         estado.cancelar(fila)
+
