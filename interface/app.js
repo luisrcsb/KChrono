@@ -407,19 +407,32 @@ function alternarPausa() {
 }
 
 // ---------------------------------------------------------------- WebSocket
+let _ultimoMsgWS = 0;
+let _reconTimer = null;
+function _agendarRecon(ms) {
+  if (_reconTimer) return;
+  _reconTimer = setTimeout(() => { _reconTimer = null; conectarWS(); }, ms || 1500);
+}
 function conectarWS() {
   if (ws && ws.readyState <= 1) return;
   const proto = location.protocol === "https:" ? "wss" : "ws";
-  ws = new WebSocket(`${proto}://${location.host}/ws`);
+  try {
+    ws = new WebSocket(`${proto}://${location.host}/ws`);
+  } catch (e) { _agendarRecon(1000); return; }
   const status = document.getElementById("ws-status");
-
-  ws.onopen = () => { status.textContent = "Conectado com o servidor"; status.style.color = "var(--accent-green)"; };
-  ws.onclose = () => {
-    status.textContent = "Desconectado do servidor"; status.style.color = "var(--accent-red)";
-    setTimeout(conectarWS, 2000);   // reconexão automática
-  };
-  ws.onmessage = (ev) => tratarEvento(JSON.parse(ev.data));
+  ws.onopen = () => { _ultimoMsgWS = Date.now(); if (status) { status.textContent = "Conectado com o servidor"; status.style.color = "var(--accent-green)"; } };
+  ws.onclose = () => { if (status) { status.textContent = "Desconectado do servidor"; status.style.color = "var(--accent-red)"; } _agendarRecon(1500); };
+  ws.onerror = () => { if (status) { status.textContent = "Desconectado do servidor"; status.style.color = "var(--accent-red)"; } try { ws.close(); } catch (e) {} };
+  ws.onmessage = (ev) => { _ultimoMsgWS = Date.now(); try { tratarEvento(JSON.parse(ev.data)); } catch (e) {} };
 }
+// watchdog: se ficar 6s sem mensagem, força reconexão (evita painel "morto")
+setInterval(() => {
+  const aberto = !!(ws && ws.readyState === 1);
+  const vivo = aberto && (Date.now() - _ultimoMsgWS) < 6000;
+  if (vivo) return;
+  if (aberto) { try { ws.close(); } catch (e) {} }
+  else { _agendarRecon(800); }
+}, 2000);
 
 function tratarEvento(ev) {
   if (ev.tipo === "snapshot") { renderSnapshot(ev); return; }
@@ -488,6 +501,13 @@ function tratarEvento(ev) {
     case "sessao":
       logMsg(`sessão: ${ev.estado}`, "l-sistema", "log-operador");
       document.getElementById("operador-estado").textContent = ev.estado;
+      if (ev.id && ev.id !== ultimoSessaoId) {
+        ultimoSessaoId = ev.id;
+        ultimaClassificacao = { linhas: [] };
+        ultimasVoltasData = { pilotos: [], parametros: {} };
+        renderClassificacao({ linhas: [] });
+        renderVoltaAVolta();
+      }
       if (ev.classificacao) renderClassificacao({ linhas: ev.classificacao });
       // estado otimista imediato
       if (ev.estado === "finalizada" || ev.estado === "finalizado") {
@@ -532,6 +552,7 @@ function refreshDecoderPainel() {
 }
 
 let ultimaClassificacao = { linhas: [] };
+let ultimoSessaoId = null;
 let ultimasVoltasData = { pilotos: [], parametros: {} };
 
 // ---------------------------------------------------------------- render

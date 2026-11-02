@@ -1,10 +1,10 @@
 {
-  "versao": "1.0.14",
+  "versao": "1.0.15",
   "canal": "estavel",
   "url_base": "",
-  "notas": "Versão 1.0.14 — finalizar: publica fim na hora e roda som/DB/upload em thread de fundo; operador congela o relógio junto com o telão; painéis atualizam em tempo real via evento",
+  "notas": "Versão 1.0.15 — sincronismo instantâneo operator/telão; reset de painéis ao iniciar sessão; watchdog WS no operador",
   "arquivos": {
-    "windows": "KChrono-Setup-1-0-14.exe",
-    "linux": "KChrono-1.0.14-x86_64.AppImage"
+    "windows": "KChrono-Setup-1-0-15.exe",
+    "linux": "KChrono-1.0.15-x86_64.AppImage"
   }
 }

@@ -811,6 +811,16 @@ class EstadoApp:
                                  "tipo": tipo, "simulacao": self.sessao_simulacao,
                                  "tempo_s": 0.0, "restante_s": None,
                                  "pausada": False})
+        # reset dos paineis: publica classificacao/voltas zeradas para que operador
+        # e telao limpem a tabela da sessao anterior assim que a nova inicia
+        try:
+            self.publicar("classificacao", {"linhas": self._classificacao()}, registrar=False)
+        except Exception:
+            pass
+        try:
+            self.publicar("voltas", self.dados_voltas(), registrar=False)
+        except Exception:
+            pass
         return True
 
     def _resolver_transponder(self, transponder: int):
