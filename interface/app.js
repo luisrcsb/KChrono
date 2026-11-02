@@ -489,7 +489,7 @@ function tratarEvento(ev) {
       logMsg(`sessão: ${ev.estado}`, "l-sistema", "log-operador");
       document.getElementById("operador-estado").textContent = ev.estado;
       if (ev.classificacao) renderClassificacao({ linhas: ev.classificacao });
-      // estado otimista imediato (o refresh abaixo confirma pelo snapshot)
+      // estado otimista imediato
       if (ev.estado === "finalizada" || ev.estado === "finalizado") {
         sessaoAtiva = false; estadoSessao = "finalizado";
       }
@@ -498,8 +498,9 @@ function tratarEvento(ev) {
       if (typeof ev.pausada === "boolean") sessaoPausada = ev.pausada;
       atualizarBotaoPrincipal();
       atualizarBotaoPausa();
-      // atualiza a base do cronômetro (o snapshot só chega ao conectar o WS)
-      api("status", "GET").then(s => { if (s && s.sessao) renderSessao(s.sessao); }).catch(() => {});
+      // atualiza a base do cronômetro DIRETO do evento (sem round-trip HTTP),
+      // para o relógio do operador parar junto com o telão no fim da prova.
+      renderSessao(ev);
       break;
     case "sistema":
       logMsg(ev.msg, "l-sistema", "log-operador");

@@ -135,7 +135,10 @@ class MotorCorrida:
         if self.estado in (EstadoSessao.PARADO, EstadoSessao.FINALIZADO):
             return
         self.estado = EstadoSessao.FINALIZADO
-        self._persistir_estado(fechar=True)
+        # a persistência do fechamento da sessão (DB) é feita pelo chamador em
+        # background, para não bloquear o loop de eventos no momento do fim.
+        pass
+
 
     def _persistir_estado(self, fechar: bool = False):
         if not self.banco:

@@ -1,10 +1,10 @@
 {
-  "versao": "1.0.13",
+  "versao": "1.0.14",
   "canal": "estavel",
   "url_base": "",
-  "notas": "Versão 1.0.13 — telão: reabre sozinho em tela cheia na 2ª tela; atualização: caixa de diálogo ao abrir; telão ao vivo (snapshot a cada 1,5s + watchdog); finalizar congela o relógio; 1ª passagem é só abertura de volta",
+  "notas": "Versão 1.0.14 — finalizar: publica fim na hora e roda som/DB/upload em thread de fundo; operador congela o relógio junto com o telão; painéis atualizam em tempo real via evento",
   "arquivos": {
-    "windows": "KChrono-Setup-1-0-13.exe",
-    "linux": "KChrono-1.0.13-x86_64.AppImage"
+    "windows": "KChrono-Setup-1-0-14.exe",
+    "linux": "KChrono-1.0.14-x86_64.AppImage"
   }
 }

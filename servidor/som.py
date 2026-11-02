@@ -329,22 +329,34 @@ class ModuloSom:
           o resultado da corrida: "O 1º lugar é de [nome], 2º [nome], etc."
         """
         # padrão de bips: 1 longo + 5 curtos
-        self._beep_pattern(500, 500, 1200, 100, 5)
+        try:
+            self._beep_pattern(500, 500, 1200, 100, 5)
+        except Exception as e:
+            log.warning("bips de fim de sessão falharam: %s", e)
         # frase final
-        if tipo == "treino":
-            self.falar("treino_finalizado")
-        elif tipo == "classificacao":
-            self.falar("classificacao_finalizada")
-        else:
-            self.falar("finalizada")
+        try:
+            if tipo == "treino":
+                self.falar("treino_finalizado")
+            elif tipo == "classificacao":
+                self.falar("classificacao_finalizada")
+            else:
+                self.falar("finalizada")
+        except Exception as e:
+            log.warning("frase de fim de sessão falhou: %s", e)
         # anúncios suplementares — posições/grid só quando o chamador liberou
         # (None = desligado). No treino NUNCA, por garantia extra:
         if tipo == "treino":
             return
         if grid_ordenado is not None:
-            self._annunciar_grid(grid_ordenado, invertido=grid_invertido)
+            try:
+                self._annunciar_grid(grid_ordenado, invertido=grid_invertido)
+            except Exception as e:
+                log.warning("anúncio de grid falhou: %s", e)
         if resultados is not None:
-            self._annuncian_resultados(resultados)
+            try:
+                self._annuncian_resultados(resultados)
+            except Exception as e:
+                log.warning("anúncio de resultados falhou: %s", e)
 
     def _posicao_por_extenso(self, n: int) -> str:
         """Retorna '1º', '2º', '3º', '4º', etc."""

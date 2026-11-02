@@ -1295,7 +1295,10 @@ class EstadoApp:
         #    tempo final e nenhum tick posterior volta a avançar o relógio.
         if self._tempo_final_s is None:
             self._tempo_final_s = self.tempo_sessao_s()
-        self.motor.finalizar()
+        # marca o motor como finalizado SEM tocar o banco (persistência vai
+        # para a thread de fundo, para não atrasar o envio do fim de prova)
+        from nucleo.modelos import EstadoSessao as _ES
+        self.motor.estado = _ES.FINALIZADO
         # simulador de CTAD: corta a reprodução junto com a sessão
         if hasattr(self.driver, "parar_replay"):
             self.driver.parar_replay()
@@ -1304,8 +1307,7 @@ class EstadoApp:
         self._cancelar_regressiva()
         self._cancelar_largada()
         # dados para o anúncio de fim de sessão
-        classificacao = self._classificacao()  # lista de dicts com posicao/nome
-        # tipo de sessão para o anúncio
+        classificacao = self._classificacao()
         tipo_motor = (self.motor.tipo or "").value if self.motor and self.motor.tipo else ""
         # 2) publica o FIM imediatamente — telão e operador congelam o relógio
         #    na hora, mesmo que a locução ou o upload demorem/falhem depois.
@@ -1316,38 +1318,41 @@ class EstadoApp:
                                  "pausada": False,
                                  "classificacao": classificacao})
         self.publicar("classificacao", {"linhas": classificacao}, registrar=False)
-        # 3) anúncio de fim de sessão: bips + frase sempre; posições (grid e
-        #    resultados) SÓ se o checkbox "depois" do tipo de sessão estiver
-        #    ligado — no treino, nunca. Qualquer falha de áudio não pode
-        #    impedir o encerramento.
-        inverter_grid = bool(self.config.get("inverter_grid", False))
-        grid_ordenado = None
-        resultados = None
-        if self._posicoes_depois_ok(tipo_motor):
-            # monta a ordem do grid a partir da classificação (posicao 1 = Pole)
-            grid_ordenado = [c["posicao"] for c in classificacao] if classificacao else None
-            # resultados da corrida (mesma estrutura da classificação)
-            resultados = classificacao[:] if classificacao else None
-        try:
-            self.som.finalizada(
-                tipo_motor,
-                grid_ordenado=grid_ordenado,
-                grid_invertido=inverter_grid,
-                resultados=resultados,
-            )
-        except Exception as e:
-            log.warning("anúncio de fim de sessão falhou: %s", e)
-        # auto-upload (Fase 3): enfileira a sessão completa para o CTAD
-        # (sessão de simulação nunca vai ao CTAD — é teste/desenvolvimento)
-        if (self.config.get("auto_upload") and self.sincronizador.configurado
-                and not self.sessao_simulacao):
+        # 3) anúncio de fim de sessão + persistência + auto-upload em thread de
+        #    fundo, para não bloquear o loop de eventos (som, DB e rede).
+        def _tarefa_fundo():
+            # persistência do fechamento da sessão (DB)
             try:
-                payload = self.sincronizador.sessao_para_upload(
-                    self.sessao_id, f"sessao_{self.sessao_id[:8]}")
-                self.sincronizador.enfileirar(payload)
-                self.publicar("sync", {"msg": "sessão enfileirada para o CTAD (auto-upload)"})
+                self.motor._persistir_estado(fechar=True)
             except Exception as e:
-                log.warning("auto-upload falhou: %s", e)
+                log.warning("persistência do fechamento falhou: %s", e)
+            inverter_grid = bool(self.config.get("inverter_grid", False))
+            grid_ordenado = None
+            resultados = None
+            if self._posicoes_depois_ok(tipo_motor):
+                grid_ordenado = [c["posicao"] for c in classificacao] if classificacao else None
+                resultados = classificacao[:] if classificacao else None
+            try:
+                self.som.finalizada(
+                    tipo_motor,
+                    grid_ordenado=grid_ordenado,
+                    grid_invertido=inverter_grid,
+                    resultados=resultados,
+                )
+            except Exception as e:
+                log.warning("anúncio de fim de sessão falhou: %s", e)
+            # auto-upload (Fase 3)
+            if (self.config.get("auto_upload") and self.sincronizador.configurado
+                    and not self.sessao_simulacao):
+                try:
+                    payload = self.sincronizador.sessao_para_upload(
+                        self.sessao_id, f"sessao_{self.sessao_id[:8]}")
+                    self.sincronizador.enfileirar(payload)
+                    self.publicar("sync", {"msg": "sessão enfileirada para o CTAD (auto-upload)"})
+                except Exception as e:
+                    log.warning("auto-upload falhou: %s", e)
+        import threading
+        threading.Thread(target=_tarefa_fundo, daemon=True).start()
         return True
 
     # ---------------------------------------------------------------- gerente de pista
