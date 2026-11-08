@@ -88,6 +88,8 @@ class EstadoApp:
         self._task_largada: Optional[asyncio.Task] = None
         self.parametros: Dict = {"duracao": 10, "criterio": "tempo",
                                  "tempo_minimo_volta_s": 3}
+        #: tempo adicional (em segundos) para concluir a última volta após expirar a duração
+        self._tempo_terminar_s: int = 30
         self.som = ModuloSom(ativo=True)
         # recordes para locução (carregados a cada sessão) e tarefa de posições
         self._recorde_pista_us: Optional[int] = None
@@ -298,6 +300,13 @@ class EstadoApp:
         except (TypeError, ValueError):
             return 10
 
+    def tempo_terminar_s(self) -> int:
+        """Tempo extra (em segundos) para concluir a última volta após o fim da duração."""
+        try:
+            return max(5, min(600, int(self.config.get("tempo_terminar_s", self._tempo_terminar_s))))
+        except (TypeError, ValueError):
+            return self._tempo_terminar_s
+
     def definir_contador_s(self, contador_s: int) -> Dict:
         """Salva o tempo do contador regressivo (0-120 s) em config.json."""
         try:
@@ -309,6 +318,19 @@ class EstadoApp:
         salvar_config(cfg)
         self.config = cfg
         return {"ok": True, "contador_s": valor}
+
+    def definir_tempo_terminar_s(self, tempo_terminar_s: int) -> Dict:
+        """Salva o tempo extra para terminar última volta (5-600 s) em config.json."""
+        try:
+            valor = max(5, min(600, int(tempo_terminar_s)))
+        except (TypeError, ValueError):
+            raise ValueError("tempo terminar inválido — informe 5 a 600 segundos")
+        cfg = carregar_config()
+        cfg["tempo_terminar_s"] = valor
+        salvar_config(cfg)
+        self.config = cfg
+        self._tempo_terminar_s = valor
+        return {"ok": True, "tempo_terminar_s": valor}
 
     def telao_tela(self) -> Dict:
         """Monitor escolhido para o telão (Configurações → Telão)."""
@@ -591,7 +613,7 @@ class EstadoApp:
             self.contadores["passings_validos"] += 1
             self.publicar("volta", {
                 "piloto_id": volta.piloto_id, "nome": self._piloto_nome(volta.piloto_id),
-                "numero": volta.numero, "tempo": volta.tempo_s})
+                "numero": volta.numero, "tempo": float(volta.tempo_s)})
             self.publicar("classificacao", {"linhas": self._classificacao()})
             self.publicar("voltas", self.dados_voltas())
             self._anunciar_volta(volta)
@@ -686,19 +708,67 @@ class EstadoApp:
 
     def dados_voltas(self) -> Dict:
         """Voltas volta a volta da sessão atual (para gráficos e Volta-a-volta)."""
-        if not self.motor or not self.sessao_id:
-            return {"pilotos": [], "parametros": self.parametros}
-        voltas = self.banco.voltas_da_sessao(self.sessao_id)
         por: Dict[int, Dict] = {}
-        for v in voltas:
-            item = por.setdefault(v.piloto_id, {
-                "piloto_id": v.piloto_id,
-                "nome": self._piloto_nome(v.piloto_id),
-                "voltas": []})
-            item["voltas"].append(
-                {"numero": v.numero, "tempo": round(v.tempo_us / 1e6, 3),
-                 "melhor": bool(v.melhor)})
-        pilotos = sorted(por.values(), key=lambda p: -len(p["voltas"]))
+
+        # 1) base do banco persistido
+        if self.sessao_id and self.banco:
+            try:
+                voltas = self.banco.voltas_da_sessao(self.sessao_id)
+                for v in voltas:
+                    item = por.setdefault(v.piloto_id, {
+                        "piloto_id": v.piloto_id,
+                        "nome": self._piloto_nome(v.piloto_id),
+                        "voltas": []})
+                    item["voltas"].append({
+                        "numero": v.numero,
+                        "tempo": round(v.tempo_us / 1e6, 3),
+                        "melhor": bool(v.melhor)})
+            except Exception:
+                pass
+
+        # 2) acrescenta / atualiza com voltas em memória do motor da sessão ativa
+        if self.motor:
+            try:
+                for pid, estado in getattr(self.motor, "_pilotos", {}).items():
+                    pid_int = int(pid)
+                    nome = self._piloto_nome(pid_int) or getattr(estado, "nome", "")
+                    item = por.setdefault(pid_int, {
+                        "piloto_id": pid_int,
+                        "nome": nome,
+                        "voltas": []})
+
+                    mem_voltas = getattr(estado, "voltas", [])
+                    # melhor volta para marcar 'melhor'
+                    melhor_us = min((getattr(v, "tempo_us", float("inf")) for v in mem_voltas), default=None)
+                    existentes = {x["numero"] for x in item["voltas"]}
+                    for v in sorted(mem_voltas, key=lambda vv: getattr(vv, "numero", 0)):
+                        n = getattr(v, "numero", 0)
+                        if n in existentes:
+                            continue
+                        item["voltas"].append({
+                            "numero": n,
+                            "tempo": round(getattr(v, "tempo_us", 0) / 1e6, 3),
+                            "melhor": melhor_us is not None and getattr(v, "tempo_us", 0) == melhor_us
+                        })
+                    item["voltas"].sort(key=lambda x: x["numero"])
+            except Exception:
+                pass
+
+        # 3) garante que todos os pilotos do motor apareçam, mesmo sem voltas
+        if self.motor:
+            try:
+                for pid in getattr(self.motor, "_pilotos", {}):
+                    pid_int = int(pid)
+                    if pid_int not in por:
+                        por[pid_int] = {
+                            "piloto_id": pid_int,
+                            "nome": self._piloto_nome(pid_int) or getattr(self.motor._pilotos[pid], "nome", ""),
+                            "voltas": []
+                        }
+            except Exception:
+                pass
+
+        pilotos = sorted(por.values(), key=lambda p: -len(p.get("voltas", [])))
         return {"pilotos": pilotos, "parametros": self.parametros}
 
     def _classificacao(self):
@@ -1065,6 +1135,8 @@ class EstadoApp:
 
         · intervalo do campeonato  → tempo restante do intervalo;
         · sessão/corrida por tempo → duração (min) menos o tempo já decorrido;
+          após expirar a duração, mantém o cronômetro rodando por tempo_terminar_s
+          para permitir concluir a volta em andamento;
         · por voltas ou finalizada → None (o display segue contando pra cima).
         """
         if self._regressiva:
@@ -1080,7 +1152,20 @@ class EstadoApp:
         decorrido = self.tempo_sessao_s()
         if decorrido is None:
             return None
-        return max(0.0, dur_min * 60.0 - decorrido)
+        dur_total = dur_min * 60.0
+        tempo_extra = float(self.tempo_terminar_s())
+        # Se já expirou a duração principal, aguarda o tempo extra para finalizar
+        if decorrido > dur_total:
+            # se ainda está dentro do tempo extra, devolve o que falta do extra
+            if decorrido < dur_total + tempo_extra:
+                return max(0.0, dur_total + tempo_extra - decorrido)
+            # tempo extra acabou → finaliza automaticamente
+            if not self.pausado and self._tempo_final_s is None:
+                log.info("tempo de terminar expirado; finalizando sessão automaticamente")
+                self.finalizar()
+                return 0.0
+            return 0.0
+        return max(0.0, dur_total - decorrido)
 
     def _cancelar_regressiva(self):
         self._regressiva = None
@@ -1316,49 +1401,85 @@ class EstadoApp:
         self._pausa_inicio_us = None
         self._cancelar_regressiva()
         self._cancelar_largada()
-        # dados para o anúncio de fim de sessão
-        classificacao = self._classificacao()
-        tipo_motor = (self.motor.tipo or "").value if self.motor and self.motor.tipo else ""
-        # 2) publica o FIM imediatamente — telão e operador congelam o relógio
-        #    na hora, mesmo que a locução ou o upload demorem/falhem depois.
-        self.publicar("sessao", {"id": self.sessao_id, "estado": "finalizado",
-                                 "simulacao": self.sessao_simulacao,
+        # Capturamos todas as referências e calculamos a classificação antes de
+        # publicar os eventos finais. campeonato_proxima() pode trocar self.motor
+        # e self.sessao_id logo depois desta função; a sessão encerrada precisa
+        # continuar sendo usada pela persistência, pelo áudio e pelos resultados.
+        motor_finalizado = self.motor
+        sessao_id_final = self.sessao_id
+        simulacao_final = self.sessao_simulacao
+        tipo_motor = ((motor_finalizado.tipo or "").value
+                      if motor_finalizado and motor_finalizado.tipo else "")
+        classificacao_final = self._classificacao()
+        config_final = dict(self.config)
+
+        # 2) publica o FIM antes de qualquer tarefa de fundo. O cronômetro fica
+        # congelado imediatamente nas interfaces.
+        self.publicar("sessao", {"id": sessao_id_final, "estado": "finalizado",
+                                 "simulacao": simulacao_final,
                                  "tempo_s": self.tempo_sessao_s(),
                                  "restante_s": None,
-                                 "pausada": False,
-                                 "classificacao": classificacao})
-        self.publicar("classificacao", {"linhas": classificacao}, registrar=False)
-        # 3) anúncio de fim de sessão + persistência + auto-upload em thread de
-        #    fundo, para não bloquear o loop de eventos (som, DB e rede).
+                                 "pausada": False})
+        # 3) publique imediatamente o snapshot final da classificação e das
+        #    voltas. Persistência, locução e auto-upload ficam em fundo; os
+        #    monitores não podem esperar essa thread para mostrar os resultados.
+        self.publicar("classificacao", {"linhas": classificacao_final}, registrar=False)
+        self.publicar("voltas", self.dados_voltas(), registrar=False)
+        # 4) o aviso sonoro sai agora, no clique, sem esperar persistência nem
+        #    upload. Uma thread daemon pode terminar (ou ser atrasada) antes de
+        #    winsound e o locutor começarem — o operador ouviria silêncio.
+        inverter_grid = bool(config_final.get("inverter_grid", False))
+        grid_ordenado = None
+        resultados = None
+        if tipo_motor != "treino":
+            if tipo_motor == "classificacao":
+                anunciar_depois = bool((config_final.get("som") or {}).get(
+                    "anunciar_posicoes_classificacao_depois", False))
+            else:
+                anunciar_depois = bool((config_final.get("som") or {}).get(
+                    "anunciar_posicoes_corrida_depois", False))
+            if anunciar_depois:
+                grid_ordenado = ([c["posicao"] for c in classificacao_final]
+                                 if classificacao_final else None)
+                resultados = classificacao_final[:] if classificacao_final else None
+        try:
+            self.som.finalizada(
+                tipo_motor,
+                grid_ordenado=grid_ordenado,
+                grid_invertido=inverter_grid,
+                resultados=resultados,
+            )
+        except Exception as e:
+            log.warning("anúncio de fim de sessão falhou: %s", e)
+        # O callback volta ao loop asyncio antes de publicar eventos secundários;
+        # asyncio.Queue não é thread-safe e publicar diretamente da thread poderia
+        # perder o evento.
+        try:
+            loop_eventos = asyncio.get_running_loop()
+        except RuntimeError:
+            loop_eventos = None
+        def publicar_fundo(tipo: str, dados: Dict, registrar: bool = True):
+            """Agenda publicações no loop asyncio a partir de uma thread."""
+            if loop_eventos and not loop_eventos.is_closed():
+                loop_eventos.call_soon_threadsafe(
+                    self.publicar, tipo, dados, registrar)
+
         def _tarefa_fundo():
-            # persistência do fechamento da sessão (DB)
+            # Persistência usa o motor e a sessão que acabaram de ser fechados,
+            # nunca os objetos que uma etapa seguinte possa instalar em self.
             try:
-                self.motor._persistir_estado(fechar=True)
+                if motor_finalizado:
+                    motor_finalizado._persistir_estado(fechar=True)
             except Exception as e:
                 log.warning("persistência do fechamento falhou: %s", e)
-            inverter_grid = bool(self.config.get("inverter_grid", False))
-            grid_ordenado = None
-            resultados = None
-            if self._posicoes_depois_ok(tipo_motor):
-                grid_ordenado = [c["posicao"] for c in classificacao] if classificacao else None
-                resultados = classificacao[:] if classificacao else None
-            try:
-                self.som.finalizada(
-                    tipo_motor,
-                    grid_ordenado=grid_ordenado,
-                    grid_invertido=inverter_grid,
-                    resultados=resultados,
-                )
-            except Exception as e:
-                log.warning("anúncio de fim de sessão falhou: %s", e)
-            # auto-upload (Fase 3)
-            if (self.config.get("auto_upload") and self.sincronizador.configurado
-                    and not self.sessao_simulacao):
+            # auto-upload (Fase 3), também referindo a sessão capturada.
+            if (config_final.get("auto_upload") and self.sincronizador.configurado
+                    and not simulacao_final and sessao_id_final):
                 try:
                     payload = self.sincronizador.sessao_para_upload(
-                        self.sessao_id, f"sessao_{self.sessao_id[:8]}")
+                        sessao_id_final, f"sessao_{sessao_id_final[:8]}")
                     self.sincronizador.enfileirar(payload)
-                    self.publicar("sync", {"msg": "sessão enfileirada para o CTAD (auto-upload)"})
+                    publicar_fundo("sync", {"msg": "sessão enfileirada para o CTAD (auto-upload)"})
                 except Exception as e:
                     log.warning("auto-upload falhou: %s", e)
         import threading
@@ -1523,8 +1644,17 @@ class EstadoApp:
         """
         if not self.motor:
             return {"ok": False, "erro": "sem sessão ativa"}
+        ja_tinha_abertura = piloto_id in getattr(self.motor, "_abertura_tecla_us", {})
         volta = self.motor.adicionar_volta_por_tecla(piloto_id)
         if volta is None:
+            # A primeira tecla é a passagem de abertura; não é erro e não deve
+            # gerar evento de volta/classificação nem locução de volta completa.
+            if (not ja_tinha_abertura and
+                    piloto_id in getattr(self.motor, "_abertura_tecla_us", {})):
+                nome = self._piloto_nome(piloto_id)
+                self._som_passagem(piloto_id=piloto_id)
+                self.publicar("admin", {"msg": f"passagem de {nome} via atalho (volta aberta)"})
+                return {"ok": True, "aberta": True, "piloto_id": piloto_id}
             return {"ok": False,
                     "erro": "piloto fora da sessão (confira o check-in) ou tempo inválido"}
         nome = self._piloto_nome(piloto_id)
@@ -1534,11 +1664,11 @@ class EstadoApp:
         self._som_passagem(piloto_id=piloto_id)
         self.publicar("admin", {"msg": f"volta de {nome} via atalho"})
         self.publicar("volta", {"piloto_id": piloto_id, "nome": nome,
-                                "numero": volta.numero, "tempo": volta.tempo_s})
+                                "numero": volta.numero, "tempo": float(volta.tempo_s)})
         self.publicar("classificacao", {"linhas": self._classificacao()})
         self.publicar("voltas", self.dados_voltas())
         self._anunciar_volta(volta)
-        return {"ok": True, "tempo_s": volta.tempo_s, "tempo": formatar(volta.tempo_us),
+        return {"ok": True, "tempo_s": float(volta.tempo_s), "tempo": formatar(volta.tempo_us),
                 "piloto_id": piloto_id}
 
     # ----- associação tecla F1..F12 -> piloto -----

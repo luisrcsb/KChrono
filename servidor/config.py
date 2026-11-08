@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import os
 from typing import Dict
 
 from caminhos import dir_dados
@@ -9,16 +10,18 @@ from caminhos import dir_dados
 DIR_PROJETO = dir_dados()
 CONFIG_PATH = DIR_PROJETO / "config.json"
 
-#: Modelo gravado no primeiro uso (credenciais do projeto KChrono no Firebase)
+#: Modelo gravado no primeiro uso.
+#: Os segredos reais ficam ESTRITAMENTE fora do repositório, preferencialmente em
+#: variáveis de ambiente ou em um arquivo local não versionado.
 CONFIG_MODELO = {
     "firebase": {
-        "apiKey": "AIzaSyDCTkeIa6QsY2zYs8S__HlIwcY-zcuhZCA",
-        "databaseURL": "https://krathus-telemetria-default-rtdb.firebaseio.com",
-        "storageBucket": "krathus-telemetria.firebasestorage.app",
+        "apiKey": os.getenv("KCHRONO_FIREBASE_API_KEY", ""),
+        "databaseURL": os.getenv("KCHRONO_FIREBASE_DATABASE_URL", ""),
+        "storageBucket": os.getenv("KCHRONO_FIREBASE_STORAGE_BUCKET", ""),
     },
-    "email": "",
-    "password": "",
-    "pistaId": "krathus",
+    "email": os.getenv("KCHRONO_FIREBASE_EMAIL", ""),
+    "password": os.getenv("KCHRONO_FIREBASE_PASSWORD", ""),
+    "pistaId": os.getenv("KCHRONO_PISTA_ID", "krathus"),
     "auto_upload": True,          # envia ao finalizar a sessão
     "tempo_minimo_volta_s": 3,
     # classificação: média de N voltas consecutivas (3, 5, 7...)

@@ -83,9 +83,12 @@ class MotorCorrida:
         self.tempo_minimo_volta_us = tempo_minimo_volta_us  # filtro ghost lap
         self.on_rejeicao = on_rejeicao    # callback(transponder, tempo_us, passing_number)
         self.rejeitados: List[Dict] = []  # ghost laps descartados (auditoria)
-        # instante (µs) da última volta registrada de cada piloto, na coordenada
-        # do cronômetro da sessão — usado pelo atalho F1..F12
+        # Instante (µs) da última volta registrada de cada piloto, na coordenada
+        # do cronômetro da sessão. O atalho F1..F12 usa uma referência separada:
+        # a primeira tecla apenas abre a volta, exatamente como o primeiro
+        # passing do decoder, e só a segunda tecla fecha a primeira volta.
         self._ultimo_passo_us: Dict[int, int] = {}
+        self._abertura_tecla_us: Dict[int, int] = {}
         # relógio da sessão (µs decorridos, sem contar pausas); None = monotonic
         self.relogio_sessao = relogio_sessao
 
@@ -324,7 +327,10 @@ class MotorCorrida:
             gap = ""
             if lider is not None and estado is not lider:
                 if len(estado.voltas) == len(lider.voltas):
-                    diff = estado.tempo_total_us - lider.tempo_total_us
+                    # Gap sempre é a diferença positiva em relação ao primeiro.
+                    # O ranking pode ser recalculado por outro critério, portanto
+                    # nunca propague um valor negativo para o telão.
+                    diff = abs(estado.tempo_total_us - lider.tempo_total_us)
                     gap = f"+{formatar_tempo(diff)}"
                 else:
                     gap = f"+{len(lider.voltas) - len(estado.voltas)} volta(s)"
@@ -426,11 +432,15 @@ class MotorCorrida:
 
     def adicionar_volta_por_tecla(self, piloto_id: int, agora_us: Optional[int] = None,
                                   base_us: Optional[int] = None) -> Optional[Volta]:
-        """Atalho F1..F12: registra a volta do piloto usando o tempo desde a
-        última volta dele (ou desde o início da sessão, se for a primeira).
+        """Processa uma passagem simulada pelo teclado.
 
-        Devolve a volta criada, ou None se não der para registrar (piloto
-        fora da sessão / tempo inválido).
+        A primeira tecla de cada piloto abre a volta e não cria registro. Cada
+        tecla seguinte fecha a volta aberta e abre imediatamente a próxima
+        referência. Isso mantém F1..F12 semanticamente equivalente ao decoder:
+        o atraso até a primeira passagem é individual e nunca vira uma volta.
+
+        Devolve a volta fechada, ou ``None`` quando a tecla apenas abriu a
+        volta (ou quando o piloto/tempo é inválido).
         """
         estado = self._pilotos.get(piloto_id)
         if not estado:
@@ -439,12 +449,38 @@ class MotorCorrida:
             agora_us = self.agora_sessao_us()
         if base_us is None:
             base_us = 0
-        referencia = self._ultimo_passo_us.get(piloto_id, base_us)
-        tempo_us = int(agora_us - referencia)
+        agora_us = int(agora_us)
+
+        abertura = self._abertura_tecla_us.get(piloto_id)
+        if abertura is None:
+            self._abertura_tecla_us[piloto_id] = agora_us
+            return None
+
+        tempo_us = agora_us - abertura
         if tempo_us <= 0:
             return None
+
+        # O atalho de teclado representa uma passagem real e precisa respeitar
+        # o mesmo filtro de ghost lap configurado para o decoder. A referência
+        # fica na passagem anterior quando o intervalo é curto; assim, um
+        # acionamento acidental não encurta a próxima volta válida.
+        minimo = max(int(self.tempo_minimo_volta_us or 0),
+                     TEMPO_MINIMO_ABSOLUTO_US)
+        if tempo_us < minimo:
+            self.rejeitados.append({"piloto_id": piloto_id,
+                                    "tempo_us": tempo_us,
+                                    "origem": "teclado"})
+            if tempo_us >= TEMPO_RUIDO_US:
+                log.warning("ghost lap via teclado: piloto %s, delta %d us < "
+                            "mínimo %d us", piloto_id, tempo_us, minimo)
+                if self.on_rejeicao:
+                    transponder = estado.transponder
+                    self.on_rejeicao(transponder or 0, tempo_us, None)
+            return None
+
         volta = self.adicionar_volta(piloto_id, tempo_us)
         if not volta:
             return None
+        self._abertura_tecla_us[piloto_id] = agora_us
         self._ultimo_passo_us[piloto_id] = agora_us
         return volta

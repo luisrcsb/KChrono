@@ -299,21 +299,29 @@ class ModuloSom:
         self.falar("retomada")
 
     def _beep(self, freq: int, ms: float):
-        """Tone puro em thread daemon (já usado pelos bipes de passagem/leader)."""
+        """Tone puro (já usado pelos bipes de passagem/leader)."""
         import winsound
         try:
-            winsound.Beep(freq, int(ms))
-        except Exception:
-            pass
+            winsound.Beep(int(freq), int(ms))
+        except Exception as e:
+            log.warning("bip %sHz/%sms falhou: %s", freq, ms, e)
 
     def _beep_pattern(self, long_freq: int = 500, long_ms: int = 500,
                       short_freq: int = 1200, short_ms: int = 100, n: int = 5):
-        """Toca 1 bip longo + N bips curtos e altos, em thread daemon."""
-        threading.Thread(target=lambda: self._beep(long_freq, long_ms), daemon=True).start()
-        for _ in range(n):
-            threading.Thread(target=lambda: self._beep(short_freq, short_ms), daemon=True).start()
-        # pequeno atraso para os bips iniciarem antes da fala
-        threading.Event().wait(0.2)
+        """Toca o padrão em sequência, preservando a cadência dos bips.
+
+        Antes cada bip era colocado em uma thread independente ao mesmo tempo.
+        No Windows isso fazia os sons se sobreporem (ou alguns serem perdidos),
+        especialmente quando ``finalizada()`` era chamada em uma thread daemon.
+        Um único worker mantém a ordem: 1 bip longo, seguido de N bips curtos.
+        """
+        def _executar():
+            self._beep(long_freq, long_ms)
+            for _ in range(max(0, int(n))):
+                self._beep(short_freq, short_ms)
+                threading.Event().wait(0.08)
+
+        threading.Thread(target=_executar, daemon=True, name="kchrono-bips-final").start()
 
     def finalizada(self, tipo: str = "", grid_ordenado: Optional[List[int]] = None,
                grid_invertido: bool = False, resultados: Optional[List[Dict]] = None):
@@ -328,6 +336,7 @@ class ModuloSom:
         * ``resultados`` : lista de dicts com 'posicao' e 'nome' para anunciar
           o resultado da corrida: "O 1º lugar é de [nome], 2º [nome], etc."
         """
+        log.info("finalizada: tipo='%s', habilitados=%s", tipo, self.habilitados)
         # padrão de bips: 1 longo + 5 curtos
         try:
             self._beep_pattern(500, 500, 1200, 100, 5)

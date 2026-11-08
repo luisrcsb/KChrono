@@ -1,0 +1,14 @@
+{
+  "firebase": {
+    "apiKey": "",
+    "databaseURL": "",
+    "storageBucket": ""
+  },
+  "email": "",
+  "password": "",
+  "pistaId": "krathus",
+  "auto_upload": true,
+  "decoder_tipo": "p3",
+  "decoder_host": "192.168.0.50",
+  "decoder_porta": 5403
+}

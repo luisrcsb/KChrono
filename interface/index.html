@@ -1,10 +1,10 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>KChrono — Precision Timing System</title>
-<link rel="stylesheet" href="/static/estilo.css?v=1.0.15">
+<link rel="stylesheet" href="/static/estilo.css?v=1.1.2">
 <link rel="icon" href="/imagens/KCHRONO-LOGO.png">
 <script src="/static/chart.umd.min.js"></script>
 </head>
@@ -53,7 +53,7 @@
       <img id="side-qr-img" alt="QR Code de Gestão Remota" style="display:none">
       <div class="side-qr-info" id="side-qr-info">gerando…</div>
     </div>
-    <div class="admin-rodape"><span id="ws-status">Desconectado do servidor</span><br>KChrono <span class="js-versao">v1.0.15</span><br>por Raphael Belowodski</div>
+    <div class="admin-rodape"><span id="ws-status">Desconectado do servidor</span><br>KChrono <span class="js-versao">v1.1.2</span><br>por Raphael Belowodski</div>
   </aside>
   <div class="corpo">
 
@@ -89,10 +89,13 @@
       </div>
     </div>
 
-    <!-- configuração da sessão -->
-    <div class="card" style="margin-bottom:16px">
-      <h3>Configuração da sessão</h3>
-      <div class="form-sessao centro">
+    <!-- dashboard em duas colunas: esquerda 1/3 | direita 2/3 -->
+    <div class="dashboard-horizontal">
+      <div class="dashboard-esquerda">
+        <!-- configuração da sessão -->
+        <div class="card" style="margin-bottom:16px">
+          <h3>Configuração da sessão</h3>
+          <div class="form-sessao centro">
         <div><label>Tipo</label>
           <select id="cfg-tipo" onchange="tipoSessaoMudou()">
             <option value="treino">Treino</option>
@@ -120,6 +123,12 @@
           <input id="cfg-media-n" value="3" title="Melhor média de N voltas consecutivas (coluna 'Média N' do telão)"></div>
       </div>
 
+      <div class="acoes" style="margin-top:16px; border-top:1px solid var(--border-card); padding-top:12px;">
+        <button class="destaque" id="btn-acao-principal" onclick="acaoPrincipal()">▶ Iniciar treino</button>
+        <button id="btn-pausar" onclick="alternarPausa()" disabled title="Pausar o cronômetro da sessão">⏸ Pausar</button>
+        <button onclick="finalizar()">⏹ Finalizar</button>
+      </div>
+
       <div id="cfg-camp-escolha" style="display:none;margin-top:14px">
         <h3 style="margin-bottom:8px">Campeonato</h3>
         <div class="form-sessao centro">
@@ -140,34 +149,43 @@
       </div>
     </div>
 
-    <!-- check-in: quem está na pista, antes de iniciar a sessão -->
+    <!-- check-in e atalhos unificados -->
     <div class="card" style="margin-bottom:16px">
-      <h3>Pilotos na pista — check-in (<span id="op-checkin-n">0</span> marcados)</h3>
-      <div class="acoes" style="margin:10px 0">
+      <h3>Pilotos na pista — check-in (<span id="op-checkin-n">0</span> marcados) &amp; Atalhos (F1 … F12)</h3>
+      <div class="acoes" style="margin:10px 0; display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
         <input id="op-checkin-busca" class="input-busca" placeholder="Filtrar pilotos…"
                oninput="renderCheckin()">
         <button class="btn-mini" onclick="marcarTodosCheckin(true)">✔ Todos presentes</button>
         <button class="btn-mini" onclick="marcarTodosCheckin(false)">✖ Limpar</button>
+        <button class="btn-mini" onclick="abrirAssociacaoAtalhos()">Associar teclas a pilotos</button>
+        <button class="btn-mini" onclick="resetarAssociacaoAtalhos()">Restaurar automático</button>
       </div>
       <div id="op-checkin" class="lista-checkin">carregando…</div>
-      <p class="hint" style="margin-top:8px">Marque quem está na pista antes de iniciar a
-        sessão: só os pilotos marcados entram na corrida. Se ninguém for marcado, entram
-        todos os transponders cadastrados.</p>
-    </div>
 
-    <!-- voltas por atalho (F1..F12) -->
-    <div class="card" style="margin-bottom:16px">
-      <h3>Adicionar volta por atalho <span class="hint">(F1 … F12)</span></h3>
-      <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-bottom:10px">
-        <button class="btn" onclick="abrirAssociacaoAtalhos()">Associar teclas a pilotos</button>
-        <button class="btn" onclick="resetarAssociacaoAtalhos()">Restaurar automático (pela lista)</button>
-        <span class="hint">Associe manualmente cada tecla F1–F12 a um piloto. Com associação manual, só as teclas com piloto definido disparam.</span>
+      <div style="margin-top:14px; border-top:1px solid var(--border-card); padding-top:12px;">
+        <h4 style="font-size:12px; margin-bottom:6px; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.5px;">Adicionar volta rápida (F1 … F12)</h4>
+        <div id="op-atalhos" class="lista-atalhos">marque os pilotos no check-in acima</div>
       </div>
-      <div id="op-atalhos" class="lista-atalhos">marque os pilotos no check-in acima</div>
-      <p class="hint">Cada tecla <b>F1 … F12</b> registra uma volta do piloto
-        associado (também vale clicar no botão). O tempo da volta é medido desde
-        a última volta do piloto — na 1ª volta, desde o início da sessão.</p>
+      <p class="hint" style="margin-top:8px">Marque quem está na pista antes de iniciar. Cada tecla <b>F1 … F12</b> adiciona volta ao piloto correspondente.</p>
+
+      <!-- console -->
+      <div class="card" style="margin-top:16px">
+        <h3>Console de eventos</h3>
+        <div class="console-op" id="log-operador"></div>
+      </div>
     </div>
+  </div>
+
+  <!-- Coluna Direita: Live Feed -->
+  <div class="dashboard-direita">
+    <div class="card volta-a-volta-card" id="card-ao-vivo">
+        <h3>Ao Vivo</h3>
+        <div id="ao-vivo-grid" class="ao-vivo-grid">
+            <!-- Grid gerado pelo app.js -->
+        </div>
+    </div>
+  </div>
+</div>
 
     <!-- mapa da pista ativa (traçado desenhado no editor) -->
     <div class="card" id="pista-mini-card" style="margin-bottom:16px" hidden>
@@ -194,40 +212,8 @@
 
     <!-- controles (o botão principal muda com o tipo: treino/classificação/corrida) -->
     <div class="acoes">
-      <button class="destaque" id="btn-acao-principal" onclick="acaoPrincipal()">▶ Iniciar treino</button>
-      <button id="btn-pausar" onclick="alternarPausa()" disabled>⏸ Pausar</button>
-      <button onclick="finalizar()">⏹ Finalizar</button>
-      <button class="perigo" style="margin-left:auto" onclick="marcarGato()">🚫 Marcar "gato"</button>
-      <button class="perigo" onclick="apagarVolta()">🗑 Apagar volta</button>
-      <button onclick="desmarcarGato()">♻️ Desmarcar</button>
     </div>
 
-    <!-- classificação -->
-    <div class="card" style="margin-bottom:16px">
-      <h3>Classificação ao vivo <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--text-main)">— clique numa linha para selecionar o piloto (marcar gato / apagar volta)</span></h3>
-      <div class="tabela-wrap">
-        <table class="tabela-op" id="tabela-classificacao">
-          <tr><th>Pos</th><th>Nº</th><th>Abr</th><th>Piloto</th><th>Voltas</th><th>Total</th><th>Intervalo</th><th>Gap</th><th>Última</th><th>Melhor</th><th>km/h</th><th>Média</th><th>Média N</th><th>Desvio</th><th>Consist.</th><th>Transponder</th><th>Ações</th></tr>
-          <tr><td colspan="17" style="color:var(--text-muted)">nenhuma volta registrada</td></tr>
-        </table>
-      </div>
-    </div>
-
-    <!-- console + volta-a-volta -->
-    <div class="grid g2">
-      <div class="card">
-        <h3>Console de eventos</h3>
-        <div class="console-op" id="log-operador"></div>
-      </div>
-      <div class="card">
-        <h3>Volta-a-volta
-          <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--text-main)">
-            — tempos de cada volta por piloto e gap para o líder</span></h3>
-        <div class="volta-volta-wrap" id="volta-a-volta">
-          <p class="hint">aguardando a primeira volta…</p>
-        </div>
-      </div>
-    </div>
   </div>
 </section>
 
@@ -1170,7 +1156,7 @@
       <!-- ============ SOBRE ============ -->
       <div class="admin-sec" id="a-sobre">
         <div class="grid g4">
-          <div class="card"><h3>Versão</h3><div class="big" id="upd-versao">1.0.15</div><div class="sub">Fases 0 → 7 concluídas · atualizações pelo GitHub</div></div>
+          <div class="card"><h3>Versão</h3><div class="big" id="upd-versao">1.1.2</div><div class="sub">Fases 0 → 7 concluídas · atualizações pelo GitHub</div></div>
           <div class="card"><h3>Drivers</h3><div class="big" style="font-size:20px">P3 · EASYLAP · LapWiz</div><div class="sub">TCP · serial · Bluetooth</div></div>
           <div class="card"><h3>Stack</h3><div class="big" style="font-size:20px">Python · FastAPI</div><div class="sub">SQLite · WebSocket · vanilla JS</div></div>
           <div class="card"><h3>Atualizações</h3><div class="sub" id="upd-status">aguardando verificação…</div>
@@ -1186,8 +1172,8 @@
               <button class="btn-slide" onclick="encerrarApp()">⏹ Sair</button>
             </div>
             <p class="hint">Publique a versão nova como <b>release no GitHub</b> com tag igual à
-              versão (ex.: <code>v1.0.15</code>) — a CI anexa sozinha o instalador
-              <code>KChrono-Setup-1-0-15.exe</code>
+              versão (ex.: <code>v1.1.2</code>) — a CI anexa sozinha o instalador
+              <code>KChrono-Setup-1-1-2.exe</code>
               (Windows), o <code>KChrono-*.AppImage</code> (Linux) e a ISO da live. "Instalar agora"
               baixa, fecha o app e atualiza em silêncio — ao reabrir já é a versão nova (os dados
               ficam intactos).</p>
@@ -1214,12 +1200,12 @@
   <div class="dir">
     <span id="rodape-sync">Sincronização CTAD: aguardando</span>
     <span class="pill novo">NOVIDADE</span>
-    <span>KChrono <span class="js-versao">v1.0.15</span> · por <b>Raphael Belowodski</b></span>
+    <span>KChrono <span class="js-versao">v1.1.2</span> · por <b>Raphael Belowodski</b></span>
   </div>
 </div>
 
-<script src="/static/tracado.js?v=1.0.15"></script>
-<script src="/static/app.js?v=1.0.15"></script>
+<script src="/static/tracado.js?v=1.1.2"></script>
+<script src="/static/app.js?v=1.1.2"></script>
 
 <!-- nova versão disponível (abre sozinho na abertura do app) -->
 <div id="modal-atualizacao" class="modal-fundo" style="display:none">

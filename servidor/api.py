@@ -446,9 +446,12 @@ async def api_som_audio_remover(chave: str = Query(...)):
 async def api_iniciar(tipo: str = Query("treino"), tempo_minimo_s: float = Query(0),
                       duracao: float = Query(10), criterio: str = Query("tempo"),
                       contador_s: Optional[int] = Query(None),
-                      media_n: Optional[int] = Query(None)):
+                      media_n: Optional[int] = Query(None),
+                      tempo_terminar: Optional[int] = Query(None)):
     if contador_s is not None:
         estado.definir_contador_s(contador_s)
+    if tempo_terminar is not None:
+        estado.definir_tempo_terminar_s(tempo_terminar)
     return {"ok": estado.iniciar_sessao(tipo, tempo_minimo_s, duracao, criterio,
                                         media_n)}
 
@@ -530,10 +533,37 @@ async def api_adicionar_volta_tecla(piloto_id: Optional[int] = Query(None),
     return {"ok": False, "erro": "informe piloto_id ou tecla"}
 
 
+# ---------------------------------------------------------------- autenticação de operações locais/remotas
+
+def exigir_local_ou_gerente(
+    request: Request,
+    x_gerente_token: Optional[str] = Header(default=None),
+) -> dict:
+    """Permite operações do painel local ou de uma sessão autenticada.
+
+    O servidor exposto na LAN não deve aceitar reconfiguração/sincronização
+    apenas porque o cliente conhece a URL. O app nativo e o navegador local
+    continuam funcionando via loopback; acesso remoto exige token de gerente.
+    """
+    host = request.client.host if request.client else ""
+    if host in {"127.0.0.1", "::1", "localhost"}:
+        return {"usuario": "operador-local"}
+    sessao = acesso.validar(_token_gerente(request, x_gerente_token))
+    if not sessao:
+        raise HTTPException(status_code=401, detail="não autenticado")
+    return sessao
+
+
 # ---------------------------------------------------------------- sync (Fase 3)
 @app.post("/api/sync/configurar")
-async def api_sync_configurar(email: str = Query(...), password: str = Query(...),
-                              pista_id: Optional[str] = Query(None)):
+async def api_sync_configurar(request: Request,
+                            dados: dict = Body(...),
+                            sessao: dict = Depends(exigir_local_ou_gerente)):
+    email = (dados or {}).get("email")
+    password = (dados or {}).get("password")
+    pista_id = (dados or {}).get("pista_id") or (dados or {}).get("pistaId")
+    if not email or not password:
+        return {"ok": False, "erro": "informe e-mail e senha"}
     try:
         return {"ok": True, **estado.configurar_sync(email, password, pista_id)}
     except ErroAuth as e:
@@ -542,8 +572,10 @@ async def api_sync_configurar(email: str = Query(...), password: str = Query(...
 
 
 @app.post("/api/sync/enviar")
-async def api_sync_enviar(nome: Optional[str] = Query(None),
-                          sessao_id: Optional[str] = Query(None)):
+async def api_sync_enviar(request: Request,
+                        nome: Optional[str] = Query(None),
+                        sessao_id: Optional[str] = Query(None),
+                        sessao: dict = Depends(exigir_local_ou_gerente)):
     try:
         return {"ok": True, **estado.enviar_sessao(nome, sessao_id)}
     except (ErroAuth, ValueError, RuntimeError) as e:
@@ -559,7 +591,8 @@ async def api_sync_previa(sessao_id: str, nome: Optional[str] = Query(None)):
 
 
 @app.post("/api/sync/processar")
-async def api_sync_processar():
+async def api_sync_processar(request: Request,
+                           sessao: dict = Depends(exigir_local_ou_gerente)):
     try:
         return {"ok": True, **estado.sync_processar()}
     except (ErroAuth, RuntimeError) as e:
@@ -568,12 +601,11 @@ async def api_sync_processar():
 
 @app.get("/api/sync/status")
 async def api_sync_status():
-    """Status do sync + credenciais salvas (app local: os campos do Admin
-    precisam voltar a mostrar o que foi configurado)."""
+    """Status do sync sem expor a senha da conta do CTAD."""
     cfg = estado.config
     return {**estado.sincronizador.status(),
             "email": cfg.get("email", ""),
-            "password": cfg.get("password", ""),
+            "configurado": bool(cfg.get("email") and cfg.get("password")),
             "pistaId": cfg.get("pistaId", "krathus")}
 
 
@@ -955,6 +987,9 @@ async def api_voltas():
 # ---------------------------------------------------------------- gerente de pista
 def _token_gerente(request: Request,
                    x_gerente_token: Optional[str] = Header(default=None)) -> Optional[str]:
+    # Tokens em URL vazam para histórico, logs e Referer. Mantemos a leitura
+    # da query apenas para compatibilidade do fluxo QR existente; operações
+    # novas devem usar o header X-Gerente-Token.
     return x_gerente_token or request.query_params.get("token")
 
 

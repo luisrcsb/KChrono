@@ -1,0 +1,1252 @@
+﻿<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KChrono — Precision Timing System</title>
+<link rel="stylesheet" href="/static/estilo.css?v=1.0.15">
+<link rel="icon" href="/imagens/KCHRONO-LOGO.png">
+<script src="/static/chart.umd.min.js"></script>
+</head>
+<body>
+
+<!-- SHELL PERSISTENTE: menu lateral sempre visível -->
+<div class="admin-shell">
+  <aside class="menu">
+    <div class="side-logo"><img src="/imagens/KCHRONO-LOGO.png" alt="KChrono"></div>
+    <div class="side-decoder" id="side-decoder" title="Conexão com o decoder">
+      <span class="led" id="side-led"></span>
+      <div class="side-decoder-txt">
+        <div class="side-decoder-nome" id="side-decoder-nome">Decoder: —</div>
+        <div class="side-decoder-sub" id="side-decoder-sub">sem ligação</div>
+      </div>
+    </div>
+    <div class="busca admin-busca">
+      <input id="busca-global" type="text" placeholder="Buscar sessão, piloto, campeonato, configuração…"
+             autocomplete="off"
+             oninput="buscaGlobalDebounce()"
+             onkeydown="if(event.key==='Enter'){event.preventDefault();buscaGlobal()}"
+             onfocus="buscaGlobal()">
+      <button onclick="buscaGlobal()">🔍</button>
+      <div class="busca-resultados" id="busca-resultados"></div>
+    </div>
+    <nav id="adm-nav">
+      <a class="on" data-titulo="Operador painel" onclick="mostrarOperador(this)">🎮 Painel do Operador</a>
+      <a data-titulo="Gerente de Pista bandeira check-in" onclick="adminSecao(this,'a-gerente')">🚦 Gerente de Pista</a>
+      <a data-titulo="Pista traçado retas curvas largada grid largura comprimento" onclick="adminSecao(this,'a-pista')">🏟️ Pista &amp; Traçado</a>
+      <a data-titulo="Voltas histórico sessões central" onclick="adminSecao(this,'a-voltas')">🏁 Voltas</a>
+      <a data-titulo="Auditoria baterias CTAD editar voltas" onclick="adminSecao(this,'a-auditoria')">🧾 Ferramenta de Auditoria</a>
+      <a data-titulo="Telão Semáforo colunas" onclick="adminSecao(this,'a-telao')">📺 Telão &amp; Semáforo</a>
+      <a data-titulo="Campeonatos etapas ranking" onclick="adminSecao(this,'a-camp')">🏆 Campeonatos <span class="prev">Fase 5</span></a>
+      <a data-titulo="Salvamento" onclick="adminSecao(this,'a-salvar')">💾 Salvamento</a>
+      <a data-titulo="Uploads Sync CTAD" onclick="adminSecao(this,'a-upload')">📤 Uploads &amp; Sync <span class="prev fase">Fase 3</span></a>
+      <a data-titulo="Pilotos fonia telefone funções transponder" onclick="adminSecao(this,'a-pilotos')">🏎️ Pilotos</a>
+      <a data-titulo="Hardware Decoders drivers" onclick="adminSecao(this,'a-hw')">🔧 Hardware &amp; Decoders</a>
+      <a data-titulo="Voz Som TTS frases áudio" onclick="adminSecao(this,'a-voz')">🔊 Voz &amp; Som</a>
+      <a data-titulo="Relatórios CSV exportar" onclick="adminSecao(this,'a-relatorio')">📊 Relatórios</a>
+      <a data-titulo="Notificações alertas" onclick="adminSecao(this,'a-notificacoes')">🔔 Notificações</a>
+      <a data-titulo="Configurações aparência wallpaper transparência" onclick="adminSecao(this,'a-config')">⚙️ Configurações</a>
+      <a data-titulo="Sobre créditos versão" onclick="adminSecao(this,'a-sobre')">ℹ️ Sobre o KChrono</a>
+    </nav>
+    <div class="side-qr" id="side-qr">
+      <div class="side-qr-tit">📱 Gestão Remota</div>
+      <img id="side-qr-img" alt="QR Code de Gestão Remota" style="display:none">
+      <div class="side-qr-info" id="side-qr-info">gerando…</div>
+    </div>
+    <div class="admin-rodape"><span id="ws-status">Desconectado do servidor</span><br>KChrono <span class="js-versao">v1.0.15</span><br>por Raphael Belowodski</div>
+  </aside>
+  <div class="corpo">
+
+<!-- OPERADOR (painel completo — 1ª opção do menu) -->
+<section id="operador" class="tela visivel">
+  <div class="conteudo">
+    <header class="main-header">
+      <h1>Painel do Operador</h1>
+      <div class="perfil"><span class="tag" id="perfil-nivel">SUPERUSER</span>
+        sessão <span id="operador-sessao">—</span> · <span id="operador-estado">sem sessão</span>
+        <span class="pill novo" id="operador-sim" hidden>SIMULAÇÃO — não oficial</span></div>
+      <div class="acoes-topo">
+        <button class="btn-slide" id="btn-telao-2" onclick="abrirTelaoSegundaTela()" title="Abre o telão em janela separada (2ª tela)">
+          🖥️ Abrir Telão 2ª Tela
+        </button>
+      </div>
+    </header>
+
+    <!-- barra de status + display digital -->
+    <div class="barra-op">
+      <div class="ligacao"><span class="led" id="led-decoder"></span><span id="txt-ligacao">Sem ligação</span></div>
+      <div class="flags">
+        <span class="flag primeiro" id="flag-primeiro">1º: —</span>
+        <span class="flag volta-rapida" id="flag-volta-rapida">Volta rápida</span>
+        <span class="mini-semaforo" id="mini-semaforo" title="Semáforo da largada">
+          <span class="mluz vermelha"></span><span class="mluz vermelha"></span><span class="mluz vermelha"></span><span class="mluz vermelha"></span><span class="mluz vermelha"></span><span class="mluz verde"></span>
+        </span>
+      </div>
+      <div class="display-digital">
+        <div class="cel"><div class="rot">Em pista</div><div class="val" id="disp-empista">0</div></div>
+        <div class="cel"><div class="rot">Tempo</div><div class="val" id="disp-tempo">0:00.000</div></div>
+        <div class="cel"><div class="rot">Voltas</div><div class="val" id="disp-voltas">0</div></div>
+      </div>
+    </div>
+
+    <!-- configuração da sessão -->
+    <div class="card" style="margin-bottom:16px">
+      <h3>Configuração da sessão</h3>
+      <div class="form-sessao centro">
+        <div><label>Tipo</label>
+          <select id="cfg-tipo" onchange="tipoSessaoMudou()">
+            <option value="treino">Treino</option>
+            <option value="classificacao">Classificação</option>
+            <option value="corrida">Corrida</option>
+            <option value="campeonato">Campeonato</option>
+          </select></div>
+        <div><label>Critério</label>
+          <select id="cfg-criterio" onchange="criterioMudou()">
+            <option value="Tempo">Tempo</option>
+            <option value="Voltas">Voltas</option>
+            <option value="livre">Tempo livre (sem limite)</option>
+          </select></div>
+        <div><label>Duração (min/voltas)</label><input id="cfg-duracao" value="10"></div>
+        <div><label>Contador regressivo (s)</label><input id="cfg-contador" value="10"></div>
+        <div><label>Aviso de saída (s)</label><input id="cfg-aviso-saida" value="30"></div>
+        <div><label>Tempo para terminar (s)</label><input id="cfg-terminar" value="30"></div>
+        <div><label>Tempo entre carros (s)</label><input id="cfg-entre-carros" value="2"></div>
+        <div><label>Método</label>
+          <select id="cfg-metodo"><option>Melhor tempo</option><option>Consecutivas</option></select></div>
+        <div><label>Saída</label>
+          <select id="cfg-saida"><option>1ª passagem pela meta</option><option>1ª detecção</option></select></div>
+        <div><label>Tempo mínimo de volta (s)</label><input id="cfg-tempo-minimo" value="3"></div>
+        <div><label>Média de N voltas</label>
+          <input id="cfg-media-n" value="3" title="Melhor média de N voltas consecutivas (coluna 'Média N' do telão)"></div>
+      </div>
+
+      <div id="cfg-camp-escolha" style="display:none;margin-top:14px">
+        <h3 style="margin-bottom:8px">Campeonato</h3>
+        <div class="form-sessao centro">
+          <div><label>Escolher campeonato</label>
+            <select id="cfg-camp-select" style="min-width:260px" onchange="atualizarEscolhaCampeonato()"></select></div>
+          <div><label>&nbsp;</label>
+            <button class="btn-slide" onclick="menuCriarCampeonato()">➕ Criar campeonato</button></div>
+          <div><label>&nbsp;</label>
+            <button class="btn-slide" id="cfg-camp-editar" onclick="menuEditarCampeonato()" disabled>✏️ Editar campeonato</button></div>
+        </div>
+        <p class="hint" id="cfg-camp-aviso" style="display:none;margin-top:10px">
+          Nenhum campeonato cadastrado ainda — clique em <b>Criar campeonato</b> para montar o primeiro.</p>
+        <div class="acoes" style="margin-top:12px">
+          <button class="destaque" id="cfg-camp-iniciar" onclick="iniciarCampeonatoEscolhido()" disabled>🏆 Iniciar campeonato</button>
+        </div>
+        <p class="hint" style="margin-top:6px">Criar e editar abrem o menu <b>🏆 Campeonatos</b>, onde ficam as
+          regras, os inscritos, as chaves, as durações e a sequência das etapas.</p>
+      </div>
+    </div>
+
+    <!-- check-in: quem está na pista, antes de iniciar a sessão -->
+    <div class="card" style="margin-bottom:16px">
+      <h3>Pilotos na pista — check-in (<span id="op-checkin-n">0</span> marcados)</h3>
+      <div class="acoes" style="margin:10px 0">
+        <input id="op-checkin-busca" class="input-busca" placeholder="Filtrar pilotos…"
+               oninput="renderCheckin()">
+        <button class="btn-mini" onclick="marcarTodosCheckin(true)">✔ Todos presentes</button>
+        <button class="btn-mini" onclick="marcarTodosCheckin(false)">✖ Limpar</button>
+      </div>
+      <div id="op-checkin" class="lista-checkin">carregando…</div>
+      <p class="hint" style="margin-top:8px">Marque quem está na pista antes de iniciar a
+        sessão: só os pilotos marcados entram na corrida. Se ninguém for marcado, entram
+        todos os transponders cadastrados.</p>
+    </div>
+
+    <!-- voltas por atalho (F1..F12) -->
+    <div class="card" style="margin-bottom:16px">
+      <h3>Adicionar volta por atalho <span class="hint">(F1 … F12)</span></h3>
+      <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-bottom:10px">
+        <button class="btn" onclick="abrirAssociacaoAtalhos()">Associar teclas a pilotos</button>
+        <button class="btn" onclick="resetarAssociacaoAtalhos()">Restaurar automático (pela lista)</button>
+        <span class="hint">Associe manualmente cada tecla F1–F12 a um piloto. Com associação manual, só as teclas com piloto definido disparam.</span>
+      </div>
+      <div id="op-atalhos" class="lista-atalhos">marque os pilotos no check-in acima</div>
+      <p class="hint">Cada tecla <b>F1 … F12</b> registra uma volta do piloto
+        associado (também vale clicar no botão). O tempo da volta é medido desde
+        a última volta do piloto — na 1ª volta, desde o início da sessão.</p>
+    </div>
+
+    <!-- mapa da pista ativa (traçado desenhado no editor) -->
+    <div class="card" id="pista-mini-card" style="margin-bottom:16px" hidden>
+      <h3>Pista <span id="pista-mini-nome"
+              style="font-weight:400; font-size:14px; color:var(--text-muted)"></span></h3>
+      <canvas id="canvas-pista-mini"
+              style="width:100%; height:210px; display:block; margin-top:8px"></canvas>
+      <p class="hint" style="margin-top:6px" id="pista-mini-info"></p>
+    </div>
+
+    <!-- campeonato em andamento (só aparece com o Tipo = Campeonato) -->
+    <div class="card" id="card-camp-ativo" style="margin-bottom:16px; display:none">
+      <h3>🏆 Campeonato em andamento</h3>
+      <div id="camp-atual" style="margin:10px 0">
+        <span class="hint">nenhum campeonato em andamento</span>
+      </div>
+      <div class="acoes">
+        <button class="destaque" id="camp-proxima" onclick="proximaEtapa()" disabled>⏭ Próxima etapa</button>
+        <button class="perigo" id="camp-encerrar" onclick="encerrarCampeonato()" disabled>⏹ Encerrar campeonato</button>
+      </div>
+      <p class="hint">O avanço é <b>manual</b>: cada etapa só começa quando você clica em
+        “Próxima etapa”. A sessão da etapa anterior é encerrada automaticamente.</p>
+    </div>
+
+    <!-- controles (o botão principal muda com o tipo: treino/classificação/corrida) -->
+    <div class="acoes">
+      <button class="destaque" id="btn-acao-principal" onclick="acaoPrincipal()">▶ Iniciar treino</button>
+      <button id="btn-pausar" onclick="alternarPausa()" disabled>⏸ Pausar</button>
+      <button onclick="finalizar()">⏹ Finalizar</button>
+      <button class="perigo" style="margin-left:auto" onclick="marcarGato()">🚫 Marcar "gato"</button>
+      <button class="perigo" onclick="apagarVolta()">🗑 Apagar volta</button>
+      <button onclick="desmarcarGato()">♻️ Desmarcar</button>
+    </div>
+
+    <!-- classificação -->
+    <div class="card" style="margin-bottom:16px">
+      <h3>Classificação ao vivo <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--text-main)">— clique numa linha para selecionar o piloto (marcar gato / apagar volta)</span></h3>
+      <div class="tabela-wrap">
+        <table class="tabela-op" id="tabela-classificacao">
+          <tr><th>Pos</th><th>Nº</th><th>Abr</th><th>Piloto</th><th>Voltas</th><th>Total</th><th>Intervalo</th><th>Gap</th><th>Última</th><th>Melhor</th><th>km/h</th><th>Média</th><th>Média N</th><th>Desvio</th><th>Consist.</th><th>Transponder</th><th>Ações</th></tr>
+          <tr><td colspan="17" style="color:var(--text-muted)">nenhuma volta registrada</td></tr>
+        </table>
+      </div>
+    </div>
+
+    <!-- console + volta-a-volta -->
+    <div class="grid g2">
+      <div class="card">
+        <h3>Console de eventos</h3>
+        <div class="console-op" id="log-operador"></div>
+      </div>
+      <div class="card">
+        <h3>Volta-a-volta
+          <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--text-main)">
+            — tempos de cada volta por piloto e gap para o líder</span></h3>
+        <div class="volta-volta-wrap" id="volta-a-volta">
+          <p class="hint">aguardando a primeira volta…</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div id="admin-conteudo" style="display:none">
+      <header>
+        <h1 id="admin-titulo">Gerente de Pista</h1>
+        <div class="perfil"><span class="tag">SUPERUSER</span> acesso total</div>
+      </header>
+
+      <!-- ============ PISTA & TRAÇADO (editor de traçados) ============ -->
+      <div class="admin-sec" id="a-pista">
+        <div class="card">
+          <h3>Pista ativa</h3>
+          <div class="acoes">
+            <select id="ed-pista" onchange="edTrocarPista()" style="max-width:240px"></select>
+            <input id="ed-pista-nome" placeholder="nome da nova pista" style="max-width:180px">
+            <button class="btn-mini" onclick="edNovaPista()">➕ Nova pista</button>
+            <button class="btn-mini" onclick="edAtivarPista()">⭐ Tornar ativa</button>
+            <span id="ed-ativa-info" class="hint"></span>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>Editor de traçado</h3>
+          <div class="acoes" style="margin-bottom:8px; flex-wrap:wrap">
+            <button class="btn-mini" id="ed-btn-ponto" onclick="edFerramenta('ponto')">➕ Reta (clique p/ adicionar)</button>
+            <button class="btn-mini" id="ed-btn-curva" onclick="edFerramenta('curva')">🌀 Curva no canto (auto)</button>
+            <button class="btn-mini" id="ed-btn-mover" onclick="edFerramenta('mover')">✋ Mover / apagar vértice</button>
+            <span class="rot" style="margin-left:8px">encaixe</span>
+            <select id="ed-snap" style="width:96px">
+              <option value="0">livre</option>
+              <option value="45" selected>45°</option>
+              <option value="90">90°</option>
+            </select>
+            <select id="ed-molde" onchange="edMolde(this.value)">
+              <option value="">moldes…</option>
+              <option value="oval">oval</option>
+              <option value="retangulo">retângulo</option>
+              <option value="c">letra C</option>
+              <option value="oito">letra oito</option>
+              <option value="gride">gride de blocos</option>
+            </select>
+            <button class="btn-mini" onclick="edFechar()">🔁 Fechar/Abrir pista</button>
+            <button class="btn-mini" onclick="edDesfazer()">↩ Desfazer</button>
+            <button class="btn-mini" onclick="edLimpar()">🗑 Limpar</button>
+          </div>
+
+          <div class="acoes" style="margin-bottom:8px; flex-wrap:wrap">
+            <label class="rot">vértice <b id="ed-sel-info">nenhum</b></label>
+            <label class="rot">raio da curva (m)
+              <input type="range" id="ed-raio" min="0" max="250" step="1" value="0"
+                     style="width:130px; vertical-align:middle" oninput="edRaio(this.value)">
+            </label>
+            <span id="ed-angulo-info" class="hint"></span>
+            <button class="btn-mini" onclick="edCurvaAuto()">✨ Curva automática (sistema escolhe o raio)</button>
+            <button class="btn-mini" onclick="edLargada()">📍 Marcar largada no vértice</button>
+            <button class="btn-mini" onclick="edGrid()">🏁 Marcar grid no vértice</button>
+            <label class="rot">colunas
+              <input type="number" id="ed-grid-col" value="2" min="1" max="4" style="width:54px"
+                     onchange="edGridOpcoes()"></label>
+            <label class="rot">vagas
+              <input type="number" id="ed-grid-vagas" value="10" min="2" max="60" style="width:60px"
+                     onchange="edGridOpcoes()"></label>
+          </div>
+
+          <canvas id="ed-canvas"
+                  style="width:100%; height:calc(100vh - 300px); min-height:460px; display:block;
+                         background:#0d1424; border:1px solid var(--border, #1a2438);
+                         border-radius:8px; cursor:crosshair; touch-action:none"></canvas>
+
+          <p class="hint" style="margin-top:10px">
+            <b>Como usar:</b> clique no canvas para criar as retas (ângulo encaixa em 45°/90°;
+            <i>livre</i> desliga o encaixe). Selecione um vértice e clique em
+            <b>✨ Curva automática</b> — o sistema mede o ângulo do canto (45°, 90° ou o que for)
+            e escolhe sozinho o melhor raio tangente às duas retas; a régua <i>raio</i> ajusta
+            depois. A <b>largada</b> é o ponto 0 da volta (ancora do perfil de largura).
+          </p>
+        </div>
+
+        <div class="grid g2">
+          <div class="card">
+            <h3>Medidas &amp; estatísticas</h3>
+            <div class="form-sessao">
+              <div><label>Comprimento total da pista (m) — para velocidade média</label>
+                <input id="ed-comprimento" type="number" min="10" step="1" value="120"></div>
+            </div>
+            <div class="acoes" style="margin-top:10px">
+              <label class="rot">largura base (m)
+                <input id="ed-larg-base" type="number" min="0.2" step="0.05" value="1" style="width:76px"
+                       oninput="edMedidas()"></label>
+              <label class="rot">largura início (m)
+                <input id="ed-larg-ini" type="number" min="0.2" step="0.05" value="1" style="width:76px"
+                       oninput="edMedidas()"></label>
+              <label class="rot">largura fim (m)
+                <input id="ed-larg-fim" type="number" min="0.2" step="0.05" value="0.8" style="width:76px"
+                       oninput="edMedidas()"></label>
+            </div>
+            <p class="hint">Largura variável ancorada na largada: início (na linha) → base
+              (meio da volta) → fim (chegando na largada). Ex.: 1 m → 1 m → 0,8 m.</p>
+          </div>
+          <div class="card">
+            <h3>Onde exibir este traçado</h3>
+            <div class="acoes">
+              <label><input type="checkbox" id="ed-ex-telao" checked> 📺 Telão</label>
+              <label><input type="checkbox" id="ed-ex-operador" checked> 🎮 Painel do Operador</label>
+              <label><input type="checkbox" id="ed-ex-gerente" checked> 📱 Gerente (celular)</label>
+              <label><input type="checkbox" id="ed-ex-simulador" checked> 🧪 Simulador</label>
+            </div>
+            <p class="hint">Telão/Operador/Gerente ligam e desligam a exibição normal;
+              <b>Simulador</b> decide se o traçado aparece no telão quando a sessão é de
+              teste (replay de corrida do CTAD).</p>
+            <div class="acoes" style="margin-top:12px">
+              <button class="btn-slide" onclick="edSalvar()">💾 Salvar traçado</button>
+              <span id="ed-msg" class="hint"></span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============ GERENTE DE PISTA ============ -->
+      <div class="admin-sec" id="a-gerente">
+        <div class="grid g2">
+          <div class="card">
+            <h3>Bandeira / estado da pista</h3>
+            <p class="hint">Estado atual: <b id="ger-estado">pista aberta (verde)</b></p>
+            <div class="acoes">
+              <button class="bd verde" onclick="definirBandeira('verde')">🟢 Verde</button>
+              <button class="bd amarela" onclick="definirBandeira('amarela')">🟡 Amarela</button>
+              <button class="bd vermelha" onclick="definirBandeira('vermelha')">🔴 Vermelha</button>
+              <button class="bd fechada" onclick="definirBandeira('fechada')">⛔ Pista fechada</button>
+            </div>
+            <div class="frase-input" style="margin-top:12px">
+              <span class="rot">Motivo</span>
+              <input id="ger-motivo" placeholder="ex.: acidente na curva 3">
+            </div>
+          </div>
+          <div class="card">
+            <h3>Anúncio por voz</h3>
+            <div class="form-sessao">
+              <div><label>Texto do anúncio</label>
+                <input id="ger-anuncio" placeholder="ex.: Bateria 3 na pista em 2 minutos"></div>
+            </div>
+            <div class="acoes" style="margin-top:12px">
+              <button class="btn-slide" onclick="anunciarGerente()">📢 Anunciar</button>
+              <button class="btn-slide" onclick="anunciarPosicoes()">🏁 Anunciar posições</button>
+            </div>
+          </div>
+        </div>
+
+        <p class="hint" style="margin:0 0 12px">O check-in dos pilotos agora fica no
+          <b>Painel do Operador</b> (logo abaixo da Configuração da Sessão).</p>
+
+        <div class="admin-secao-tit">Volta manual (correção)</div>
+        <div class="card">
+          <div class="form-sessao">
+            <div><label>Piloto</label><select id="ger-volta-piloto"></select></div>
+            <div><label>Tempo da volta (s)</label><input id="ger-volta-tempo" placeholder="ex.: 9.123"></div>
+            <button class="btn-slide" onclick="adicionarVoltaManual()">➕ Adicionar volta</button>
+          </div>
+        </div>
+
+        <div class="admin-secao-tit">QR Code de acesso (sem senha)</div>
+        <div class="card">
+          <div class="grid g2">
+            <div style="display:flex; align-items:center; justify-content:center; background:#fff; border-radius:12px; padding:12px; min-height:220px">
+              <img id="adm-qr-img" alt="QR Code de acesso" style="width:200px; height:200px; display:none">
+              <span class="hint" id="adm-qr-vazio">clique em “Gerar QR”</span>
+            </div>
+            <div>
+              <p class="hint">Aponte a câmera do celular para entrar no painel do gerente
+                <b>sem digitar senha</b>. A cada abertura do aplicativo um novo
+                <b>QR de Gestão Remota</b> é gerado no rodapé do menu lateral
+                (válido até fechar) — ele é o mesmo código exibido aqui. O botão
+                <b>“Gerar QR”</b> abaixo cria outro manualmente quando precisar.</p>
+              <div class="form-sessao" style="margin-top:12px">
+                <div><label>Válido por (dias)</label>
+                  <input id="adm-qr-dias" type="number" min="1" max="365" value="30" style="width:90px"></div>
+              </div>
+              <div class="acoes" style="margin-top:12px">
+                <button class="destaque" onclick="adminGerarQR()">🔄 Gerar QR</button>
+                <button onclick="adminCopiarQR()">📋 Copiar endereço</button>
+                <button class="perigo" onclick="adminRevogarQR()">⛔ Revogar</button>
+              </div>
+              <p class="hint" style="margin-top:10px">Endereço</p>
+              <div class="code" id="adm-qr-url" style="word-break:break-all">—</div>
+              <p class="hint" id="adm-qr-info" style="margin-top:8px">—</p>
+              <p class="hint" id="adm-qr-erro" style="color:var(--accent-red)"></p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============ RELATÓRIOS ============ -->
+      <div class="admin-sec" id="a-relatorio">
+        <div class="grid g4">
+          <div class="card"><h3>Sessões</h3><div class="big" id="rel-sessoes">0</div><div class="sub">registradas</div></div>
+          <div class="card"><h3>Pilotos</h3><div class="big" id="rel-pilotos">0</div><div class="sub">cadastrados</div></div>
+          <div class="card"><h3>Voltas</h3><div class="big" id="rel-voltas">0</div><div class="sub">no histórico</div></div>
+          <div class="card"><h3>Campeonatos</h3><div class="big" id="rel-camps">0</div><div class="sub">criados</div></div>
+        </div>
+
+        <div class="admin-secao-tit">Gerar relatórios</div>
+        <div class="grid g2">
+          <div class="card">
+            <h3>Sessões</h3>
+            <div class="form-sessao">
+              <div><label>Tipo</label>
+                <select id="rel-filtro-tipo">
+                  <option value="">todos</option>
+                  <option value="treino">Treino</option>
+                  <option value="classificacao">Classificação</option>
+                  <option value="corrida">Corrida</option>
+                  <option value="campeonato">Campeonato</option>
+                </select></div>
+              <div><label>De (data)</label><input id="rel-de" type="date"></div>
+              <div><label>Até (data)</label><input id="rel-ate" type="date"></div>
+            </div>
+            <div class="acoes" style="margin-top:12px">
+              <button class="btn-slide" onclick="carregarRelatorioSessoes()">📊 Gerar</button>
+              <button class="btn-slide" onclick="baixarRelatorio('sessoes')">⬇ CSV sessões</button>
+            </div>
+          </div>
+          <div class="card">
+            <h3>Pilotos</h3>
+            <p class="hint">Voltas, sessões disputadas e melhor volta de cada piloto.</p>
+            <div class="acoes" style="margin-top:12px">
+              <button class="btn-slide" onclick="carregarRelatorioPilotos()">📊 Gerar</button>
+              <button class="btn-slide" onclick="baixarRelatorio('pilotos')">⬇ CSV pilotos</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="admin-secao-tit">Resultado</div>
+        <div class="card"><div class="tabela-wrap"><table class="admin-tabela" id="rel-tabela">
+          <tr><td style="color:var(--text-muted)">clique em "Gerar" acima</td></tr>
+        </table></div></div>
+      </div>
+
+      <!-- ============ VOLTAS (Central de Voltas / histórico) ============ -->
+      <div class="admin-sec" id="a-voltas">
+        <div class="admin-secao-tit">Central de Voltas</div>
+        <p class="hint" style="margin-bottom:12px">Histórico completo · <b id="total-sessoes">0</b> sessões com voltas.</p>
+        <div class="grid-historico">
+          <div class="card">
+            <h3>Sessões</h3>
+            <input id="busca-sessao" class="input-busca" placeholder="Filtrar por tipo/data…"
+                   oninput="filtrarSessoes()">
+            <div id="lista-sessoes" class="lista-sessoes"></div>
+          </div>
+          <div class="card">
+            <div class="detalhe-topo">
+              <h3 id="detalhe-titulo">Selecione uma sessão</h3>
+              <div id="acoes-sessao" style="display:none; gap:8px; flex-wrap:wrap">
+                <button class="btn-slide" onclick="enviarSessaoCTAD()">📤 Enviar ao CTAD</button>
+              </div>
+            </div>
+            <div class="tabela-wrap"><table class="tabela-voltas" id="tabela-historico"></table></div>
+            <p class="hint" id="detalhe-legenda">Clique numa sessão à esquerda para ver todas as voltas,
+              com a <b style="color:var(--accent-gold)">melhor da sessão</b> em destaque e o gap de cada
+              volta em relação ao líder.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============ FERRAMENTA DE AUDITORIA ============ -->
+      <div class="admin-sec" id="a-auditoria">
+        <div class="admin-secao-tit">Ferramenta de Auditoria</div>
+        <p class="hint" style="margin-bottom:12px">Editar baterias enviadas ao CTAD (Firebase <code>baterias/{chave}</code>). Elimine voltas inválidas, reorganize a ordem.</p>
+        <div class="grid-historico">
+          <div class="card">
+            <h3>Baterias no CTAD</h3>
+            <input id="busca-auditoria" class="input-busca" placeholder="Filtrar por sessão/chave..." oninput="filtrarAuditoria()">
+            <div class="acoes" style="margin:10px 0"><button class="btn-slide" onclick="carregarAuditoria()">🔄 Atualizar</button></div>
+            <div id="lista-auditoria" class="lista-sessoes"></div>
+          </div>
+          <div class="card">
+            <div class="detalhe-topo">
+              <h3 id="auditoria-titulo">Selecione uma bateria</h3>
+              <div id="acoes-auditoria" style="display:none; gap:8px; flex-wrap:wrap">
+                <button class="btn-slide" onclick="salvarAuditoria()">💾 Salvar no CTAD</button>
+              </div>
+            </div>
+            <div id="auditoria-conteudo"></div>
+            <p class="hint" style="margin-top:8px">Para "reorganizar a ordem", você pode mover as linhas para cima/baixo. Para "eliminar uma volta", remova a linha da volta. Ao salvar, voltasTotais, melhorVolta, média e desvio são recalculados.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============ NOTIFICAÇÕES ============ -->
+      <div class="admin-sec" id="a-notificacoes">
+        <div class="admin-secao-tit">O que é esta ferramenta</div>
+        <div class="card">
+          <h3>Notificações do KChrono</h3>
+          <p class="hint" style="font-size:12.5px; line-height:1.55">
+            As notificações são os <b>avisos rápidos</b> que aparecem no sino <b>🔔</b> da barra
+            superior. Elas registram o que aconteceu na pista (decoder caiu, ghost lap, fila de
+            upload, novo recorde) para você conferir depois, sem precisar procurar no Console de
+            eventos. Nada é enviado para a internet: os avisos ficam só neste computador.</p>
+          <p class="hint" style="font-size:12.5px; line-height:1.55">
+            <b>Eventos</b> liga/desliga cada tipo de aviso no sino. <b>Tocar som de alerta</b>
+            faz um bipe curto a cada notificação. <b>Notificações do navegador</b> mostra o aviso
+            também como balão do Windows, mesmo com o KChrono em segundo plano — para isso use
+            “Permitir no navegador”. As escolhas são salvas automaticamente.</p>
+        </div>
+        <div class="admin-secao-tit">O que deve gerar notificação</div>
+        <div class="grid g2">
+          <div class="card">
+            <h3>Eventos</h3>
+            <div class="frase-input"><label class="chk-linha"><input type="checkbox" id="ntf-decoder_offline"> Decoder offline / perda de conexão</label></div>
+            <div class="frase-input"><label class="chk-linha"><input type="checkbox" id="ntf-ghost_lap"> Ghost lap descartado</label></div>
+            <div class="frase-input"><label class="chk-linha"><input type="checkbox" id="ntf-fila_upload"> Acúmulo na fila de upload</label></div>
+            <div class="frase-input"><label class="chk-linha"><input type="checkbox" id="ntf-recorde"> Novo recorde de volta</label></div>
+            <div class="frase-input"><label class="chk-linha"><input type="checkbox" id="ntf-som_alerta"> Tocar som de alerta</label></div>
+          </div>
+          <div class="card">
+            <h3>Entrega</h3>
+            <div class="frase-input"><label class="chk-linha"><input type="checkbox" id="ntf-navegador"> Notificações do navegador (web)</label></div>
+            <p class="hint">As notificações aparecem no sino <b>🔔</b> da barra superior. O navegador,
+              quando autorizado, mostra o alerta mesmo com a aba em segundo plano.</p>
+            <div class="acoes" style="margin-top:12px">
+              <button class="btn-slide" onclick="salvarNotificacoes()">💾 Salvar preferências</button>
+              <button class="btn-slide" onclick="pedirPermissaoNotificacoes()">🔔 Permitir no navegador</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============ SALVAMENTO ============ -->
+      <div class="admin-sec" id="a-salvar">
+        <div class="admin-secao-tit">Formato do nome de salvamento</div>
+        <div class="card">
+          <div class="code" id="tpl-nome">{campeonato}_{etapa}_{tipo}_{data}_{hora}</div>
+          <div class="form-sessao" style="margin-top:14px">
+            <div><label>Template</label><input id="tpl-input" value="{campeonato}_{etapa}_{tipo}_{data}_{hora}" oninput="previewNome()"></div>
+            <div><label>Campeonato</label><input id="tpl-camp" value="KR2026" oninput="previewNome()"></div>
+            <div><label>Etapa</label><input id="tpl-etapa" value="etapa3" oninput="previewNome()"></div>
+            <div><label>Tipo</label><input id="tpl-tipo" value="corrida" oninput="previewNome()"></div>
+          </div>
+          <p class="hint">Pré-visualização: <b id="tpl-preview" style="color:var(--accent-gold)"></b></p>
+          <p class="hint">Variáveis: {campeonato} {etapa} {tipo} {pista} {categoria} {data} {hora}</p>
+        </div>
+        <div class="admin-secao-tit">Quando salvar</div>
+        <div class="grid g2">
+          <div class="card">
+            <h3>Política de salvamento</h3>
+            <div class="switch"><span class="ck on">✓</span> <b>Automático</b> quando a corrida corre do início ao fim sem interrupções</div>
+            <div class="switch"><span class="ck on">✓</span> <b>Perguntar</b> quando houver interrupção (pausa, reinício, volta editada) — sugerindo o nome no formato acima</div>
+            <div class="switch"><span class="ck">·</span> Somente manual</div>
+            <p class="hint">Interrupções marcam a sessão como "interrompida" e prevalecem sobre o automático.</p>
+          </div>
+          <div class="card">
+            <h3>Após salvar</h3>
+            <div class="switch"><span class="ck on">✓</span> Enviar ao CTAD automaticamente (Fase 3)</div>
+            <div class="switch"><span class="ck on">✓</span> Registrar na trilha de auditoria (ação, usuário, hora)</div>
+            <div class="switch"><span class="ck">·</span> Manter cópia local do arquivo</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============ UPLOADS ============ -->
+      <div class="admin-sec" id="a-upload">
+        <div class="grid g4">
+          <div class="card"><h3>Fila local</h3><div class="big" id="up-fila">0</div><div class="sub">itens aguardando envio</div></div>
+          <div class="card"><h3>Enviados hoje</h3><div class="big" id="up-enviados">0</div><div class="sub">sincronizados com o CTAD</div></div>
+          <div class="card"><h3>Dedup por hash</h3><div class="big" style="color:var(--accent-green)">Ativo</div><div class="sub">SHA-256 — mesmo arquivo não duplica</div></div>
+          <div class="card"><h3>Reenvio</h3><div class="big" id="up-falhas">0</div><div class="sub">falhas aguardando retry</div></div>
+        </div>
+        <div class="admin-secao-tit">Conta do CTAD</div>
+        <div class="card">
+          <div class="form-sessao">
+            <div><label>E-mail (conta do site)</label><input id="sync-email" type="email" placeholder="email@exemplo.com"></div>
+            <div><label>Senha</label><input id="sync-senha" type="password" placeholder="senha do CTAD"></div>
+            <div><label>ID da pista</label><input id="sync-pista" placeholder="krathus"></div>
+            <button class="btn-slide" onclick="configurarSync()">🔐 Conectar e testar</button>
+          </div>
+          <p class="hint">Status: <b id="sync-status-text" style="color:var(--text-muted)">não configurado</b>
+            · nível: <b id="sync-nivel">—</b></p>
+          <div class="acoes">
+            <button class="destaque" onclick="enviarSessao()">📤 Enviar sessão atual</button>
+            <button onclick="processarFila()">🔄 Processar fila</button>
+            <button class="perigo" onclick="limparFila()">🗑 Limpar fila local</button>
+          </div>
+          <p class="hint">A sessão é convertida no mesmo formato do upload do site
+            (<code>baterias/{chave}</code> + resumo público). Fila offline: se a internet cair,
+            os envios acumulam e saem sozinhos quando voltar.</p>
+        </div>
+
+        <div class="admin-secao-tit">Regras de upload</div>
+        <div class="card">
+          <div class="switch"><span class="ck on">✓</span> Enviar automaticamente após salvar a sessão</div>
+          <div class="switch"><span class="ck on">✓</span> Modo offline: acumular na fila e enviar quando voltar a conexão</div>
+          <div class="switch"><span class="ck">·</span> Comprimir arquivo antes do envio</div>
+          <p class="hint">Controle fino da fila, reprocessamento e log por upload — Fase 3.</p>
+        </div>
+      </div>
+
+      <!-- ============ VOZ & SOM ============ -->
+      <div class="admin-sec" id="a-voz">
+        <div class="grid g2">
+          <div class="card">
+            <h3>Locutor (TTS)</h3>
+            <div class="form-sessao">
+              <div><label>Voz instalada</label>
+                <select id="som-voz" onchange="testarVoz()"></select></div>
+            </div>
+            <p class="hint" id="som-voz-dica" style="margin-top:8px"></p>
+            <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:10px">
+              <button class="btn-slide" id="som-baixar-voz" onclick="baixarVozNeural()">⬇ Baixar voz neural</button>
+              <button class="btn-slide" onclick="atualizarVozes()">🔄 Atualizar lista</button>
+            </div>
+            <p class="hint" id="som-voz-status" style="margin-top:6px"></p>
+            <div class="frase-input">
+              <span class="rot">Volume</span>
+              <input type="range" id="som-volume" min="0" max="100" value="80"
+                     oninput="rotuloVolume()">
+              <span id="som-volume-txt" class="rot" style="min-width:44px">80%</span>
+            </div>
+            <div class="frase-input">
+              <span class="rot">Velocidade</span>
+              <input type="range" id="som-velocidade" min="80" max="320" value="180"
+                     oninput="rotuloVelocidade()">
+              <span id="som-velocidade-txt" class="rot" style="min-width:66px">180 ppm</span>
+            </div>
+            <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:12px">
+              <button class="btn-slide" onclick="testarVoz()">🔊 Testar voz</button>
+              <button class="btn-slide" onclick="salvarSom()">💾 Salvar preferências</button>
+            </div>
+            <p class="hint">Locutor <b>neural offline</b> (Piper) quando há um modelo instalado —
+              roda no próprio computador, sem internet, com entonação natural. Como reserva, o
+              <b>SAPI do Windows</b> (offline), incluindo as vozes <b>OneCore</b> — <i>Maria</i>
+              (feminina) e <i>Daniel</b> (masculina) em pt-BR. Sem voz disponível, o sistema usa
+              bipes e registra as falas no log. O <b>pyttsx3</b> é reserva de último caso.</p>
+          </div>
+          <div class="card">
+            <h3>Como vai sair</h3>
+            <div id="som-preview" class="som-preview">Clique em <b>▶ Ouvir</b> numa frase para
+              escutá-la exatamente como será falada na corrida.</div>
+            <h3 style="margin-top:16px">Semáforo & largada</h3>
+            <div class="frase-input">
+              <label class="chk-linha" title="bipe a cada luz vermelha acesa na contagem">
+                <input type="checkbox" id="bip-luz" checked> Bipe a cada luz acesa</label>
+              <button class="btn-mini" onclick="testarBipLuz()" title="Ouvir bipe da luz">▶ Ouvir</button>
+            </div>
+            <div class="frase-input">
+              <label class="chk-linha" title="locução dos números na contagem regressiva">
+                <input type="checkbox" id="cfg-voz-contagem" checked onchange="salvarVozContagem()">
+                Voz na contagem regressiva</label>
+              <button class="btn-mini" onclick="testarVoz()" title="Ouvir a voz">▶ Ouvir</button>
+            </div>
+            <div class="frase-input">
+              <label class="chk-linha" title="bipe longo quando acende o verde">
+                <input type="checkbox" id="bip-vai" checked> Bipe longo no verde (largada)</label>
+              <button class="btn-mini" onclick="testarBipVai()" title="Ouvir bipe do verde">▶ Ouvir</button>
+            </div>
+            <p class="hint">Os bipes são gerados no servidor — tocam no operador e no telão ao mesmo tempo.</p>
+          </div>
+        </div>
+        <div class="admin-secao-tit">Frases faladas — edite, ouça (▶) ou troque por um áudio (📁)</div>
+        <div class="card" id="som-frases"></div>
+
+        <div class="admin-secao-tit">Anúncio de posições por tipo de sessão</div>
+        <div class="card">
+          <div class="frase-input">
+            <span class="rot" style="min-width:120px">Treino</span>
+            <span class="hint">⛔ Nunca anuncia posições — regra fixa, sem checkbox.</span>
+          </div>
+          <div class="frase-input">
+            <span class="rot" style="min-width:120px">Classificação</span>
+            <label class="chk-linha"><input type="checkbox" id="som-pos-class-durante" checked>
+              Durante</label>
+            <label class="chk-linha"><input type="checkbox" id="som-pos-class-depois">
+              Depois (ao final)</label>
+          </div>
+          <div class="frase-input">
+            <span class="rot" style="min-width:120px">Corrida</span>
+            <label class="chk-linha"><input type="checkbox" id="som-pos-corrida-durante" checked>
+              Durante</label>
+            <label class="chk-linha"><input type="checkbox" id="som-pos-corrida-depois">
+              Depois (ao final)</label>
+          </div>
+          <p class="hint">"Durante" vale para a leitura por intervalo e a cada N voltas.
+            "Depois" libera a fala de grid/resultados quando a sessão termina (padrão: desligado).</p>
+        </div>
+
+        <div class="admin-secao-tit">Anúncios automáticos</div>
+        <div class="grid g2">
+          <div class="card">
+            <div class="form-sessao">
+              <div><label>Ler posições a cada (segundos) — 0 desliga</label>
+                <input id="som-intervalo" type="number" min="0" step="5" value="0"></div>
+              <div><label>Ler posições a cada N voltas do líder — 0 desliga</label>
+                <input id="som-a-cada-voltas" type="number" min="0" step="1" value="0"></div>
+              <div><label>Quantos pilotos ler</label>
+                <input id="som-topo" type="number" min="1" max="20" value="3"></div>
+            </div>
+            <div class="frase-input">
+              <label class="chk-linha"><input type="checkbox" id="som-anunciar-volta">
+                Falar cada volta (nome + tempo)</label>
+            </div>
+            <div class="frase-input">
+              <label class="chk-linha"><input type="checkbox" id="som-anunciar-rec-pessoal" checked>
+                Anunciar quando o piloto bate o próprio recorde</label>
+            </div>
+            <div class="frase-input">
+              <label class="chk-linha"><input type="checkbox" id="som-anunciar-rec-pista" checked>
+                Anunciar quando bate o recorde da pista</label>
+            </div>
+            <div class="frase-input">
+              <label class="chk-linha"><input type="checkbox" id="som-passagem" checked>
+                Bip de passagem (cada piloto)</label>
+              <button class="btn-mini" onclick="testarSomPassagem()" title="Ouvir bip de passagem">▶ Ouvir</button>
+            </div>
+            <div class="frase-input">
+              <label class="chk-linha"><input type="checkbox" id="som-lider" checked>
+                Bip especial do líder (alto-baixo-alto)</label>
+              <button class="btn-mini" onclick="testarSomLider()" title="Ouvir bip do líder">▶ Ouvir</button>
+            </div>
+            <div class="frase-input">
+              <label class="chk-linha"><input type="checkbox" id="som-menor-volta" checked>
+                Bip da menor volta / recorde (7 bipes)</label>
+              <button class="btn-mini" onclick="testarMenorVolta()" title="Ouvir bip da menor volta">▶ Ouvir</button>
+            </div>
+            <div style="display:flex; gap:8px; margin-top:12px; flex-wrap:wrap">
+              <button class="btn-slide" onclick="salvarSom()">💾 Salvar preferências</button>
+              <button class="btn-slide" onclick="anunciarPosicoes()">📢 Anunciar posições agora</button>
+            </div>
+          </div>
+          <div class="card">
+            <h3>Como funciona</h3>
+            <p class="hint">A <b>leitura de posições</b> repete a classificação no intervalo escolhido
+              (ex.: a cada 60 s) e/ou <b>a cada N voltas do líder</b> (ex.: a cada 10 voltas), do 1º até
+              o N-ésimo colocado. Os <b>recordes</b> são anunciados no instante em que acontecem
+              (o da pista tem prioridade sobre o pessoal). O nome falado usa a <b>fonia</b> cadastrada
+              em <b>Admin → 🏎️ Pilotos</b>.</p>
+            <p class="hint">Exemplos de como sai: <b>“Posições: 1º Krathus, 2º Ana.”</b> ·
+              <b>“Novo recorde da pista! Ana, 8,95 segundos!”</b></p>
+            <h3 style="margin-top:10px">Áudio em vez de frase</h3>
+            <p class="hint">Em cada frase acima, use <b>📁 Áudio</b> para enviar um arquivo
+              (WAV/MP3). Quando existir, ele toca <b>no lugar</b> da voz sintetizada — ótimo para
+              vinhetas, patrocinadores ou gravações próprias. Use <b>🗑</b> para voltar à voz.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============ TELÃO ============ -->
+      <div class="admin-sec" id="a-telao">
+        <div class="admin-secao-tit">Exibição do telão</div>
+        <div class="card">
+          <p class="hint">O telão abre em tela cheia numa janela própria — ótimo para o monitor/TV
+            da pista. O semáforo e a contagem ficam sincronizados com a sessão.</p>
+          <div class="acoes">
+            <button class="destaque" onclick="abrirTelao()">📺 Abrir telão</button>
+          </div>
+        </div>
+        <div class="card">
+          <h3>Telão / segunda tela</h3>
+          <p class="hint">Onde o botão 🖥️ abre o telão (em janela própria do app). O estado é
+            salvo: na próxima abertura o telão volta como estava.</p>
+          <div class="frase-input" style="margin-top:12px">
+            <span class="rot">Abrir na tela</span>
+            <select id="cfg-telao" onchange="salvarTelaoTela()">
+              <option value="0">carregando…</option>
+            </select>
+          </div>
+          <div class="switch" style="margin-top:14px" onclick="alternarPreferenciaTelao('autostart')">
+            <span class="ck" id="cfg-telao-autostart-ck">·</span>
+            <span><b>Abrir o telão ao iniciar o app</b> — na tela escolhida acima (só quando
+              existe um segundo monitor conectado)</span>
+          </div>
+          <div class="switch" style="margin-top:8px" onclick="alternarPreferenciaTelao('fullscreen')">
+            <span class="ck on" id="cfg-telao-fullscreen-ck">✓</span>
+            <span><b>Tela cheia</b> — sem barra de título (kiosk); desligue para janela maximizada</span>
+          </div>
+        </div>
+        <div class="grid g2">
+          <div class="card">
+            <h3>Colunas do feedback (selecionáveis)</h3>
+            <div id="telao-colunas" style="columns:2; font-size:13px">
+              <div class="switch"><span class="ck on">✓</span> Posição</div>
+            </div>
+            <div class="acoes" style="margin-top:10px">
+              <button onclick="telaoColunasTodas(true)">Marcar todas</button>
+              <button onclick="telaoColunasTodas(false)">Limpar</button>
+            </div>
+            <p class="hint">Clique para ligar/desligar cada coluna do telão. A escolha
+              vale para o telão desta máquina e é aplicada na hora.</p>
+          </div>
+          <div class="card">
+            <h3>Semáforo da largada</h3>
+            <div class="form-sessao">
+              <div><label>Luzes</label><input value="5 luzes (F1)"></div>
+              <div><label>Tempo entre luzes</label><input value="aleatório 0,6–1,2s"></div>
+              <div><label>Contagem regressiva</label><input value="5 · 4 · 3 · 2 · 1 · VAI!"></div>
+              <div><label>Frase antes da largada</label><input id="som-frase-telao" value='Atenção pilotos, preparem-se para a largada!'></div>
+            </div>
+            <h3 style="margin-top:16px">Exibição</h3>
+            <div class="switch"><span class="ck on">✓</span> Resolução até 4K (tela cheia)</div>
+            <div class="switch"><span class="ck on">✓</span> Pódio top 3 durante a corrida</div>
+            <div class="switch"><span class="ck">·</span> Rotação automática de perfis (30s)</div>
+            <p class="hint">Luzes e contagem usam o mesmo relógio — sincronizados por construção.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============ HARDWARE ============ -->
+      <div class="admin-sec" id="a-hw">
+        <div class="card" style="margin-bottom:16px">
+          <h3>Decoder <span class="pill ok" id="hw-status-pill">—</span></h3>
+            <div class="form-sessao">
+              <div><label>Tipo de decoder</label>
+                <select id="hw-tipo" onchange="hwTrocarTipo()">
+                  <option value="p3">MyLaps / AMB P3 (TCP)</option>
+                  <option value="easylap">EASYLAP-USB (serial Robitronic)</option>
+                  <option value="lapwiz">SKYRC LapWiz (Bluetooth BLE)</option>
+                  <option value="simulador">Simulador de corridas (CTAD) — testes</option>
+                </select></div>
+              <div><label id="hw-alvo-label">IP do decoder</label>
+                <input id="hw-alvo" value="192.168.0.50"></div>
+              <div id="hw-porta-wrap"><label>Porta TCP</label><input id="hw-porta" value="5403"></div>
+              <div id="hw-sim-wrap" style="display:none"><label>Corrida do CTAD (reproduz ao vivo como se fosse agora)</label>
+                <div style="display:flex; gap:6px">
+                  <select id="hw-sessao" style="flex:1; min-width:0">
+                    <option value="">— carregue as sessões —</option>
+                  </select>
+                  <select id="hw-velocidade" title="Velocidade da reprodução" style="width:64px">
+                    <option value="0.5">0,5x</option>
+                    <option value="1">1x</option>
+                    <option value="2">2x</option>
+                    <option value="5">5x</option>
+                    <option value="10">10x</option>
+                  </select>
+                  <button class="btn-slide" onclick="carregarSessoesCTAD()" title="Buscar corridas realizadas no CTAD">🔄</button>
+                </div>
+                <label style="margin-top:6px">Sistema de telemetria (de onde "vem" a simulação)</label>
+                <select id="hw-sistema" title="Assinatura do sistema simulado">
+                  <option value="p3">MyLaps / AMB P3</option>
+                  <option value="easylap">EASYLAP-USB</option>
+                  <option value="lapwiz">SKYRC LapWiz</option>
+                </select>
+                <p class="hint" style="margin:6px 0 0">Somente testes e desenvolvimento: a
+                  sessão simulada é marcada como <b>SIMULAÇÃO</b> — não conta em
+                  recordes/relatórios/campeonatos e não vai ao CTAD.</p>
+              </div>
+            </div>
+            <p class="hint">Status: <b id="hw-status">—</b> · temp <b id="hw-temp">—</b> · tensão <b id="hw-tensao">—</b> · ruído <b id="hw-ruido">—</b></p>
+            <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center">
+              <button class="btn-slide" onclick="conectarDecoder()">🔌 (Re)conectar</button>
+              <button class="btn-slide" onclick="desconectarDecoder()">⏏ Desconectar</button>
+              <button class="btn-slide" onclick="detectarPortas()">🔍 Detectar portas</button>
+              <label class="chk-linha" title="Ao abrir o aplicativo, tenta conectar sozinho em loop até conseguir">
+                <input type="checkbox" id="hw-auto" checked onchange="definirAutoConectar()"> 🔁 Conectar ao abrir
+              </label>
+            </div>
+          </div>
+          <div class="card">
+            <h3>Situação dos drivers</h3>
+            <table class="admin-tabela">
+              <tr><th>Driver</th><th>Status</th></tr>
+              <tr><td>MyLaps / AMB P3</td><td>operacional — TCP, validado ao vivo</td></tr>
+              <tr><td>EASYLAP-USB <span class="pill ok">pronto</span></td><td>serial 38400 8N1 · protocolo Robitronic — conecte p/ testar</td></tr>
+              <tr><td>SKYRC LapWiz (RT004) <span class="pill novo">captura</span></td><td>BLE · descoberta + captura p/ decodificar o protocolo</td></tr>
+              <tr><td>Simulador de corridas (CTAD) <span class="pill novo">teste</span></td><td>busca corridas do CTAD e reemite ao vivo — velocidade (0,5x..10x) e sistema de telemetria (P3/EASYLAP/LapWiz) à escolha · <b>não oficial</b>: só testes/desenvolvimento</td></tr>
+              <tr><td>LapZ · GiroZ · RiCino</td><td>roadmap — serial/USB</td></tr>
+            </table>
+            <p class="hint">Teste de bancada via CLI: <code>python cli.py easylap --porta COM3</code> · <code>python cli.py lapwiz</code></p>
+          </div>
+      </div>
+
+      <!-- ============ PILOTOS ============ -->
+      <div class="admin-sec" id="a-pilotos">
+        <div class="grid g2">
+          <div class="card">
+            <h3 id="piloto-form-tit">Novo piloto</h3>
+            <div class="form-sessao">
+              <div><label>Nome *</label><input id="pil-nome" placeholder="ex.: João Silva"></div>
+              <div><label>Apelido</label><input id="pil-apelido" placeholder="ex.: JS"></div>
+              <div><label>Fonia (como falar)</label>
+                <input id="pil-fonia" placeholder="ex.: Joan Silva — pronúncia no TTS"></div>
+              <div><label>Telefone (chave do piloto)</label>
+                <input id="pil-telefone" placeholder="ex.: 11 99999-0000"></div>
+              <div><label>Funções extra (opcional)</label>
+                <select id="pil-funcoes">
+                  <option value="">— nenhuma —</option>
+                  <option value="admin">Admin</option>
+                  <option value="gestor">Gestor de pista</option>
+                  <option value="superuser">Superuser</option>
+                </select></div>
+              <div><label>Transponder(s)</label>
+                <input id="pil-transponders" placeholder="ex.: 7096340, 1234567"></div>
+              <div><label>Status</label>
+                <select id="pil-ativo">
+                  <option value="1">Ativo</option>
+                  <option value="0">Inativo</option>
+                </select></div>
+            </div>
+            <div style="display:flex; gap:8px; margin-top:14px; flex-wrap:wrap">
+              <button class="btn-slide" onclick="salvarPiloto()">💾 Salvar piloto</button>
+              <button class="btn-slide" onclick="novoPiloto()">✖ Limpar formulário</button>
+            </div>
+            <p class="hint">Vários transponders separados por vírgula. O transponder é o que identifica
+              o piloto ao passar pelo loop. A <b>fonia</b> é como o locutor fala o nome (ex.: grafia
+              fonética) — se ficar vazia, fala o próprio nome.
+              <b>Pilotos com histórico de voltas não são apagados</b> — são inativados.</p>
+          </div>
+          <div class="card">
+            <h3>Resumo</h3>
+            <div class="grid g2" style="gap:12px">
+              <div class="stat-mini"><div class="big" id="pil-total">0</div>
+                <div class="sub">pilotos cadastrados</div></div>
+              <div class="stat-mini"><div class="big" id="pil-ativos">0</div>
+                <div class="sub">ativos</div></div>
+              <div class="stat-mini"><div class="big" id="pil-transp-n">0</div>
+                <div class="sub">transponders</div></div>
+              <div class="stat-mini"><div class="big" id="pil-inativos">0</div>
+                <div class="sub">inativos</div></div>
+            </div>
+            <p class="hint" style="margin-top:12px">Os pilotos cadastrados aqui são a fonte local.
+              O <b>telefone é a chave primária</b>: é por ele que o KChrono reconhece um piloto ao
+              sincronizar com o CTAD <b id="pil-pista">—</b>.</p>
+          </div>
+        </div>
+
+        <div class="admin-secao-tit">Sincronizar com o CTAD</div>
+        <div class="card">
+          <div class="grid g2">
+            <div>
+              <h3>Pilotos do site</h3>
+              <p class="hint">Traz o cadastro público do CTAD (<code>pilotosMetadados</code>) para o KChrono.
+                A identidade é o <b>telefone — chave primária</b>: ele decide quem é quem, e
+                <b>nunca é sobrescrito por outro número</b>. Nome e apelido são só atributos.
+                Só quando o site não informa telefone o vínculo é feito por nome (e apenas se o nome
+                for único). <b>Fonia</b>, <b>funções</b> e <b>transponders</b> são locais e nunca são sobrescritos.</p>
+              <div class="acoes" style="margin-top:12px">
+                <button class="btn-slide" onclick="previaPilotosSite()">🔍 Prévia (não grava)</button>
+                <button class="destaque" onclick="importarPilotosSite()">⬇ Importar do site</button>
+                <button onclick="exportarPilotoSite()">⬆ Enviar piloto ao site</button>
+              </div>
+              <p class="hint" style="margin-top:10px">Status: <b id="sync-pl-status" style="color:var(--text-muted)">aguardando</b></p>
+            </div>
+            <div>
+              <h3>Campeonato do site</h3>
+              <p class="hint">Traz de um <code>campeonatos/{chave}</code> do CTAD a configuração do
+                <b>sistema de chaves</b> (<code>pilotosPorChave</code>, <code>inverterSegundaBateria</code>,
+                <code>numeroProvas</code>, <code>pontuacaoTabela</code>) e os <b>inscritos</b>.</p>
+              <div class="form-sessao" style="margin-top:12px">
+                <div><label>Campeonato no KChrono</label><select id="sync-camp-local"></select></div>
+                <div><label>Chave no CTAD</label><input id="sync-camp-chave" placeholder="ex.: camp_kr_2026"></div>
+              </div>
+              <div class="acoes" style="margin-top:12px">
+                <button class="btn-slide" onclick="previaCampeonatoSite()">🔍 Prévia</button>
+                <button class="destaque" onclick="importarCampeonatoSite()">⬇ Importar</button>
+              </div>
+            </div>
+          </div>
+          <div id="sync-pl-resultado" style="margin-top:14px"></div>
+        </div>
+
+        <div class="admin-secao-tit">Pilotos cadastrados (<span id="pil-lista-n">0</span>)</div>
+        <div class="card">
+          <div class="acoes" style="margin-bottom:12px">
+            <input id="pil-busca" placeholder="Buscar por nome/transponder…" oninput="renderPilotos()"
+                   style="flex:1; padding:10px 12px; border-radius:8px; border:1px solid var(--border-card); background:var(--bg-input); color:var(--text-title)">
+            <button onclick="carregarPilotos()">🔄 Atualizar</button>
+          </div>
+          <div class="tabela-wrap">
+            <table class="admin-tabela" id="tabela-pilotos">
+              <tr><th>Nome</th><th>Apelido</th><th>Fonia</th><th>Telefone</th><th>Funções</th><th>Transponder(s)</th><th>Status</th><th>Ações</th></tr>
+              <tr><td colspan="8" style="color:var(--text-muted)">carregando…</td></tr>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============ CAMPEONATOS ============ -->
+      <div class="admin-sec" id="a-camp">
+        <div class="grid g2">
+          <div class="card">
+            <h3>Campeonato</h3>
+            <div class="form-sessao">
+              <div><label>Selecionar</label><select id="camp-select" onchange="abrirCampeonato()"></select></div>
+              <div><label>Novo campeonato</label><input id="camp-nome" placeholder="ex.: KR 2026"></div>
+              <div><label>Nº de provas (etapas)</label><input id="camp-provas" value="4"></div>
+              <div><label>Pilotos por prova</label><input id="camp-porprova" value="10"></div>
+              <div><label>Nº máximo por chave</label><input id="camp-porchave" value="10" title="limite de pilotos por chave (divisão da grade em A/B/C…)"></div>
+              <div><label>Inverter bateria seguinte</label><input type="checkbox" id="camp-inverter"></div>
+              <div><label>Drop rounds (descartar piores)</label><input id="camp-drop" value="0"></div>
+              <div><label>Bônus pole</label><input id="camp-bpole" value="0"></div>
+              <div><label>Bônus melhor volta</label><input id="camp-bmv" value="0"></div>
+              <button class="btn-slide" onclick="criarCampeonato()">➕ Criar campeonato</button>
+            </div>
+          </div>
+          <div class="card">
+            <h3>Inscrever piloto</h3>
+            <div class="form-sessao">
+              <div><label>Piloto</label><select id="camp-piloto"></select></div>
+              <div><label>Transponder</label><input id="camp-transponder" placeholder="código"></div>
+              <div><label>Frequência</label><input id="camp-freq" placeholder="ex.: 40.040"></div>
+              <button class="btn-slide" onclick="inscreverPilotoCamp()">✍️ Inscrever</button>
+            </div>
+            <p class="hint">Transponder e frequência de cada inscrito alimentam a
+              <b>varredura de espectro</b>: bateria com dois pilotos no mesmo transponder
+              ou na mesma frequência é <b>bloqueada</b> até o conflito ser resolvido.</p>
+          </div>
+        </div>
+
+        <div class="admin-secao-tit">Sequência &amp; durações das etapas</div>
+        <div class="card" id="cfg-camp-plano">
+          <div class="form-sessao centro">
+            <div><label>Treino (min)</label>
+              <input id="camp-d-treino" type="number" min="0" value="10" onchange="salvarDuracoesCamp()"></div>
+            <div><label>Classificação (min)</label>
+              <input id="camp-d-class" type="number" min="0" value="10" onchange="salvarDuracoesCamp()"></div>
+            <div><label>Corrida (min)</label>
+              <input id="camp-d-corr" type="number" min="0" value="20" onchange="salvarDuracoesCamp()"></div>
+            <div><label>Intervalo (min)</label>
+              <input id="camp-d-int" type="number" min="0" value="5" onchange="salvarDuracoesCamp()"></div>
+          </div>
+          <div style="display:flex; align-items:end; gap:14px; margin:14px 0 8px">
+            <div><label>Nº de provas (etapas)</label>
+              <input id="camp-num-provas" type="number" min="1" max="20" value="1"
+                     style="width:80px" onchange="remontarPlanoCampeonato()"></div>
+            <label class="chk-linha" style="font-size:12.5px; padding-bottom:10px"
+                   title="Classificação define o grid das corridas pela média das 3 melhores voltas consecutivas (desmarcado: melhor volta)">
+              <input type="checkbox" id="camp-class-3voltas" checked onchange="salvarClassRegra()">
+              classificação: 3 melhores voltas (média)</label>
+          </div>
+          <div class="plano-linha" id="camp-plano-lista"></div>
+          <p class="hint">Etapa atual: <b id="camp-etapa-atual">—</b>
+            · Total previsto: <b id="camp-plano-total">—</b></p>
+
+          <h3 style="margin:14px 0 8px">Regras vindas do CTAD <span style="font-weight:400;font-size:12px;color:var(--text-muted)">(opcional)</span></h3>
+          <div class="form-sessao">
+            <div><label>Chave do campeonato no site</label>
+              <input id="camp-chave-ctad" placeholder="ex.: camp_kr_2026"></div>
+            <div><label>&nbsp;</label>
+              <button class="btn-slide" onclick="buscarCampeonatoCTAD()">🔍 Buscar no CTAD</button></div>
+          </div>
+          <div id="camp-ctad-preview" style="margin-top:10px"></div>
+
+          <div class="acoes">
+            <button class="btn-slide" onclick="salvarPlanoCampeonato()">💾 Salvar plano</button>
+          </div>
+          <p class="hint">Estas durações e a sequência valem para o <b>campeonato iniciado</b> no painel do
+            operador (aqui você configura; lá você escolhe qual campeonato rodar e inicia).</p>
+        </div>
+
+        <div class="admin-secao-tit">Inscritos (<span id="camp-inscritos-n">0</span>)</div>
+        <div class="card"><div class="tabela-wrap">
+          <table class="admin-tabela" id="tabela-inscritos">
+            <tr><th>#</th><th>Piloto</th><th>Transponder</th><th>Frequência</th><th>Ranking</th></tr>
+            <tr><td colspan="5" style="color:var(--text-muted)">nenhum inscrito</td></tr>
+          </table>
+        </div></div>
+
+        <div class="admin-secao-tit">Baterias &amp; espectro RF</div>
+        <div class="card">
+          <div class="acoes">
+            <input id="camp-finais" value="1" title="nº de finais" style="width:64px; padding:10px; border-radius:8px; border:1px solid var(--border-card); background:var(--bg-input); color:var(--text-title); text-align:center">
+            <button class="destaque" onclick="gerarHeats()">🏁 Gerar heats &amp; finais</button>
+            <button onclick="carregarRanking()">🏆 Ver ranking</button>
+          </div>
+          <div id="baterias-lista"></div>
+        </div>
+
+        <div class="admin-secao-tit">Grids &amp; chaves (diretiva CTAD)</div>
+        <div class="card">
+          <p class="hint">Máximo por chave: <b id="camp-chave-max-valor">—</b>
+            · Inverter a bateria seguinte:
+            <input type="checkbox" id="camp-chave-inv" onchange="salvarInversaoChaves()"
+                   title="Inverte a ordem de largada da bateria seguinte (vem da diretiva do CTAD)">
+            <span class="hint">— definido na criação do campeonato ou na importação do CTAD</span></p>
+          <div class="acoes">
+            <button class="destaque" onclick="carregarGrids()">🏁 Ver grids</button>
+          </div>
+          <p class="hint">A grade de cada prova é dividida em <b>Chave A, B, C…</b> sempre que o
+            número de pilotos passa do limite. A Chave A é o grupo mais rápido (semeadura por
+            desempenho); ninguém corre sozinho — uma chave com 1 piloto é absorvida pela anterior.
+            O critério da corrida 1 é a <b>classificação</b> (média das 3 melhores voltas
+            consecutivas — ou a melhor volta, se a opção estiver desmarcada); as corridas
+            seguintes usam o resultado da anterior, opcionalmente <b>invertido</b>.</p>
+          <div id="camp-grids"></div>
+        </div>
+
+        <div class="admin-secao-tit">Ranking geral (drop rounds + bônus)</div>
+        <div class="card"><div class="tabela-wrap">
+          <table class="admin-tabela" id="tabela-ranking">
+            <tr><th>Pos</th><th>Piloto</th><th>Total</th><th>Válidos</th><th>Descartados</th></tr>
+            <tr><td colspan="5" style="color:var(--text-muted)">sem resultados lançados</td></tr>
+          </table>
+        </div></div>
+      </div>
+
+      <!-- ============ CONFIGURAÇÕES ============ -->
+      <div class="admin-sec" id="a-config">
+        <div class="admin-secao-tit">Aparência</div>
+        <div class="grid g2">
+          <div class="card">
+            <h3>Wallpaper da área principal</h3>
+            <p class="hint">Imagem de fundo da área de conteúdo. O app <b>já vem com um wallpaper
+              padrão</b> (<code>/imagens/wallpaper.jpg</code>); ao escolher outro aqui, a escolha
+              fica salva <b>neste navegador</b>.</p>
+            <div class="form-sessao" style="margin-top:12px">
+              <div><label>URL da imagem</label>
+                <input id="cfg-wallpaper-url" placeholder="/imagens/wallpaper.jpg (padrão)"></div>
+            </div>
+            <div class="acoes" style="margin-top:12px">
+              <button class="btn-slide" onclick="definirWallpaperURL()">🖼 Aplicar URL</button>
+              <label class="btn-slide" style="cursor:pointer">📁 Enviar arquivo
+                <input type="file" id="cfg-wallpaper-file" accept="image/*" style="display:none" onchange="carregarWallpaperArquivo(this)">
+              </label>
+              <button onclick="removerWallpaper()">🗑 Remover</button>
+            </div>
+            <div id="cfg-wallpaper-prev" style="margin-top:10px"></div>
+          </div>
+          <div class="card">
+            <h3>Transparência dos cartões</h3>
+            <p class="hint">Controla o quanto o wallpaper aparece através dos cartões e tabelas.</p>
+            <div class="frase-input" style="margin-top:12px">
+              <span class="rot">Transparência</span>
+              <input type="range" id="cfg-transparencia" min="0" max="80" value="0"
+                     oninput="mudarTransparencia(this.value)">
+              <span id="cfg-transparencia-txt" class="rot" style="min-width:44px">0%</span>
+            </div>
+            <p class="hint">0% = cartões sólidos · 80% = máximo de transparência.</p>
+          </div>
+          <div class="card">
+            <h3>Idioma</h3>
+            <p class="hint">Selecione o idioma da interface. Requer recarregar a página.</p>
+            <div class="frase-input" style="margin-top:12px">
+              <span class="rot">Idioma</span>
+              <select id="cfg-idioma" onchange="mudarIdioma(this.value)">
+                <option value="pt_BR">Português (Brasil)</option>
+                <option value="en_US">English (US)</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============ SOBRE ============ -->
+      <div class="admin-sec" id="a-sobre">
+        <div class="grid g4">
+          <div class="card"><h3>Versão</h3><div class="big" id="upd-versao">1.0.15</div><div class="sub">Fases 0 → 7 concluídas · atualizações pelo GitHub</div></div>
+          <div class="card"><h3>Drivers</h3><div class="big" style="font-size:20px">P3 · EASYLAP · LapWiz</div><div class="sub">TCP · serial · Bluetooth</div></div>
+          <div class="card"><h3>Stack</h3><div class="big" style="font-size:20px">Python · FastAPI</div><div class="sub">SQLite · WebSocket · vanilla JS</div></div>
+          <div class="card"><h3>Atualizações</h3><div class="sub" id="upd-status">aguardando verificação…</div>
+            <div style="margin-top:8px"><label>Repositório GitHub da atualização (usuario/repo público)</label>
+              <div style="display:flex; gap:6px">
+                <input id="upd-repo" placeholder="ex.: seuusuario/KChrono" style="flex:1; min-width:0">
+                <button class="btn-slide" onclick="salvarRepoAtualizacao()">💾</button>
+              </div></div>
+            <div style="display:flex; gap:8px; margin-top:8px; flex-wrap:wrap">
+              <button class="btn-slide" onclick="verificarVersao()">🔍 Verificar</button>
+              <button class="btn-slide" onclick="baixarAtualizacao()">⬇ Baixar</button>
+              <button class="btn-slide" onclick="instalarAtualizacao()">🔄 Instalar agora</button>
+              <button class="btn-slide" onclick="encerrarApp()">⏹ Sair</button>
+            </div>
+            <p class="hint">Publique a versão nova como <b>release no GitHub</b> com tag igual à
+              versão (ex.: <code>v1.0.15</code>) — a CI anexa sozinha o instalador
+              <code>KChrono-Setup-1-0-15.exe</code>
+              (Windows), o <code>KChrono-*.AppImage</code> (Linux) e a ISO da live. "Instalar agora"
+              baixa, fecha o app e atualiza em silêncio — ao reabrir já é a versão nova (os dados
+              ficam intactos).</p>
+          </div>
+        </div>
+        <div class="admin-secao-tit">Créditos</div>
+        <div class="card sobre-credito">
+          <div>
+            <div class="credito-nome">Raphael Belowodski</div>
+            <div class="credito-cargo">Criador e desenvolvedor do KChrono</div>
+            <p class="hint">Sistema de cronometragem de precisão para pistas de RC/modelismo.
+              Decoder MyLaps P3, locução offline em pt-BR, gestão de pilotos e campeonatos,
+              integração com o CTAD e administração local pela rede.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- rodapé fixo -->
+<div class="rodape-bar">
+  <span class="add">⊕ Adicionar sessão</span>
+  <div class="dir">
+    <span id="rodape-sync">Sincronização CTAD: aguardando</span>
+    <span class="pill novo">NOVIDADE</span>
+    <span>KChrono <span class="js-versao">v1.0.15</span> · por <b>Raphael Belowodski</b></span>
+  </div>
+</div>
+
+<script src="/static/tracado.js?v=1.0.15"></script>
+<script src="/static/app.js?v=1.0.15"></script>
+
+<!-- nova versão disponível (abre sozinho na abertura do app) -->
+<div id="modal-atualizacao" class="modal-fundo" style="display:none">
+  <div class="modal-card" style="width:min(560px,96vw)">
+    <h3 id="upd-dlg-titulo">Nova versão disponível</h3>
+    <p class="hint" id="upd-dlg-atual" style="margin:6px 0 12px"></p>
+    <div id="upd-dlg-notas" class="upd-notas"></div>
+    <p class="hint" id="upd-dlg-status" style="margin-top:10px"></p>
+    <div class="acoes" style="margin-top:16px; justify-content:flex-end">
+      <button class="btn-slide" onclick="fecharDialogoAtualizacao()">Agora não</button>
+      <button class="destaque" onclick="atualizarAgoraPeloDialogo()">🔄 Atualizar agora</button>
+    </div>
+  </div>
+</div>
+
+<!-- associação manual das teclas F1..F12 -->
+<div id="modal-atalhos" class="modal-fundo" style="display:none">
+  <div class="modal-card">
+    <h3>Associar teclas a pilotos</h3>
+    <p class="hint" style="margin-bottom:10px">Cada tecla F1–F12 registra a volta do piloto escolhido.
+      Deixe em “automático” para usar a ordem do check-in.</p>
+    <div id="modal-atalhos-corpo" class="atalho-assoc-lista"></div>
+    <div class="acoes" style="margin-top:14px; justify-content:flex-end">
+      <button class="btn-slide" onclick="fecharAssociacaoAtalhos()">Cancelar</button>
+      <button class="destaque" onclick="salvarAssociacaoAtalhos()">Salvar associação</button>
+    </div>
+  </div>
+</div>
+</body>
+</html>

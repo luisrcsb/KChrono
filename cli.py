@@ -175,7 +175,7 @@ def main(argv=None) -> int:
     campo.set_defaults(func=comando_campeonato_teste)
 
     serv = sub.add_parser("servidor", help="sobe o servidor local (interface web)")
-    serv.add_argument("--host", default="0.0.0.0", help="interface de rede (default: 0.0.0.0 = LAN)")
+    serv.add_argument("--host", default="127.0.0.1", help="interface de rede (default: 127.0.0.1; use 0.0.0.0 somente com autenticação LAN)")
     serv.add_argument("--porta", type=int, default=8780, help="porta HTTP (default: 8780)")
     serv.set_defaults(func=comando_servidor)
 

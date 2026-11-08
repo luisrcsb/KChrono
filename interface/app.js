@@ -1,6 +1,18 @@
 /* KChrono — frontend (Fase 2): consome a API local e o WebSocket de tempo real. */
 "use strict";
 
+function alternarMenu() {
+  const shell = document.querySelector('.admin-shell');
+  const btn = document.getElementById('btn-menu');
+  if (!shell) return;
+  shell.classList.toggle('menu-recolhido');
+  if (btn) {
+    const recolhido = shell.classList.contains('menu-recolhido');
+    btn.setAttribute('aria-expanded', !recolhido);
+    btn.textContent = recolhido ? '☰ MENU' : '✕ MENU';
+  }
+}
+
 let ws = null;
 let usuario = { nome: "", nivel: "superuser" };
 
@@ -463,6 +475,8 @@ function tratarEvento(ev) {
     case "classificacao": renderClassificacao(ev); break;
     case "voltas":
       renderVoltaAVolta(ev);
+      renderFeedAoVivo(ev);
+      renderLiveFeed(ev);
       break;
     case "ghost_lap":
       logMsg(`GHOST LAP descartado — transponder ${ev.transponder}`, "l-aviso", "log-operador");
@@ -554,6 +568,14 @@ function refreshDecoderPainel() {
 let ultimaClassificacao = { linhas: [] };
 let ultimoSessaoId = null;
 let ultimasVoltasData = { pilotos: [], parametros: {} };
+let matrizVisible = true;
+let autoFontSizeVv = true;
+let fontSizeVv = 12;
+
+const FONT_SIZE_KEY = 'kchrono-volta-volta-font-size';
+const FONT_AUTO_KEY = 'kchrono-volta-volta-font-auto';
+let autoFontSize = true;
+let fontSize = 12;
 
 // ---------------------------------------------------------------- render
 function renderSnapshot(s) {
@@ -572,6 +594,7 @@ function renderSnapshot(s) {
   if (s.tracada !== undefined) renderTracada(s.tracada);
   if (Array.isArray(s.checkin)) { checkinCache.presentes = s.checkin; if (checkinCache.pilotos.length) renderCheckin(); }
   if (s.campeonato) renderEstadoCampeonato(s.campeonato);
+  renderLiveFeed(s.voltas || { pilotos: [] });
   (s.eventos || []).slice(-12).forEach(e => {
     const classe = e.tipo === "aviso" || e.tipo === "ghost_lap" ? "l-aviso"
       : e.tipo === "erro" ? "l-erro" : e.tipo === "volta" ? "l-volta" : "l-sistema";
@@ -939,6 +962,9 @@ function renderClassificacao(ev) {
   // Volta-a-volta (matriz de tempos + gap)
   renderVoltaAVolta();
 
+  // Live Feed - Ao Vivo
+  renderLiveFeed({ pilotos: ultimasVoltasData.pilotos || [] });
+
   // líder da sessão (cartões de resumo)
   const el = document.getElementById("card-lider");
   if (el) el.textContent = lider ? lider.nome.split(" ")[0] : "—";
@@ -950,22 +976,219 @@ function renderClassificacao(ev) {
 
 // "Volta-a-volta": todos os pilotos participantes lado a lado; cada coluna
 // lista os tempos das voltas (linhas) e o gap para o líder.
+function ajustarTamanhoFonteAutomatico() {
+  const box = document.getElementById("volta-a-volta");
+  if (!box || !autoFontSize) return;
+
+  const pilotos = (ultimasVoltasData.pilotos || []).length || 1;
+  const maxVoltas = Math.max(...(ultimasVoltasData.pilotos || []).map(p => (p.voltas || []).length), 1);
+  const larguraDisponivel = box.clientWidth;
+  const larguraPorPiloto = larguraDisponivel / pilotos;
+  const alturaPorVolta = box.clientHeight / maxVoltas;
+
+  // Calcular tamanho ideal baseado na largura e altura disponíveis
+  const tamanhoBase = Math.min(
+    Math.max(10, larguraPorPiloto / 8),
+    Math.max(8, alturaPorVolta / 2)
+  );
+
+  const tamanho = Math.min(16, Math.max(8, Math.round(tamanhoBase)));
+
+  box.style.fontSize = tamanho + 'px';
+  box.querySelectorAll('.vv-cel, .vv-nome, .vv-pos').forEach(el => {
+    el.style.fontSize = tamanho + 'px';
+  });
+}
+
+function alternarAutoFont() {
+  autoFontSize = document.getElementById('toggle-auto-font').checked;
+  if (autoFontSize) {
+    ajustarTamanhoFonteAutomatico();
+  } else {
+    document.getElementById('volta-a-volta').style.fontSize = fontSize + 'px';
+  }
+}
+
+function alterarTamanhoFonte() {
+  const select = document.getElementById('select-font-size');
+  if (select) {
+    fontSize = parseInt(select.value);
+    autoFontSize = false;
+    document.getElementById('toggle-auto-font').checked = false;
+    const box = document.getElementById('volta-a-volta');
+    if (box) {
+      box.style.fontSize = fontSize + 'px';
+      box.querySelectorAll('.vv-cel, .vv-nome, .vv-pos').forEach(el => {
+        el.style.fontSize = fontSize + 'px';
+      });
+    }
+  }
+}
+
+function ajustarTamanhoFonteVoltaVolta() {
+  const container = document.getElementById('volta-a-volta');
+  if (!container || !autoFontSizeVv) return;
+
+  // Evita recalcular excessivamente: só ajusta se mudou significativamente
+  const pilotos = (ultimasVoltasData.pilotos || []).length || 1;
+  const larguraDisponivel = container.getBoundingClientRect().width;
+  const larguraPorPiloto = larguraDisponivel / pilotos;
+  const tamanhoCalculado = Math.floor(larguraPorPiloto / 6);
+  const tamanhoFinal = Math.max(8, Math.min(16, tamanhoCalculado));
+
+  if (Math.abs(tamanhoFinal - fontSizeVv) < 2) {
+    // Mudança pequena demais, mantém para evitar piscar
+    return;
+  }
+
+  container.style.fontSize = tamanhoFinal + 'px';
+  fontSizeVv = tamanhoFinal;
+  atualizarDisplayFonte(tamanhoFinal);
+
+  const celulas = container.querySelectorAll('.vv-cel, .vv-nome, .vv-pos, .vv-cab');
+  celulas.forEach(el => {
+    el.style.fontSize = tamanhoFinal + 'px';
+  });
+
+  const alturaMinima = Math.max(24, tamanhoFinal * 1.6);
+  container.querySelectorAll('.vv-cel').forEach(el => {
+    el.style.minHeight = alturaMinima + 'px';
+    el.style.height = alturaMinima + 'px';
+  });
+}
+
+function atualizarDisplayFonte(tamanho) {
+  const display = document.getElementById('font-size-display');
+  if (display) display.textContent = tamanho;
+  const select = document.getElementById('manual-font-vv');
+  if (select) select.value = tamanho;
+}
+
+function carregarPreferenciasFonte() {
+  const salvoAuto = localStorage.getItem(FONT_AUTO_KEY);
+  const salvoSize = localStorage.getItem(FONT_SIZE_KEY);
+
+  if (salvoAuto !== null) {
+    autoFontSizeVv = salvoAuto === 'true';
+  }
+  if (salvoSize !== null) {
+    fontSizeVv = parseInt(salvoSize);
+  }
+
+  const checkbox = document.getElementById('auto-font-vv');
+  const select = document.getElementById('manual-font-vv');
+
+  if (checkbox) checkbox.checked = autoFontSizeVv;
+  if (select) {
+    select.disabled = autoFontSizeVv;
+    select.value = fontSizeVv;
+  }
+
+  atualizarDisplayFonte(fontSizeVv);
+
+  if (!autoFontSizeVv) {
+    aplicarTamanhoFonteManual(fontSizeVv);
+  }
+}
+
+function salvarPreferenciasFonte() {
+  localStorage.setItem(FONT_AUTO_KEY, autoFontSizeVv.toString());
+  localStorage.setItem(FONT_SIZE_KEY, fontSizeVv.toString());
+}
+
+function aplicarTamanhoFonteManual(tamanho) {
+  const container = document.getElementById('volta-a-volta');
+  if (container) {
+    container.style.fontSize = tamanho + 'px';
+    container.querySelectorAll('.vv-cel, .vv-nome, .vv-pos, .vv-cab').forEach(el => {
+      el.style.fontSize = tamanho + 'px';
+    });
+    const alturaMinima = Math.max(10, tamanho * 1.8);
+    container.querySelectorAll('.vv-cel').forEach(el => {
+      el.style.minHeight = alturaMinima + 'px';
+    });
+  }
+}
+
+function toggleAutoFontVoltaVolta() {
+  const checkbox = document.getElementById('auto-font-vv');
+  const select = document.getElementById('manual-font-vv');
+
+  autoFontSizeVv = checkbox.checked;
+  select.disabled = autoFontSizeVv;
+
+  if (autoFontSizeVv) {
+    ajustarTamanhoFonteVoltaVolta();
+  } else {
+    aplicarTamanhoFonteManual(fontSizeVv);
+  }
+
+  salvarPreferenciasFonte();
+}
+
+function setManualFontVoltaVolta() {
+  const select = document.getElementById('manual-font-vv');
+  fontSizeVv = parseInt(select.value);
+
+  autoFontSizeVv = false;
+  const checkbox = document.getElementById('auto-font-vv');
+  if (checkbox) checkbox.checked = false;
+  if (select) select.disabled = false;
+
+  aplicarTamanhoFonteManual(fontSizeVv);
+  atualizarDisplayFonte(fontSizeVv);
+  salvarPreferenciasFonte();
+}
+
+function ajustarFonte(delta) {
+  fontSizeVv = Math.max(1, fontSizeVv + delta);
+
+  autoFontSizeVv = false;
+  const checkbox = document.getElementById('auto-font-vv');
+  const select = document.getElementById('manual-font-vv');
+  if (checkbox) checkbox.checked = false;
+  if (select) select.disabled = false;
+
+  aplicarTamanhoFonteManual(fontSizeVv);
+  atualizarDisplayFonte(fontSizeVv);
+  salvarPreferenciasFonte();
+}
+
+function alternarModoVoltaVolta() {
+  const box = document.getElementById('volta-a-volta-wrap');
+  if (!box) return;
+
+  // Alternar entre matriz e feed
+  const isMatrix = box.dataset.mode !== 'feed';
+  box.dataset.mode = isMatrix ? 'feed' : 'matrix';
+
+  if (isMatrix) {
+    // Mudar para feed
+    renderFeedAoVivo(ultimasVoltasData);
+  } else {
+    // Mudar para matriz
+    renderVoltaAVolta(ultimasVoltasData);
+  }
+}
+
 function renderVoltaAVolta(dados) {
   if (dados) ultimasVoltasData = dados;
   const box = document.getElementById("volta-a-volta");
   if (!box) return;
-  const voltasPorId = {};
-  (ultimasVoltasData.pilotos || []).forEach(p => {
-    voltasPorId[String(p.piloto_id ?? p.nome)] = p;
+  let linhas = (ultimaClassificacao.linhas || []).slice();
+  const pilotosDeDados = ultimasVoltasData.pilotos || [];
+  const idsPresentes = new Set(linhas.map(l => String(l.piloto_id)));
+  pilotosDeDados.forEach(p => {
+    if (!idsPresentes.has(String(p.piloto_id ?? p.nome))) {
+      linhas.push({
+        piloto_id: p.piloto_id,
+        nome: p.nome,
+        voltas: (p.voltas || []).length,
+        gap: "",
+        posicao: null
+      });
+    }
   });
-  // classificação = todos os pilotos da sessão (mesmo os que ainda não voltaram)
-  const linhas = (ultimaClassificacao.linhas || []).slice();
-  if (!linhas.length) {
-    (ultimasVoltasData.pilotos || []).forEach(p => {
-      linhas.push({ piloto_id: p.piloto_id, nome: p.nome,
-                    voltas: (p.voltas || []).length, gap: "" });
-    });
-  }
   if (!linhas.length) {
     box.innerHTML = '<p class="hint">aguardando a primeira volta…</p>';
     return;
@@ -974,22 +1197,25 @@ function renderVoltaAVolta(dados) {
     0,
     ...(ultimasVoltasData.pilotos || []).map(p => (p.voltas || []).length),
     ...linhas.map(l => l.voltas || 0));
-  const cols = linhas.map(l => {
+
+// Normaliza células: cada piloto tem exatamente maxVoltas células, evitando reflow
+const cols = linhas.map(l => {
     const dadosP = voltasPorId[String(l.piloto_id)] || {};
     const porNum = {};
     (dadosP.voltas || []).forEach(v => { porNum[v.numero] = v; });
     const celulas = [];
-    for (let n = 1; n <= maxVoltas; n++) {
+    // da volta mais recente (topo) para a primeira (base)
+    for (let n = maxVoltas; n >= 1; n--) {
       const v = porNum[n];
       celulas.push(v
-        ? `<div class="vv-cel${v.melhor ? " vv-melhor" : ""}" title="volta ${n}">${fmtVolta(v.tempo)}</div>`
-        : '<div class="vv-cel vv-vazia">—</div>');
+        ? `<div class="vv-cel${v.melhor ? " vv-melhor" : ""}" title="volta ${n}" style="min-width:80px;text-align:center;">${fmtVolta(v.tempo)}</div>`
+        : '<div class="vv-cel vv-vazia" style="min-width:80px;text-align:center;">—</div>');
     }
     const gap = l.gap ? `<div class="vv-gap" title="gap para o líder">${_esc(l.gap)}</div>` : "";
     return `<div class="vv-piloto">
       <div class="vv-cab">
         <div class="vv-pos">${l.posicao || ""}</div>
-        <div class="vv-nome" title="${_esc(l.nome)}">${_esc(l.nome)}</div>
+        <div class="vv-nome" title="${_esc(l.nome)}" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:140px;">${_esc(l.nome)}</div>
         <div class="vv-total">${l.voltas || 0} volta(s)</div>
         ${gap}
       </div>
@@ -997,15 +1223,263 @@ function renderVoltaAVolta(dados) {
     </div>`;
   });
   const numeros = [];
-  for (let n = 1; n <= maxVoltas; n++)
-    numeros.push(`<div class="vv-cel vv-num">${n}</div>`);
+  for (let n = maxVoltas; n >= 1; n--)
+    numeros.push(`<div class="vv-cel vv-num" style="min-width:80px;text-align:center;">${n}</div>`);
   box.innerHTML = `<div class="vv-tabela">
     <div class="vv-piloto vv-fixa">
-      <div class="vv-cab"><div class="vv-nome">Volta</div></div>
+      <div class="vv-cab" style="display:flex;align-items:center;justify-content:center;height: auto;">
+        <div class="vv-nome" style="font-weight:bold;margin:0;">Volta</div>
+      </div>
       ${numeros.join("")}
     </div>
     ${cols.join("")}
   </div>`;
+  setTimeout(() => ajustarTamanhoFonteVoltaVolta(), 50);
+}
+
+// Feed AO VIVO (resumo) - mantido para compatibilidade, mas não usado no novo layout
+function renderFeedAoVivo(dados) {
+  if (dados) ultimasVoltasData = dados;
+  const box = document.getElementById("ao-vivo-feed");
+  if (!box) return;
+  if (!dados || !dados.pilotos || dados.pilotos.length === 0) {
+    box.innerHTML = '<p class="hint" style="text-align: center; padding: 20px;">Aguardando primeiro passagem...</p>';
+    return;
+  }
+
+  let html = '';
+  const agora = new Date();
+  const timestamp = agora.toLocaleTimeString('pt-BR');
+
+  dados.pilotos.forEach(p => {
+    const voltas = p.voltas || [];
+    if (voltas.length > 0) {
+      const ultimaVolta = voltas[voltas.length - 1];
+      const numeroVolta = ultimaVolta.numero;
+      const tempoVolta = fmtVolta(ultimaVolta.tempo);
+      const melhorFlag = ultimaVolta.melhor ? ' 🏆 MELHOR' : '';
+      const recordeFlag = ultimaVolta.recorde ? ' ⭐ RECORDE' : '';
+
+      html += `
+        <div style="padding: 8px 12px; border-bottom: 1px solid var(--border); background: ${ultimaVolta.melhor ? 'rgba(255, 183, 3, 0.1)' : 'transparent'};">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div style="font-weight: bold; color: var(--text-primary);">
+              ${_esc(p.nome)}
+              <span style="color: var(--text-muted); font-size: 11px;">#${p.piloto_id || ''}</span>
+            </div>
+            <div style="font-size: 11px; color: var(--text-muted);">${timestamp}</div>
+          </div>
+          <div style="display: flex; justify-content: space-between; margin-top: 4px;">
+            <div>
+              <span style="color: var(--accent-green); font-weight: bold;">V${numeroVolta}</span>
+              <span style="color: var(--text-primary); margin-left: 8px;">${tempoVolta}</span>
+              ${melhorFlag ? `<span style="color: #ffb703; margin-left: 8px;">${melhorFlag}</span>` : ''}
+              ${recordeFlag ? `<span style="color: #ff006e; margin-left: 8px;">${recordeFlag}</span>` : ''}
+            </div>
+            <div style="color: var(--text-muted); font-size: 11px;">
+              Total: ${voltas.length} volta(s) · Melhor: ${p.melhor ? fmtVolta(p.melhor) : '—'}
+            </div>
+          </div>
+        </div>
+      `;
+    }
+  });
+
+  if (html === '') {
+    box.innerHTML = '<p class="hint" style="text-align: center; padding: 20px;">Aguardando primeira volta...</p>';
+  } else {
+    box.innerHTML = html;
+  }
+}
+
+// ============================================================
+// NOVO: Live Feed Grid - "Ao Vivo"
+// ============================================================
+// Sistema que empilha cada volta conforme acontece:
+// - Eixo Y = Número da volta (mais recente no topo)
+// - Eixo X = Pilotos
+// - Quando um piloto "abre" uma volta, cria a linha com seu tempo
+// - Outros pilotos têm "slots reservados" vazios até completarem a volta
+// ============================================================
+function renderLiveFeed(dados) {
+  if (dados) ultimasVoltasData = dados;
+  const box = document.getElementById("ao-vivo-grid");
+  if (!box) return;
+
+  const pilotos = (ultimasVoltasData.pilotos || []).slice();
+  if (!pilotos.length) {
+    box.innerHTML = '<p class="hint">Aguardando primeira passagem...</p>';
+    return;
+  }
+
+  // Construir mapa de voltas por piloto
+  const voltasPorPiloto = {};
+  let maxVolta = 0;
+  pilotos.forEach(p => {
+    const voltas = (p.voltas || []).slice().sort((a, b) => a.numero - b.numero);
+    voltasPorPiloto[p.piloto_id] = voltas;
+    if (voltas.length > 0) {
+      maxVolta = Math.max(maxVolta, voltas[voltas.length - 1].numero);
+    }
+  });
+
+  // Obter classificação atual para gaps e posição
+  const classif = ultimaClassificacao.linhas || [];
+  const posPorPiloto = {};
+  const gapPorPiloto = {};
+  const totalTempoPorPiloto = {};
+  classif.forEach(l => {
+    posPorPiloto[l.piloto_id] = l.posicao;
+    gapPorPiloto[l.piloto_id] = l.gap;
+    totalTempoPorPiloto[l.piloto_id] = l.tempo;
+  });
+
+  // Determinar piloto líder (posição 1)
+  const liderId = classif[0]?.piloto_id;
+
+  // Construir linhas: uma para cada número de volta (maxVolta até 1)
+  // Cada linha tem colunas: [Nº Volta] [Piloto] [Tempo] [Gap]
+  let html = '';
+
+  // Cabeçalho fixo
+  html += `
+    <div class="ao-vivo-controls">
+      <span style="font-size:11px; color:var(--text-muted);">Volta mais recente no topo</span>
+    </div>
+    <div class="ao-vivo-header">
+      <div class="col-volta">VOLTA</div>
+      <div class="col-piloto">PILOTO</div>
+      <div class="col-tempo">TEMPO</div>
+      <div class="col-gap">GAP</div>
+    </div>
+  `;
+
+  // Para cada volta (da mais recente para a primeira)
+  for (let n = maxVolta; n >= 1; n--) {
+    let voltaTeveDados = false;
+    const pilotosNaVolta = [];
+
+    // Coletar dados de todos os pilotos para esta volta
+    pilotos.forEach(p => {
+      const voltas = voltasPorPiloto[p.piloto_id] || [];
+      const volta = voltas.find(v => v.numero === n);
+      const pos = posPorPiloto[p.piloto_id];
+      const gap = gapPorPiloto[p.piloto_id];
+      const totalTempo = totalTempoPorPiloto[p.piloto_id];
+      const isLider = p.piloto_id === liderId;
+
+      if (volta) {
+        voltaTeveDados = true;
+        pilotosNaVolta.push({
+          piloto: p,
+          volta: volta,
+          pos: pos,
+          gap: gap,
+          totalTempo: totalTempo,
+          isLider: isLider,
+          temVolta: true
+        });
+      } else {
+        // Piloto ainda não completou esta volta
+        // Só mostrar slot se houver pilotos mais rápidos que já completaram
+        const pilotoMaisRapido = pilotos.find(p2 => {
+          const v2 = (voltasPorPiloto[p2.piloto_id] || []).find(v => v.numero === n);
+          return v2 && (posPorPiloto[p2.piloto_id] || 999) <= (pos || 999);
+        });
+        if (pilotoMaisRapido || pos) {
+          pilotosNaVolta.push({
+            piloto: p,
+            volta: null,
+            pos: pos,
+            gap: gap,
+            totalTempo: totalTempo,
+            isLider: isLider,
+            temVolta: false
+          });
+        }
+      }
+    });
+
+    // Ordenar pela posição atual na classificação
+    pilotosNaVolta.sort((a, b) => (a.pos || 999) - (b.pos || 999));
+
+    // Renderizar cada piloto nesta volta
+    pilotosNaVolta.forEach((item, idx) => {
+      const p = item.piloto;
+      const v = item.volta;
+      const pos = item.pos;
+      const gap = item.gap;
+      const isLider = item.isLider;
+      const temVolta = item.temVolta;
+
+      const classeLinha = [];
+      if (!temVolta) classeLinha.push('volta-aberta');
+      if (isLider) classeLinha.push('volta-lider');
+      const classeStr = classeLinha.length ? ` class="${classeLinha.join(' ')}"` : '';
+
+      let tempoHtml = '';
+      let gapHtml = '';
+      let badgesHtml = '';
+
+      if (temVolta && v) {
+        const tempoFormatado = fmtVolta(v.tempo);
+        let tempoClass = '';
+        if (v.melhor) tempoClass = ' melhor';
+        if (v.recorde) tempoClass = ' recorde';
+        tempoHtml = `<div class="col-tempo${tempoClass}">${tempoFormatado}</div>`;
+
+        // Badges
+        if (v.melhor) badgesHtml += `<span class="ao-vivo-badge melhor">MELHOR</span>`;
+        if (v.recorde) badgesHtml += `<span class="ao-vivo-badge recorde">RECORDE</span>`;
+        if (isLider) badgesHtml += `<span class="ao-vivo-badge lider">LÍDER</span>`;
+
+        // Gap para o líder
+        if (gap && gap !== '' && !isLider) {
+          gapHtml = `<div class="col-gap">+${gap}</div>`;
+        } else if (isLider) {
+          gapHtml = `<div class="col-gap leader">LÍDER</div>`;
+        } else {
+          gapHtml = `<div class="col-gap">—</div>`;
+        }
+      } else {
+        // Slot vazio - esperando o piloto completar a volta
+        tempoHtml = `<div class="col-tempo"><span class="ao-vivo-slot-vazio pendente">⏳ aguardando</span></div>`;
+        if (gap && gap !== '') {
+          gapHtml = `<div class="col-gap">+${gap} (proj.)</div>`;
+        } else {
+          gapHtml = `<div class="col-gap"><span class="ao-vivo-slot-vazio">—</span></div>`;
+        }
+      }
+
+      const pilotoNome = _esc(p.nome);
+      const pilotoAbrev = p.abreviado ? _esc(p.abreviado) : '';
+      const pilotoNum = p.numero ? `#${p.numero}` : '';
+
+      html += `
+        <div${classeStr}>
+          <div class="col-volta">${n}</div>
+          <div class="col-piloto">
+            <div class="piloto-info">
+              <div class="piloto-nome">${pilotoNome} ${pilotoAbrev ? `<span style="color:var(--accent-gold);font-size:10px;margin-left:6px;">${pilotoAbrev}</span>` : ''} ${pilotoNum ? `<span style="color:var(--text-muted);font-size:10px;margin-left:4px;">${pilotoNum}</span>` : ''} ${badgesHtml}</div>
+              <div class="piloto-meta">Pos: ${pos || '—'} · Total: ${totalTempo || '—'}</div>
+            </div>
+          </div>
+          ${tempoHtml}
+          ${gapHtml}
+        </div>
+      `;
+    });
+
+    // Se ninguém fez esta volta ainda, não renderizar a linha
+    // (já controlado pelo loop - só entra se tiver pilotosNaVolta)
+  }
+
+  // Se não houve nenhuma volta
+  if (maxVolta === 0) {
+    html += '<p class="hint" style="padding: 20px; text-align: center;">Aguardando primeira volta...</p>';
+  }
+
+  box.innerHTML = html;
 }
 
 function fmtVolta(t) {
@@ -3959,4 +4433,194 @@ window.addEventListener("resize", () => {
   if (document.getElementById("a-pista")?.classList.contains("on")) {
     try { edDesenhar(); } catch (e) {}
   }
+});
+
+// Observador de resize para ajustar fonte automaticamente
+let resizeTimer;
+window.addEventListener('resize', () => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => {
+    if (autoFontSize) {
+      ajustarTamanhoFonteAutomatico();
+    }
+  }, 250);
+});
+
+// Drag and drop para reposicionar cards do dashboard
+function initDragDrop() {
+  const cards = document.querySelectorAll('.dashboard-card.draggable');
+  if (!cards.length) return;
+
+  cards.forEach(card => {
+    const handle = card.querySelector('.card-handle');
+    if (!handle) return;
+
+    let isDragging = false;
+    let startX = 0;
+    let startY = 0;
+    let startLeft = 0;
+    let startTop = 0;
+    let startParent = null;
+    let currentCol = null;
+
+    // Determina a coluna inicial
+    const getColumn = (el) => {
+      const col = el.closest('.dashboard-coluna-esquerda, .dashboard-coluna-direita');
+      return col ? col.className.match(/dashboard-coluna-(\w+)/)[1] : null;
+    };
+
+    handle.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+
+      isDragging = true;
+      startX = e.clientX;
+      startY = e.clientY;
+      startParent = card.parentNode;
+      currentCol = getColumn(card);
+
+      card.style.position = 'fixed';
+      card.style.width = card.offsetWidth + 'px';
+      card.style.zIndex = '1000';
+      card.classList.add('dragging');
+
+      const rect = card.getBoundingClientRect();
+      startLeft = rect.left;
+      startTop = rect.top;
+
+      const moveHandler = (e) => {
+        if (!isDragging) return;
+
+        const deltaX = e.clientX - startX;
+        const deltaY = e.clientY - startY;
+
+        card.style.left = (startLeft + deltaX) + 'px';
+        card.style.top = (startTop + deltaY) + 'px';
+
+        // Detectar mudança de coluna pela posição X
+        const leftCol = document.querySelector('.dashboard-coluna-esquerda');
+        const rightCol = document.querySelector('.dashboard-coluna-direita');
+
+        if (!leftCol || !rightCol) return;
+
+        const leftRect = leftCol.getBoundingClientRect();
+        const rightRect = rightCol.getBoundingClientRect();
+        const mouseX = e.clientX;
+
+        // Se arrastou para esquerda
+        if (mouseX < (leftRect.left + leftRect.width / 2)) {
+          if (currentCol !== 'esquerda') {
+            moveToColumn('esquerda');
+            currentCol = 'esquerda';
+          }
+        }
+        // Se arrastou para direita
+        else if (mouseX > leftRect.right) {
+          if (currentCol !== 'direita') {
+            moveToColumn('direita');
+            currentCol = 'direita';
+          }
+        }
+      };
+
+      const moveToColumn = (colName) => {
+        const targetCol = document.querySelector(`.dashboard-coluna-${colName}`);
+        if (!targetCol) return;
+
+        // Remover da coluna atual
+        if (card.parentNode) {
+          card.parentNode.removeChild(card);
+        }
+
+        // Adicionar à nova coluna
+        targetCol.appendChild(card);
+
+        // Resetar posição para fluxo normal
+        card.style.position = '';
+        card.style.left = '';
+        card.style.top = '';
+        card.style.width = '';
+
+        // Atualizar posição e tamanho
+        setTimeout(() => {
+          card.style.transition = 'none';
+          card.offsetHeight; // force reflow
+          card.style.transition = '';
+        }, 0);
+      };
+
+      const upHandler = () => {
+        if (!isDragging) return;
+
+        isDragging = false;
+        card.classList.remove('dragging');
+
+        // Voltar para fluxo normal
+        card.style.position = '';
+        card.style.left = '';
+        card.style.top = '';
+        card.style.width = '';
+        card.style.zIndex = '';
+
+        document.removeEventListener('mousemove', moveHandler);
+        document.removeEventListener('mouseup', upHandler);
+
+        salvarLayoutDashboard();
+      };
+
+      document.addEventListener('mousemove', moveHandler);
+      document.addEventListener('mouseup', upHandler);
+    });
+  });
+}
+
+function salvarLayoutDashboard() {
+  const cards = Array.from(document.querySelectorAll('.dashboard-card[data-card-id]'));
+  const layout = cards.map(card => ({
+    id: card.dataset.cardId,
+    ordem: Array.from(card.parentNode.children).indexOf(card)
+  }));
+  localStorage.setItem('kchrono-dashboard-layout', JSON.stringify(layout));
+  console.log('Layout salvo:', layout);
+}
+
+function carregarLayoutDashboard() {
+  const salvo = localStorage.getItem('kchrono-dashboard-layout');
+  if (!salvo) return;
+  try {
+    const layout = JSON.parse(salvo);
+    console.log('Layout carregado:', layout);
+  } catch (e) {
+    console.error('Erro ao carregar layout:', e);
+  }
+}
+
+// Observador de resize para ajustar fonte automaticamente
+let resizeTimeoutVv;
+window.addEventListener('resize', () => {
+  clearTimeout(resizeTimeoutVv);
+  resizeTimeoutVv = setTimeout(() => {
+    if (autoFontSizeVv) {
+      ajustarTamanhoFonteVoltaVolta();
+    }
+  }, 250);
+});
+
+// Inicializar estado da matriz/feed ao carregar a página
+document.addEventListener('DOMContentLoaded', function() {
+  const toggle = document.getElementById('toggle-matriz');
+  if (toggle) {
+    toggle.checked = true;
+    const feed = document.getElementById('ao-vivo-feed');
+    const matriz = document.getElementById('volta-a-volta');
+    if (feed) feed.style.display = 'none';
+    if (matriz) matriz.style.display = 'block';
+  }
+
+  // Carregar preferências de fonte do Volta-a-volta
+  carregarPreferenciasFonte();
+
+  // Inicializar drag and drop
+  setTimeout(initDragDrop, 100);
+  carregarLayoutDashboard();
 });

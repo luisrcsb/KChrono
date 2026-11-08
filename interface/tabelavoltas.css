@@ -1,0 +1,6 @@
+.tabela-volta-volta {width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums;}
+.tabela-volta-volta th,.tabela-volta-volta td{border:1px solid var(--border-card);padding:6px 8px;text-align:center;white-space:nowrap}
+.tabela-volta-volta thead th{background:var(--bg-header);color:var(--text-title);font-weight:600;font-size:13px}
+.tabela-volta-volta tbody tr:nth-child(even){background:rgba(255,255,255,.02)}
+.tabela-volta-volta td.num-volta{font-weight:700;color:var(--text-muted);background:var(--bg-card)}
+.tabela-volta-volta td.piloto-nome{background:var(--bg-card);font-weight:600;text-align:center}

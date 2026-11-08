@@ -5,7 +5,13 @@
 
 let ws = null;
 let estadoAtual = "parado";
+let ultimoSessaoId = null;
 let ultimaLinhas = [];
+// Mantém o destaque pendente enquanto a classificação é reconstruída após o
+// evento de volta. Sem isso, o evento "classificacao" substitui o <tr> e
+// apaga o efeito antes que o piloto consiga vê-lo.
+const flashesVolta = new Map();
+const DURACAO_FLASH_VOLTA_MS = 1800;
 let tracadaAtual = null;      // traçado salvo da pista ativa (evento/snapshot)
 let sessaoSimulacao = false;  // sessão de teste (replay do simulador)
 let tracadaCache = null;      // pista estática em offscreen (evita redesenhar)
@@ -120,8 +126,21 @@ document.addEventListener("visibilitychange", () => {
   }
 });
 
+function limparDadosSessao() {
+  ultimaLinhas = [];
+  ultimasVoltas = { pilotos: [], parametros: { duracao: 10, criterio: "tempo" } };
+  renderClassificacao([]);
+  if (tabAtual === "tv-ritmo") desenharRitmo();
+  if (tabAtual === "tv-posicoes") desenharPosicoes();
+  if (tabAtual === "tv-track") desenharTrack();
+}
+
 function tratarEvento(ev) {
   if (ev.tipo === "snapshot") {
+    if (ev.sessao && ev.sessao.id && ev.sessao.id !== ultimoSessaoId) {
+      ultimoSessaoId = ev.sessao.id;
+      limparDadosSessao();
+    }
     if (ev.sessao) definirClock(ev.sessao.tempo_s, ev.sessao.pausada, ev.sessao.estado,
                                 ev.sessao.restante_s);
     if (ev.sessao && ev.sessao.parametros) ultimasVoltas.parametros = ev.sessao.parametros;
@@ -141,6 +160,10 @@ function tratarEvento(ev) {
       aplicarColunasTelao(ev.colunas || []);
       break;
     case "sessao":
+      if (ev.id && ev.id !== ultimoSessaoId) {
+        ultimoSessaoId = ev.id;
+        limparDadosSessao();
+      }
       renderSessao(ev);
       if (typeof ev.tempo_s === "number" || typeof ev.restante_s === "number") {
         definirClock(ev.tempo_s, ev.pausada, ev.estado, ev.restante_s);
@@ -159,7 +182,7 @@ function tratarEvento(ev) {
       // bip sonoro no telão a cada volta completada
       if (ev.recorde) beepRecorde();
       else beepVolta();
-      if (!ev.recorde) destacarVolta(ev.piloto_id);
+      destacarVolta(ev.piloto_id);
       break;
     case "voltas":
       ultimasVoltas = ev;
@@ -351,20 +374,42 @@ function renderClassificacao(linhas) {
     corpo || '<tr><td colspan="13" style="color:var(--mut)">aguardando largada…</td></tr>';
   // o tbody foi reconstruído — reaplica as colunas escolhidas
   if (colunasTelaoAtuais) aplicarColunasTelao(colunasTelaoAtuais);
+  // Os snapshots/classificações reconstroem o tbody. Reaplique qualquer flash
+  // ainda ativo para que a atualização dos dados não esconda a volta recém-lida.
+  const agora = Date.now();
+  for (const [pid, expiraEm] of flashesVolta) {
+    if (expiraEm <= agora) flashesVolta.delete(pid);
+    else aplicarFlashVolta(pid, expiraEm - agora);
+  }
 }
 
-// Pisca o quadro (linha) do piloto quando uma volta é contada — junto com o bip.
-function destacarVolta(pilotoId) {
+// Aplica o flash e guarda sua expiração. A classificação pode reconstruir o
+// tbody imediatamente depois do evento "volta", portanto o destaque precisa
+// sobreviver à troca do elemento <tr>.
+function aplicarFlashVolta(pilotoId, duracaoMs = DURACAO_FLASH_VOLTA_MS) {
   if (pilotoId == null) return;
   const tr = document.querySelector(
     `#tabela-telao tbody tr[data-piloto="${pilotoId}"]`);
   if (!tr) return;
   tr.classList.remove("volta-flash");
-  // reinicia a animação se a volta anterior ainda estiver piscando
   void tr.offsetWidth;
   tr.classList.add("volta-flash");
   clearTimeout(tr._voltaFlashTimer);
-  tr._voltaFlashTimer = setTimeout(() => tr.classList.remove("volta-flash"), 1700);
+  tr._voltaFlashTimer = setTimeout(() => tr.classList.remove("volta-flash"), duracaoMs);
+}
+
+// Pisca o quadro (linha) do piloto toda vez que uma volta é lida — inclusive
+// quando a volta também é recorde. O bip e o destaque usam o mesmo evento.
+function destacarVolta(pilotoId) {
+  if (pilotoId == null) return;
+  const expiraEm = Date.now() + DURACAO_FLASH_VOLTA_MS;
+  flashesVolta.set(String(pilotoId), expiraEm);
+  aplicarFlashVolta(pilotoId, DURACAO_FLASH_VOLTA_MS);
+  clearTimeout(destacarVolta._timers?.get(String(pilotoId)));
+  const timer = setTimeout(() => flashesVolta.delete(String(pilotoId)),
+                           DURACAO_FLASH_VOLTA_MS);
+  if (!destacarVolta._timers) destacarVolta._timers = new Map();
+  destacarVolta._timers.set(String(pilotoId), timer);
 }
 
 // ---------------------------------------------------------------- gráficos

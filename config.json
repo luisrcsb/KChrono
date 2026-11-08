@@ -20,6 +20,9 @@
   "sim_sistema": "p3",
   "sim_velocidade": 1.0,
   "telao_tela": 0,
+  "telao_aberto": false,
+  "telao_autostart": false,
+  "telao_fullscreen": true,
   "telao_colunas": [
     "posicao",
     "numero",
@@ -59,9 +62,9 @@
     },
     "volume": 0.9,
     "velocidade": 180,
-    "intervalo_posicoes": 30.0,
+    "intervalo_posicoes": 0.0,
     "posicoes_topo": 3,
-    "anunciar_volta": true,
+    "anunciar_volta": false,
     "anunciar_recorde_pessoal": true,
     "anunciar_recorde_pista": true,
     "voz": "piper:C:\\Users\\luisr\\OneDrive\\Documentos\\Projetos\\KChrono\\dados\\vozes\\pt_BR-faber-medium.onnx",
@@ -96,9 +99,9 @@
     "som_passagem": true,
     "som_lider": true,
     "anunciar_posicoes_classificacao_durante": true,
-    "anunciar_posicoes_classificacao_depois": false,
+    "anunciar_posicoes_classificacao_depois": true,
     "anunciar_posicoes_corrida_durante": true,
-    "anunciar_posicoes_corrida_depois": false,
+    "anunciar_posicoes_corrida_depois": true,
     "som_menor_volta": true,
     "bip_luz": true,
     "bip_vai": true
@@ -149,11 +152,51 @@
       },
       {
         "etapa": "corrida",
-        "rotulo": "Corrida",
+        "rotulo": "Corrida P1",
+        "duracao": 4
+      },
+      {
+        "etapa": "intervalo",
+        "rotulo": "Intervalo",
+        "duracao": 1
+      },
+      {
+        "etapa": "corrida",
+        "rotulo": "Corrida P2",
+        "duracao": 4
+      },
+      {
+        "etapa": "intervalo",
+        "rotulo": "Intervalo",
+        "duracao": 1
+      },
+      {
+        "etapa": "corrida",
+        "rotulo": "Corrida P3",
+        "duracao": 4
+      },
+      {
+        "etapa": "intervalo",
+        "rotulo": "Intervalo",
+        "duracao": 1
+      },
+      {
+        "etapa": "corrida",
+        "rotulo": "Corrida P4",
+        "duracao": 4
+      },
+      {
+        "etapa": "intervalo",
+        "rotulo": "Intervalo",
+        "duracao": 1
+      },
+      {
+        "etapa": "corrida",
+        "rotulo": "Corrida P5",
         "duracao": 4
       }
     ],
-    "numero_provas": 1,
+    "numero_provas": 5,
     "treino_min": 1,
     "classificacao_min": 1,
     "corrida_min": 4,
@@ -178,11 +221,12 @@
     }
   ],
   "gerente_tokens": {
-    "QMji49Um2Vb589DF5FnLT8j4ejszp6Uh": {
+    "eRxAuOlxNzGOGuEOG_rzvI6oZuMJ7B8p": {
       "usuario": "qrcode",
       "convite": true,
-      "criado_em": 1793273681.95255,
-      "expira": 1793360081.9525504
+      "criado_em": 1794111966.9835043,
+      "expira": 1794198366.9835043
     }
-  }
+  },
+  "tempo_terminar_s": 30
 }
