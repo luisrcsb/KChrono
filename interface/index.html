@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>KChrono — Precision Timing System</title>
-<link rel="stylesheet" href="/static/estilo.css?v=1.1.2">
+<link rel="stylesheet" href="/static/estilo.css?v=1.2.3">
 <link rel="icon" href="/imagens/KCHRONO-LOGO.png">
 <script src="/static/chart.umd.min.js"></script>
 </head>
@@ -14,11 +14,28 @@
 <div class="admin-shell">
   <aside class="menu">
     <div class="side-logo"><img src="/imagens/KCHRONO-LOGO.png" alt="KChrono"></div>
-    <div class="side-decoder" id="side-decoder" title="Conexão com o decoder">
-      <span class="led" id="side-led"></span>
-      <div class="side-decoder-txt">
-        <div class="side-decoder-nome" id="side-decoder-nome">Decoder: —</div>
-        <div class="side-decoder-sub" id="side-decoder-sub">sem ligação</div>
+    <!-- painel de conexões: estado de cada ligação do sistema -->
+    <div class="side-conexoes" id="side-conexoes">
+      <div class="side-conexao" id="side-decoder" title="Conexão com o decoder (hardware de cronometragem)">
+        <span class="led" id="side-led"></span>
+        <div class="side-conexao-txt">
+          <div class="side-conexao-nome" id="side-decoder-nome">Decoder: —</div>
+          <div class="side-conexao-sub" id="side-decoder-sub">sem ligação</div>
+        </div>
+      </div>
+      <div class="side-conexao" id="side-ctad" title="Conta do CTAD (sincronização com o site de resultados)">
+        <span class="led" id="side-ctad-led"></span>
+        <div class="side-conexao-txt">
+          <div class="side-conexao-nome" id="side-ctad-nome">CTAD: —</div>
+          <div class="side-conexao-sub" id="side-ctad-sub">não configurado</div>
+        </div>
+      </div>
+      <div class="side-conexao" id="side-servidor" title="Servidor local do KChrono que serve esta interface">
+        <span class="led" id="side-servidor-led"></span>
+        <div class="side-conexao-txt">
+          <div class="side-conexao-nome" id="side-servidor-nome">Servidor: —</div>
+          <div class="side-conexao-sub" id="side-servidor-sub">conectando…</div>
+        </div>
       </div>
     </div>
     <div class="busca admin-busca">
@@ -31,29 +48,27 @@
       <div class="busca-resultados" id="busca-resultados"></div>
     </div>
     <nav id="adm-nav">
-      <a class="on" data-titulo="Operador painel" onclick="mostrarOperador(this)">🎮 Painel do Operador</a>
-      <a data-titulo="Gerente de Pista bandeira check-in" onclick="adminSecao(this,'a-gerente')">🚦 Gerente de Pista</a>
-      <a data-titulo="Pista traçado retas curvas largada grid largura comprimento" onclick="adminSecao(this,'a-pista')">🏟️ Pista &amp; Traçado</a>
-      <a data-titulo="Voltas histórico sessões central" onclick="adminSecao(this,'a-voltas')">🏁 Voltas</a>
-      <a data-titulo="Auditoria baterias CTAD editar voltas" onclick="adminSecao(this,'a-auditoria')">🧾 Ferramenta de Auditoria</a>
-      <a data-titulo="Telão Semáforo colunas" onclick="adminSecao(this,'a-telao')">📺 Telão &amp; Semáforo</a>
-      <a data-titulo="Campeonatos etapas ranking" onclick="adminSecao(this,'a-camp')">🏆 Campeonatos <span class="prev">Fase 5</span></a>
-      <a data-titulo="Salvamento" onclick="adminSecao(this,'a-salvar')">💾 Salvamento</a>
-      <a data-titulo="Uploads Sync CTAD" onclick="adminSecao(this,'a-upload')">📤 Uploads &amp; Sync <span class="prev fase">Fase 3</span></a>
-      <a data-titulo="Pilotos fonia telefone funções transponder" onclick="adminSecao(this,'a-pilotos')">🏎️ Pilotos</a>
-      <a data-titulo="Hardware Decoders drivers" onclick="adminSecao(this,'a-hw')">🔧 Hardware &amp; Decoders</a>
-      <a data-titulo="Voz Som TTS frases áudio" onclick="adminSecao(this,'a-voz')">🔊 Voz &amp; Som</a>
-      <a data-titulo="Relatórios CSV exportar" onclick="adminSecao(this,'a-relatorio')">📊 Relatórios</a>
-      <a data-titulo="Notificações alertas" onclick="adminSecao(this,'a-notificacoes')">🔔 Notificações</a>
-      <a data-titulo="Configurações aparência wallpaper transparência" onclick="adminSecao(this,'a-config')">⚙️ Configurações</a>
-      <a data-titulo="Sobre créditos versão" onclick="adminSecao(this,'a-sobre')">ℹ️ Sobre o KChrono</a>
+      <a class="on" data-titulo="Operador painel" onclick="mostrarOperador(this)">🎮 Painel do Operador <span class="prog-btn" data-key="Operador" onclick="event.stopPropagation(); cicloProgresso(this)">0%</span></a>
+      <a data-titulo="Gerente de Pista bandeira check-in" onclick="adminSecao(this,'a-gerente')">🚦 Gerente de Pista <span class="prog-btn" data-key="Gerente" onclick="event.stopPropagation(); cicloProgresso(this)">0%</span></a>
+      <a data-titulo="Pista traçado retas curvas largada grid largura comprimento" onclick="adminSecao(this,'a-pista')">🏟️ Pista &amp; Traçado <span class="prog-btn" data-key="Pista" onclick="event.stopPropagation(); cicloProgresso(this)">0%</span></a>
+      <a data-titulo="Voltas histórico sessões central" onclick="adminSecao(this,'a-voltas')">🏁 Voltas <span class="prog-btn" data-key="Voltas" onclick="event.stopPropagation(); cicloProgresso(this)">0%</span></a>
+      <a data-titulo="Auditoria baterias CTAD editar voltas" onclick="adminSecao(this,'a-auditoria')">🧾 Ferramenta de Auditoria <span class="prog-btn" data-key="Auditoria" onclick="event.stopPropagation(); cicloProgresso(this)">0%</span></a>
+      <a data-titulo="Telão Semáforo colunas" onclick="adminSecao(this,'a-telao')">📺 Telão &amp; Semáforo <span class="prog-btn" data-key="Telao" onclick="event.stopPropagation(); cicloProgresso(this)">0%</span></a>
+      <a data-titulo="Campeonatos etapas ranking" onclick="adminSecao(this,'a-camp')">🏆 Campeonatos <span class="prog-btn" data-key="Campeonatos" onclick="event.stopPropagation(); cicloProgresso(this)">0%</span></a>
+      <a data-titulo="Salvamento" onclick="adminSecao(this,'a-salvar')">💾 Salvamento <span class="prog-btn" data-key="Salvamento" onclick="event.stopPropagation(); cicloProgresso(this)">0%</span></a>
+      <a data-titulo="Uploads Sync CTAD" onclick="adminSecao(this,'a-upload')">📤 Uploads &amp; Sync <span class="prog-btn" data-key="Uploads" onclick="event.stopPropagation(); cicloProgresso(this)">0%</span></a>
+      <a data-titulo="Pilotos fonia telefone funções transponder" onclick="adminSecao(this,'a-pilotos')">🏎️ Pilotos <span class="prog-btn" data-key="Pilotos" onclick="event.stopPropagation(); cicloProgresso(this)">0%</span></a>
+      <a data-titulo="Hardware Decoders drivers" onclick="adminSecao(this,'a-hw')">🔧 Hardware &amp; Decoders <span class="prog-btn" data-key="Hardware" onclick="event.stopPropagation(); cicloProgresso(this)">0%</span></a>
+      <a data-titulo="Voz Som TTS frases áudio" onclick="adminSecao(this,'a-voz')">🔊 Voz &amp; Som <span class="prog-btn" data-key="Voz" onclick="event.stopPropagation(); cicloProgresso(this)">0%</span></a>
+      <a data-titulo="Relatórios CSV exportar" onclick="adminSecao(this,'a-relatorio')">📊 Relatórios <span class="prog-btn" data-key="Relatorios" onclick="event.stopPropagation(); cicloProgresso(this)">0%</span></a>
+      <a data-titulo="Configurações aparência wallpaper transparência" onclick="adminSecao(this,'a-config')">⚙️ Configurações <span class="prog-btn" data-key="Configuracoes" onclick="event.stopPropagation(); cicloProgresso(this)">0%</span></a>
+      <a data-titulo="Sobre créditos versão" onclick="adminSecao(this,'a-sobre')">ℹ️ Sobre o KChrono <span class="prog-btn" data-key="Sobre" onclick="event.stopPropagation(); cicloProgresso(this)">0%</span></a>
     </nav>
     <div class="side-qr" id="side-qr">
       <div class="side-qr-tit">📱 Gestão Remota</div>
       <img id="side-qr-img" alt="QR Code de Gestão Remota" style="display:none">
       <div class="side-qr-info" id="side-qr-info">gerando…</div>
     </div>
-    <div class="admin-rodape"><span id="ws-status">Desconectado do servidor</span><br>KChrono <span class="js-versao">v1.1.2</span><br>por Raphael Belowodski</div>
   </aside>
   <div class="corpo">
 
@@ -62,9 +77,6 @@
   <div class="conteudo">
     <header class="main-header">
       <h1>Painel do Operador</h1>
-      <div class="perfil"><span class="tag" id="perfil-nivel">SUPERUSER</span>
-        sessão <span id="operador-sessao">—</span> · <span id="operador-estado">sem sessão</span>
-        <span class="pill novo" id="operador-sim" hidden>SIMULAÇÃO — não oficial</span></div>
       <div class="acoes-topo">
         <button class="btn-slide" id="btn-telao-2" onclick="abrirTelaoSegundaTela()" title="Abre o telão em janela separada (2ª tela)">
           🖥️ Abrir Telão 2ª Tela
@@ -93,79 +105,60 @@
     <div class="dashboard-horizontal">
       <div class="dashboard-esquerda">
         <!-- configuração da sessão -->
-        <div class="card" style="margin-bottom:16px">
+        <div class="card" id="card-config-sessao" style="margin-bottom:16px">
           <h3>Configuração da sessão</h3>
-          <div class="form-sessao centro">
-        <div><label>Tipo</label>
-          <select id="cfg-tipo" onchange="tipoSessaoMudou()">
-            <option value="treino">Treino</option>
-            <option value="classificacao">Classificação</option>
-            <option value="corrida">Corrida</option>
-            <option value="campeonato">Campeonato</option>
-          </select></div>
-        <div><label>Critério</label>
-          <select id="cfg-criterio" onchange="criterioMudou()">
-            <option value="Tempo">Tempo</option>
-            <option value="Voltas">Voltas</option>
-            <option value="livre">Tempo livre (sem limite)</option>
-          </select></div>
-        <div><label>Duração (min/voltas)</label><input id="cfg-duracao" value="10"></div>
-        <div><label>Contador regressivo (s)</label><input id="cfg-contador" value="10"></div>
-        <div><label>Aviso de saída (s)</label><input id="cfg-aviso-saida" value="30"></div>
-        <div><label>Tempo para terminar (s)</label><input id="cfg-terminar" value="30"></div>
-        <div><label>Tempo entre carros (s)</label><input id="cfg-entre-carros" value="2"></div>
-        <div><label>Método</label>
-          <select id="cfg-metodo"><option>Melhor tempo</option><option>Consecutivas</option></select></div>
-        <div><label>Saída</label>
-          <select id="cfg-saida"><option>1ª passagem pela meta</option><option>1ª detecção</option></select></div>
-        <div><label>Tempo mínimo de volta (s)</label><input id="cfg-tempo-minimo" value="3"></div>
-        <div><label>Média de N voltas</label>
-          <input id="cfg-media-n" value="3" title="Melhor média de N voltas consecutivas (coluna 'Média N' do telão)"></div>
-      </div>
+          <div class="cfg-grupo">
+            <h4 class="cfg-grupo-tit">Pré-corrida</h4>
+            <div class="form-sessao centro">
+              <div><label>Tipo</label>
+                <select id="cfg-tipo" onchange="tipoSessaoMudou()">
+                  <option value="treino">Treino</option>
+                  <option value="classificacao">Classificação</option>
+                  <option value="corrida">Corrida</option>
+                  <option value="campeonato">Campeonato</option>
+                </select></div>
+                  <option value="livre">Tempo livre (sem limite)</option>
+        <button class="destaque" id="btn-acao-principal" onclick="acaoPrincipal()" data-help="Inicia a sessão conforme o tipo selecionado (treino, classificação ou prepara a largada para corrida)">▶ Iniciar treino</button>
+        <button id="btn-pausa" onclick="alternarPausa()" disabled title="Pausar o cronômetro da sessão">⏸ Pausar</button>
+        <button onclick="finalizar()">⏹ Finalizar</button>
+        <div class="sessao-resumo" id="sessao-resumo" style="display:none; margin-bottom:10px">
+          <span id="sessao-resumo-txt" style="font-size:13px; color:var(--text-main)"></span>
+        </div>
 
       <div class="acoes" style="margin-top:16px; border-top:1px solid var(--border-card); padding-top:12px;">
-        <button class="destaque" id="btn-acao-principal" onclick="acaoPrincipal()">▶ Iniciar treino</button>
-        <button id="btn-pausar" onclick="alternarPausa()" disabled title="Pausar o cronômetro da sessão">⏸ Pausar</button>
+        <button class="destaque" id="btn-acao-principal" onclick="acaoPrincipal()" data-help="Inicia a sessão conforme o tipo selecionado (treino, classificação ou prepara a largada para corrida)">▶ Iniciar treino</button>
+        <button id="btn-pausa" onclick="alternarPausa()" disabled title="Pausar o cronômetro da sessão">⏸ Pausar</button>
         <button onclick="finalizar()">⏹ Finalizar</button>
-      </div>
-
-      <div id="cfg-camp-escolha" style="display:none;margin-top:14px">
-        <h3 style="margin-bottom:8px">Campeonato</h3>
-        <div class="form-sessao centro">
-          <div><label>Escolher campeonato</label>
-            <select id="cfg-camp-select" style="min-width:260px" onchange="atualizarEscolhaCampeonato()"></select></div>
-          <div><label>&nbsp;</label>
-            <button class="btn-slide" onclick="menuCriarCampeonato()">➕ Criar campeonato</button></div>
-          <div><label>&nbsp;</label>
-            <button class="btn-slide" id="cfg-camp-editar" onclick="menuEditarCampeonato()" disabled>✏️ Editar campeonato</button></div>
-        </div>
-        <p class="hint" id="cfg-camp-aviso" style="display:none;margin-top:10px">
-          Nenhum campeonato cadastrado ainda — clique em <b>Criar campeonato</b> para montar o primeiro.</p>
-        <div class="acoes" style="margin-top:12px">
-          <button class="destaque" id="cfg-camp-iniciar" onclick="iniciarCampeonatoEscolhido()" disabled>🏆 Iniciar campeonato</button>
-        </div>
-        <p class="hint" style="margin-top:6px">Criar e editar abrem o menu <b>🏆 Campeonatos</b>, onde ficam as
-          regras, os inscritos, as chaves, as durações e a sequência das etapas.</p>
       </div>
     </div>
 
+    <!-- campeonato em andamento (só aparece com o Tipo = Campeonato) -->
+    <div class="card" id="card-camp-ativo" style="margin-bottom:16px; display:none">
+      <h3>🏆 Campeonato em andamento</h3>
+      <div id="camp-atual" style="margin:10px 0">
+        <span class="hint">nenhum campeonato em andamento</span>
+      </div>
+      <div class="acoes">
+        <button class="destaque" id="camp-proxima" onclick="proximaEtapa()" disabled>⏭ Próxima etapa</button>
+        <button class="perigo" id="camp-encerrar" onclick="encerrarCampeonato()" disabled>⏹ Encerrar campeonato</button>
+      </div>
+      <p class="hint">O avanço é <b>manual</b>: cada etapa só começa quando você clica em
+        “Próxima etapa”. A sessão da etapa anterior é encerrada automaticamente.</p>
+    </div>
+
     <!-- check-in e atalhos unificados -->
-    <div class="card" style="margin-bottom:16px">
-      <h3>Pilotos na pista — check-in (<span id="op-checkin-n">0</span> marcados) &amp; Atalhos (F1 … F12)</h3>
+    <div class="card" id="card-checkin" style="margin-bottom:16px">
+      <h3>Pilotos na pista — check-in (<span id="op-checkin-n">0</span> marcados)</h3>
       <div class="acoes" style="margin:10px 0; display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
         <input id="op-checkin-busca" class="input-busca" placeholder="Filtrar pilotos…"
                oninput="renderCheckin()">
-        <button class="btn-mini" onclick="marcarTodosCheckin(true)">✔ Todos presentes</button>
+        <button class="btn-mini" onclick="marcarTodosCheckin(true)" data-help="Marca todos os pilotos como presentes">✔ Todos</button>
         <button class="btn-mini" onclick="marcarTodosCheckin(false)">✖ Limpar</button>
-        <button class="btn-mini" onclick="abrirAssociacaoAtalhos()">Associar teclas a pilotos</button>
-        <button class="btn-mini" onclick="resetarAssociacaoAtalhos()">Restaurar automático</button>
+        <button class="btn-mini" onclick="abrirAssociacaoAtalhos()">Atalhos</button>
+        <button class="btn-mini" onclick="resetarAssociacaoAtalhos()">Restaurar</button>
       </div>
       <div id="op-checkin" class="lista-checkin">carregando…</div>
 
-      <div style="margin-top:14px; border-top:1px solid var(--border-card); padding-top:12px;">
-        <h4 style="font-size:12px; margin-bottom:6px; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.5px;">Adicionar volta rápida (F1 … F12)</h4>
-        <div id="op-atalhos" class="lista-atalhos">marque os pilotos no check-in acima</div>
-      </div>
       <p class="hint" style="margin-top:8px">Marque quem está na pista antes de iniciar. Cada tecla <b>F1 … F12</b> adiciona volta ao piloto correspondente.</p>
 
       <!-- console -->
@@ -194,20 +187,6 @@
       <canvas id="canvas-pista-mini"
               style="width:100%; height:210px; display:block; margin-top:8px"></canvas>
       <p class="hint" style="margin-top:6px" id="pista-mini-info"></p>
-    </div>
-
-    <!-- campeonato em andamento (só aparece com o Tipo = Campeonato) -->
-    <div class="card" id="card-camp-ativo" style="margin-bottom:16px; display:none">
-      <h3>🏆 Campeonato em andamento</h3>
-      <div id="camp-atual" style="margin:10px 0">
-        <span class="hint">nenhum campeonato em andamento</span>
-      </div>
-      <div class="acoes">
-        <button class="destaque" id="camp-proxima" onclick="proximaEtapa()" disabled>⏭ Próxima etapa</button>
-        <button class="perigo" id="camp-encerrar" onclick="encerrarCampeonato()" disabled>⏹ Encerrar campeonato</button>
-      </div>
-      <p class="hint">O avanço é <b>manual</b>: cada etapa só começa quando você clica em
-        “Próxima etapa”. A sessão da etapa anterior é encerrada automaticamente.</p>
     </div>
 
     <!-- controles (o botão principal muda com o tipo: treino/classificação/corrida) -->
@@ -502,45 +481,6 @@
         </div>
       </div>
 
-      <!-- ============ NOTIFICAÇÕES ============ -->
-      <div class="admin-sec" id="a-notificacoes">
-        <div class="admin-secao-tit">O que é esta ferramenta</div>
-        <div class="card">
-          <h3>Notificações do KChrono</h3>
-          <p class="hint" style="font-size:12.5px; line-height:1.55">
-            As notificações são os <b>avisos rápidos</b> que aparecem no sino <b>🔔</b> da barra
-            superior. Elas registram o que aconteceu na pista (decoder caiu, ghost lap, fila de
-            upload, novo recorde) para você conferir depois, sem precisar procurar no Console de
-            eventos. Nada é enviado para a internet: os avisos ficam só neste computador.</p>
-          <p class="hint" style="font-size:12.5px; line-height:1.55">
-            <b>Eventos</b> liga/desliga cada tipo de aviso no sino. <b>Tocar som de alerta</b>
-            faz um bipe curto a cada notificação. <b>Notificações do navegador</b> mostra o aviso
-            também como balão do Windows, mesmo com o KChrono em segundo plano — para isso use
-            “Permitir no navegador”. As escolhas são salvas automaticamente.</p>
-        </div>
-        <div class="admin-secao-tit">O que deve gerar notificação</div>
-        <div class="grid g2">
-          <div class="card">
-            <h3>Eventos</h3>
-            <div class="frase-input"><label class="chk-linha"><input type="checkbox" id="ntf-decoder_offline"> Decoder offline / perda de conexão</label></div>
-            <div class="frase-input"><label class="chk-linha"><input type="checkbox" id="ntf-ghost_lap"> Ghost lap descartado</label></div>
-            <div class="frase-input"><label class="chk-linha"><input type="checkbox" id="ntf-fila_upload"> Acúmulo na fila de upload</label></div>
-            <div class="frase-input"><label class="chk-linha"><input type="checkbox" id="ntf-recorde"> Novo recorde de volta</label></div>
-            <div class="frase-input"><label class="chk-linha"><input type="checkbox" id="ntf-som_alerta"> Tocar som de alerta</label></div>
-          </div>
-          <div class="card">
-            <h3>Entrega</h3>
-            <div class="frase-input"><label class="chk-linha"><input type="checkbox" id="ntf-navegador"> Notificações do navegador (web)</label></div>
-            <p class="hint">As notificações aparecem no sino <b>🔔</b> da barra superior. O navegador,
-              quando autorizado, mostra o alerta mesmo com a aba em segundo plano.</p>
-            <div class="acoes" style="margin-top:12px">
-              <button class="btn-slide" onclick="salvarNotificacoes()">💾 Salvar preferências</button>
-              <button class="btn-slide" onclick="pedirPermissaoNotificacoes()">🔔 Permitir no navegador</button>
-            </div>
-          </div>
-        </div>
-      </div>
-
       <!-- ============ SALVAMENTO ============ -->
       <div class="admin-sec" id="a-salvar">
         <div class="admin-secao-tit">Formato do nome de salvamento</div>
@@ -658,12 +598,6 @@
               <button class="btn-mini" onclick="testarBipLuz()" title="Ouvir bipe da luz">▶ Ouvir</button>
             </div>
             <div class="frase-input">
-              <label class="chk-linha" title="locução dos números na contagem regressiva">
-                <input type="checkbox" id="cfg-voz-contagem" checked onchange="salvarVozContagem()">
-                Voz na contagem regressiva</label>
-              <button class="btn-mini" onclick="testarVoz()" title="Ouvir a voz">▶ Ouvir</button>
-            </div>
-            <div class="frase-input">
               <label class="chk-linha" title="bipe longo quando acende o verde">
                 <input type="checkbox" id="bip-vai" checked> Bipe longo no verde (largada)</label>
               <button class="btn-mini" onclick="testarBipVai()" title="Ouvir bipe do verde">▶ Ouvir</button>
@@ -674,7 +608,7 @@
         <div class="admin-secao-tit">Frases faladas — edite, ouça (▶) ou troque por um áudio (📁)</div>
         <div class="card" id="som-frases"></div>
 
-        <div class="admin-secao-tit">Anúncio de posições por tipo de sessão</div>
+        <div class="admin-secao-tit">Anúncios de posições por tipo de sessão</div>
         <div class="card">
           <div class="frase-input">
             <span class="rot" style="min-width:120px">Treino</span>
@@ -689,8 +623,6 @@
           </div>
           <div class="frase-input">
             <span class="rot" style="min-width:120px">Corrida</span>
-            <label class="chk-linha"><input type="checkbox" id="som-pos-corrida-durante" checked>
-              Durante</label>
             <label class="chk-linha"><input type="checkbox" id="som-pos-corrida-depois">
               Depois (ao final)</label>
           </div>
@@ -698,7 +630,7 @@
             "Depois" libera a fala de grid/resultados quando a sessão termina (padrão: desligado).</p>
         </div>
 
-        <div class="admin-secao-tit">Anúncios automáticos</div>
+        <div class="admin-secao-tit">Anúncios automáticos e estendidos</div>
         <div class="grid g2">
           <div class="card">
             <div class="form-sessao">
@@ -708,6 +640,22 @@
                 <input id="som-a-cada-voltas" type="number" min="0" step="1" value="0"></div>
               <div><label>Quantos pilotos ler</label>
                 <input id="som-topo" type="number" min="1" max="20" value="3"></div>
+              <div><label>Ler classificação a cada (min) — 0 desliga</label>
+                <input id="som-class-cada-min" type="number" min="0" step="1" value="0"></div>
+              <div><label>Ler estimativa a cada (voltas) — 0 desliga</label>
+                <input id="som-est-cada-voltas" type="number" min="0" step="1" value="0"></div>
+              <div><label>Falar tempo restante a cada (s) — 0 desliga</label>
+                <input id="som-tempo-restante-seg" type="number" min="0" step="5" value="30"></div>
+              <div><label>Repetir anúncio a cada (s)</label>
+                <input id="som-tempo-restante-repetir" type="number" min="0" step="5" value="30"></div>
+              <div><label>Posições a ler na troca de líder</label>
+                <input id="som-pos-troca-lider" type="number" min="0" max="20" value="3"></div>
+              <div><label>Começar leitura na volta nº</label>
+                <input id="som-comecar-volta" type="number" min="1" value="1"></div>
+              <div><label>Casas decimais no tempo de volta</label>
+                <input id="som-casas-decimais" type="number" min="0" max="3" value="3"></div>
+              <div><label>Ignorar tempos maiores que (s) — 0 desliga</label>
+                <input id="som-ignorar-maiores" type="number" min="0" value="0"></div>
             </div>
             <div class="frase-input">
               <label class="chk-linha"><input type="checkbox" id="som-anunciar-volta">
@@ -736,11 +684,46 @@
                 Bip da menor volta / recorde (7 bipes)</label>
               <button class="btn-mini" onclick="testarMenorVolta()" title="Ouvir bip da menor volta">▶ Ouvir</button>
             </div>
+            <div class="frase-input">
+              <label class="chk-linha"><input type="checkbox" id="som-chamar-pilotos" style="display:none">
+                </label>
+              <label>Chamar pilotos por</label>
+              <select id="som-chamar-pilotos">
+                <option value="nome">Nome</option>
+                <option value="numero">Número</option>
+                <option value="dorsal">Número de peito</option>
+              </select>
+            </div>
+            <div class="frase-input">
+              <label class="chk-linha"><input type="checkbox" id="som-alarme-fim" checked>
+                Alarme de fim de corrida</label></div>
+            <div class="frase-input">
+              <label class="chk-linha"><input type="checkbox" id="som-falar-tempo-restante" checked>
+                Falar o tempo restante</label></div>
+            <div class="frase-input">
+              <label class="chk-linha"><input type="checkbox" id="som-ler-tempos-treino">
+                Ler os tempos do treino</label></div>
+            <div class="frase-input">
+              <label class="chk-linha"><input type="checkbox" id="som-ler-estimativa-mudanca" checked>
+                Ler a estimativa quando o valor mudar</label></div>
+            <div class="frase-input">
+              <label class="chk-linha"><input type="checkbox" id="som-ler-recorde-baterias" checked>
+                Ler o recorde de melhor volta em todas as baterias/finais</label></div>
+            <div class="frase-input">
+              <label class="chk-linha"><input type="checkbox" id="som-ler-todas-voltas-livre">
+                Ler todas as voltas no treino livre</label></div>
+            <div class="frase-input">
+              <label class="chk-linha"><input type="checkbox" id="som-ler-class-durante-corrida" checked>
+                Leitura da classificação durante a corrida</label></div>
+            <div class="frase-input">
+              <label class="chk-linha"><input type="checkbox" id="som-omitir-minutos-ritmo">
+                Omitir os minutos na leitura do ritmo</label></div>
             <div style="display:flex; gap:8px; margin-top:12px; flex-wrap:wrap">
               <button class="btn-slide" onclick="salvarSom()">💾 Salvar preferências</button>
               <button class="btn-slide" onclick="anunciarPosicoes()">📢 Anunciar posições agora</button>
             </div>
           </div>
+
           <div class="card">
             <h3>Como funciona</h3>
             <p class="hint">A <b>leitura de posições</b> repete a classificação no intervalo escolhido
@@ -888,6 +871,9 @@
           <div class="card">
             <h3 id="piloto-form-tit">Novo piloto</h3>
             <div class="form-sessao">
+              <div><label>Número</label>
+                <input id="pil-numero" type="number" min="0" step="1"
+                       placeholder="auto (deixe em branco)"></div>
               <div><label>Nome *</label><input id="pil-nome" placeholder="ex.: João Silva"></div>
               <div><label>Apelido</label><input id="pil-apelido" placeholder="ex.: JS"></div>
               <div><label>Fonia (como falar)</label>
@@ -915,7 +901,9 @@
             </div>
             <p class="hint">Vários transponders separados por vírgula. O transponder é o que identifica
               o piloto ao passar pelo loop. A <b>fonia</b> é como o locutor fala o nome (ex.: grafia
-              fonética) — se ficar vazia, fala o próprio nome.
+              fonética) — se ficar vazia, fala o próprio nome. O <b>número</b> é a etiqueta do piloto:
+              se ficar em branco, o sistema atribui o próximo número livre; e se o piloto tiver um
+              atalho <b>F1–F12</b>, o número passa a ser o do atalho.
               <b>Pilotos com histórico de voltas não são apagados</b> — são inativados.</p>
           </div>
           <div class="card">
@@ -1150,13 +1138,110 @@
               </select>
             </div>
           </div>
+          <div class="card">
+            <h3>Modo desenvolvimento</h3>
+            <p class="hint">Mostra as etiquetas de identidade (<b>C01</b>, <b>C02</b>…) em todos os
+              cards. Cada etiqueta é única e, com o modo ligado, um clique copia o nome.
+              Com o modo ligado também aparece em <b>Pilotos cadastrados (C50)</b> o botão
+              <b>☠️ Excluir tudo</b> — exclusão total do cadastro (apaga o piloto e todo o
+              histórico). Use com cuidado: não dá para desfazer.</p>
+            <label class="chk-linha" style="margin-top:12px">
+              <input type="checkbox" id="cfg-modo-dev" onchange="mudarModoDesenvolvimento(this.checked)">
+              Ativar etiquetas de identidade
+            </label>
+            <label class="chk-linha" style="margin-top:8px">
+              <input type="checkbox" id="cfg-modo-dev-texto" onchange="mudarModoDesenvolvimentoTexto(this.checked)">
+              Ativar texto explicativo (mostra ajuda abaixo de cada função/botão)
+            </label>
+          </div>
         </div>
       </div>
 
       <!-- ============ SOBRE ============ -->
       <div class="admin-sec" id="a-sobre">
         <div class="grid g4">
-          <div class="card"><h3>Versão</h3><div class="big" id="upd-versao">1.1.2</div><div class="sub">Fases 0 → 7 concluídas · atualizações pelo GitHub</div></div>
+          <div class="card sobre-versao" style="grid-column:1/-1">
+            <h3>Versão</h3>
+            <div class="big" id="upd-versao">1.2.3</div>
+            <div class="sub">Resumo completo do sistema · fases 0 → 8 implementadas (fase 6 parcial)</div>
+
+            <div class="resumo-sistema">
+              <div>
+                <h4>Cronometragem &amp; hardware</h4>
+                <ul>
+                  <li>Decoders <b>MyLaps P3</b> (TCP 5403, canais redundantes), <b>EASYLAP</b> USB/serial e <b>SKYRC LapWiz</b> (BLE).</li>
+                  <li>Leitura read-only do decoder, sem risco de alterar o hardware.</li>
+                  <li>Relógio de alta precisão (µs), ring buffer e recuperação de falhas.</li>
+                  <li>Filtro de <b>ghost lap</b>, tempo mínimo de volta e auditoria de passagens.</li>
+                </ul>
+              </div>
+              <div>
+                <h4>Sessões &amp; corrida</h4>
+                <ul>
+                  <li>Treino livre, treino cronometrado, classificação, corrida por tempo/voltas e campeonato.</li>
+                  <li>Durações por tipo: treino 60 min, classificação 10 min e corrida 4 min; no critério Voltas o padrão é 20 voltas. Treino em tempo livre usa 0 (sem limite).</li>
+                  <li>Campeonato respeita as durações de <b>C56 · Regras vindas do CTAD</b>, voltando ao valor original ao sair.</li>
+                  <li>Largada lançada, grid, Le Mans, contagem regressiva com semáforo, bipes e voz.</li>
+                  <li>Check-in de pilotos e atalhos <b>F1–F12</b> para registrar volta manual.</li>
+                  <li>Associação transponder ↔ piloto, com troca durante o campeonato.</li>
+                </ul>
+              </div>
+              <div>
+                <h4>Classificação ao vivo</h4>
+                <ul>
+                  <li>Posição, voltas, total, melhor e última volta, intervalo e gap.</li>
+                  <li>Velocidade, ritmo, média de N voltas, consistência, desvio e estimativas.</li>
+                  <li>Aba <b>Ao Vivo</b> com tempos/gaps por volta, volta mais recente no topo e badges de melhor/recorde.</li>
+                  <li>Atualização em tempo real por <b>WebSocket</b>, sem polling, sem piscar e mantendo a rolagem.</li>
+                </ul>
+              </div>
+              <div>
+                <h4>Campeonatos &amp; dados</h4>
+                <ul>
+                  <li>Etapas, baterias/chaves, grid builder, espectro RF, drop rounds e bônus (pole/melhor volta).</li>
+                  <li>Ranking geral, cadastro de pilotos, categorias, transponders e pistas.</li>
+                  <li>Central de Voltas, histórico de sessões, auditoria de baterias e relatórios CSV.</li>
+                  <li>SQLite local-first, fila offline e dedup por hash.</li>
+                </ul>
+              </div>
+              <div>
+                <h4>CTAD &amp; integração</h4>
+                <ul>
+                  <li>Sincronização Firebase/CTAD com login superuser e auto-upload das sessões.</li>
+                  <li>Espelho local de campeonatos, pilotos, categorias e pistas.</li>
+                  <li>QR Code de <b>Gestão Remota</b> e acesso pela rede local.</li>
+                  <li>Conflitos resolvidos por <i>last-write-wins</i>, mantendo o banco local como fonte primária.</li>
+                </ul>
+              </div>
+              <div>
+                <h4>Telão, voz &amp; mobilidade</h4>
+                <ul>
+                  <li>Telão 4K/TV com colunas configuráveis, gráficos Chart.js, track view e countdown.</li>
+                  <li>Gerente de Pista no celular pela LAN, com traçado e classificação.</li>
+                  <li>Locutor neural <b>Piper offline</b> em pt-BR; SAPI/OneCore e bipes como reserva.</li>
+                  <li>Frases editáveis, anúncios por tipo de sessão e áudio próprio por frase.</li>
+                </ul>
+              </div>
+              <div>
+                <h4>Pista &amp; administração</h4>
+                <ul>
+                  <li>Editor de traçado: retas, curvas com raio automático, snap, largada, grid e largura variável.</li>
+                  <li>Comprimento da pista para velocidade, mini-mapa e exibição por tela.</li>
+                  <li>Admin de aparência/wallpaper, transparência, idioma pt-BR/en-US, som e hardware.</li>
+                  <li>Modo desenvolvimento com etiquetas de identidade únicas (<b>C01</b>, <b>C02</b>…) em todos os cards.</li>
+                </ul>
+              </div>
+              <div>
+                <h4>Plataforma &amp; distribuição</h4>
+                <ul>
+                  <li>Backend <b>Python + FastAPI</b>, banco <b>SQLite</b>, tempo real por WebSocket.</li>
+                  <li>Frontend HTML/CSS/JS vanilla + Chart.js, sem etapa de build.</li>
+                  <li>App nativo <b>pywebview</b>: WebView2 no Windows e WebKitGTK no Linux.</li>
+                  <li>Instaladores NSIS/AppImage, atualização automática pelo GitHub e dados preservados fora do executável.</li>
+                </ul>
+              </div>
+            </div>
+          </div>
           <div class="card"><h3>Drivers</h3><div class="big" style="font-size:20px">P3 · EASYLAP · LapWiz</div><div class="sub">TCP · serial · Bluetooth</div></div>
           <div class="card"><h3>Stack</h3><div class="big" style="font-size:20px">Python · FastAPI</div><div class="sub">SQLite · WebSocket · vanilla JS</div></div>
           <div class="card"><h3>Atualizações</h3><div class="sub" id="upd-status">aguardando verificação…</div>
@@ -1172,8 +1257,8 @@
               <button class="btn-slide" onclick="encerrarApp()">⏹ Sair</button>
             </div>
             <p class="hint">Publique a versão nova como <b>release no GitHub</b> com tag igual à
-              versão (ex.: <code>v1.1.2</code>) — a CI anexa sozinha o instalador
-              <code>KChrono-Setup-1-1-2.exe</code>
+              versão (ex.: <code>v1.2.3</code>) — a CI anexa sozinha o instalador
+              <code>KChrono-Setup-1-2-3.exe</code>
               (Windows), o <code>KChrono-*.AppImage</code> (Linux) e a ISO da live. "Instalar agora"
               baixa, fecha o app e atualiza em silêncio — ao reabrir já é a versão nova (os dados
               ficam intactos).</p>
@@ -1196,16 +1281,13 @@
 
 <!-- rodapé fixo -->
 <div class="rodape-bar">
-  <span class="add">⊕ Adicionar sessão</span>
   <div class="dir">
-    <span id="rodape-sync">Sincronização CTAD: aguardando</span>
-    <span class="pill novo">NOVIDADE</span>
-    <span>KChrono <span class="js-versao">v1.1.2</span> · por <b>Raphael Belowodski</b></span>
+    <span>KChrono <span class="js-versao">v1.2.3</span> · por <b>Raphael Belowodski</b></span>
   </div>
 </div>
 
-<script src="/static/tracado.js?v=1.1.2"></script>
-<script src="/static/app.js?v=1.1.2"></script>
+<script src="/static/tracado.js?v=1.2.3"></script>
+<script src="/static/app.js?v=1.2.3"></script>
 
 <!-- nova versão disponível (abre sozinho na abertura do app) -->
 <div id="modal-atualizacao" class="modal-fundo" style="display:none">

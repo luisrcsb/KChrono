@@ -41,6 +41,7 @@ class Piloto:
     ativo: bool = True
     telefone: str = ""    # chave natural do piloto (login/identidade)
     funcoes: str = ""     # funções extra opcionais: admin, gestor (CSV)
+    numero: Optional[int] = None   # etiqueta numérica do piloto (auto se vazio)
 
 
 @dataclass

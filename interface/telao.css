@@ -7,6 +7,8 @@
 *{box-sizing:border-box; margin:0; padding:0}
 html,body{height:100%}
 body{background:var(--bg); color:var(--txt); font-family:"Segoe UI",system-ui,sans-serif; overflow:hidden}
+body.grace{background:#4a0e14 !important}
+body.finalizado{background:#0e2a4a !important}
 
 .tela{display:none; height:100vh; flex-direction:column}
 .tela.visivel{display:flex}
@@ -23,7 +25,9 @@ body{background:var(--bg); color:var(--txt); font-family:"Segoe UI",system-ui,sa
   border:.4vmin solid #263354; transition:all .1s}
 .luz.on{box-shadow:0 0 5vmin 1.2vmin currentColor}
 .contagem{font-size:20vmin; font-weight:900; font-variant-numeric:tabular-nums;
-  font-family:"Arial Black",sans-serif; line-height:1}
+  font-family:"Arial Black",sans-serif; line-height:1; text-align:center;
+  white-space:nowrap}
+.contagem.texto{font-size:7vmin; letter-spacing:2px; white-space:normal; max-width:90vw}
 .contagem.vai{color:var(--verde)}
 
 /* ---------- faixa de bandeira (gerente de pista) ---------- */
@@ -87,6 +91,16 @@ tr.volta-flash td{animation:voltaFlash 1.7s ease-out}
   50%{background:var(--txt); color:var(--bg)}
   100%{background:transparent; color:var(--txt)}
 }
+/* volta inválida (ghost lap): o nome do piloto pisca 3 vezes em vermelho */
+tr.ghost-flash td:nth-child(3){animation:ghostFlash 1.5s ease-out}
+@keyframes ghostFlash{
+  0%,100%{color:var(--txt)}
+  16%{color:#ff3333; font-weight:900}
+  33%{color:var(--txt)}
+  50%{color:#ff3333; font-weight:900}
+  66%{color:var(--txt)}
+  83%{color:#ff3333; font-weight:900}
+}
 td.pos{font-weight:800; color:var(--ouro)}
 .badge{font-size:1.4vmin; font-weight:700; padding:.2vmin .9vmin; border-radius:.8vmin; margin-left:.8vmin}
 .badge.lider{background:rgba(255,183,3,.2); color:var(--ouro)}
@@ -95,7 +109,13 @@ td.pos{font-weight:800; color:var(--ouro)}
 .rodape{display:flex; justify-content:space-between; font-size:1.6vmin; color:var(--mut)}
 .rodape b{color:var(--txt)}
 
-/* abas e painéis (Fase 4) */
+/* QR de participação (idle) */
+.qr-part{position:fixed; right:2vmin; bottom:2vmin; background:rgba(11,15,26,.85);
+  border:.25vmin solid var(--borda); border-radius:1.2vmin; padding:1.2vmin;
+  text-align:center; z-index:50; backdrop-filter:blur(4px)}
+.qr-part img{width:16vmin; height:16vmin; background:#fff; border-radius:.6vmin}
+.qr-part-tit{font-size:1.6vmin; font-weight:700; color:var(--txt); margin-bottom:.6vmin}
+.qr-part-sub{font-size:1.2vmin; color:var(--mut); margin-top:.6vmin}
 #tela-corrida{gap:1.4vmin}
 .abas-telao{display:flex; gap:4px; align-items:flex-end}
 .abas-telao button{background:var(--bg2); border:.2vmin solid var(--borda); color:var(--mut);

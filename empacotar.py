@@ -3,7 +3,7 @@ publicacao/linux.
 
     python empacotar.py
 
-· Windows: PyInstaller (onefile) + NSIS → publicacao/windows/
+· Windows: PyInstaller (onedir) + NSIS → publicacao/windows/
 · Linux:   Docker (se instalado) → publicacao/linux/; sem Docker, o AppImage
    é gerado pela CI do GitHub Actions (.github/workflows/release.yml) na
    publicação da tag — deixe a pasta linux preenchida por ela.
@@ -11,6 +11,9 @@ publicacao/linux.
 
 Uma tag (`git tag v1.0.5 && git push origin v1.0.5`) publica a release
 com os três pacotes: Setup (Windows), AppImage (Linux) e ISO da live.
+
+O executável e o instalador são assinados automaticamente se houver
+certificado configurado (ver empacotamento/assinar.py).
 """
 from __future__ import annotations
 
@@ -44,31 +47,52 @@ def _makensis():
     return shutil.which("makensis")
 
 
+def _assinar(arquivos: list) -> None:
+    """Assina os arquivos (no-op sem certificado configurado)."""
+    try:
+        sys.path.insert(0, str(RAIZ / "empacotamento"))
+        import assinar
+        assinar.assinar([str(a) for a in arquivos])
+    except Exception as e:
+        print(f"[assinar] aviso: {e}")
+
+
 def build_windows() -> None:
     if sys.platform != "win32":
         print("[windows] pulando: só é possível buildar o Windows no Windows "
               "(a CI cuida disso na tag).")
         return
 
-    print("== [windows] PyInstaller (onefile)")
+    print("== [windows] PyInstaller (onedir)")
+    # O PyInstaller às vezes termina com código espúrio (1) mesmo com o build
+    # concluído — a existência do artefato é o critério, não o código de saída.
     subprocess.run([sys.executable, str(RAIZ / "empacotamento" / "build.py")],
-                   check=True, cwd=RAIZ)
-    exe = RAIZ / "empacotamento" / "dist" / "KChrono.exe"
+                   cwd=RAIZ)
+
+    versao = _versao()
+    pasta_app = RAIZ / "empacotamento" / "dist" / f"KChrono-{versao}"
+    exe = pasta_app / f"KChrono-{versao}.exe"
     if not exe.exists():
-        sys.exit("ERRO: empacotamento/dist/KChrono.exe não foi gerado")
+        sys.exit(f"ERRO: {exe} não foi gerado")
+
+    # Assina o executável (o build.py já tenta; repetir é inofensivo).
+    _assinar([exe])
 
     alvo = PUB / "windows"
     alvo.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(exe, alvo / "KChrono.exe")
+    # Portátil: copia a pasta onedir inteira (exe + _internal).
+    portatil = alvo / f"KChrono-{versao}"
+    if portatil.exists():
+        shutil.rmtree(portatil)
+    shutil.copytree(pasta_app, portatil)
 
     makensis = _makensis()
     if not makensis:
         print("[windows] AVISO: makensis não encontrado (instale o NSIS) — "
-              "só o exe solto foi copiado.")
+              "só a pasta portátil foi copiada.")
         return
 
     print("== [windows] NSIS (instalador)")
-    versao = _versao()
     nome_setup = (f"KChrono-Setup-{versao.replace('.', '-')}.exe"
                   if versao != "?" else "KChrono-Setup.exe")
     subprocess.run([makensis, "instalador.nsi"], check=True,
@@ -76,6 +100,7 @@ def build_windows() -> None:
     setup = RAIZ / "empacotamento" / nome_setup
     if not setup.exists():
         sys.exit(f"ERRO: {nome_setup} não foi gerado")
+    _assinar([setup])
     # Remove instaladores de versões anteriores — só fica o da versão atual
     for velho in (RAIZ / "empacotamento").glob("KChrono-Setup*.exe"):
         if velho.name != nome_setup:

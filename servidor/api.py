@@ -47,7 +47,7 @@ async def _sem_cache_na_interface(request: Request, call_next):
     resp = await call_next(request)
     caminho = request.url.path
     if (caminho.startswith("/static") or caminho.startswith("/imagens")
-            or caminho in ("/", "/telao", "/gerente")):
+            or caminho in ("/", "/telao", "/gerente", "/participante")):
         resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
         resp.headers["Pragma"] = "no-cache"
         resp.headers["Expires"] = "0"
@@ -209,6 +209,17 @@ async def api_portas():
 async def api_versao():
     from atualizador import VERSAO_ATUAL, verificar
     return {"versao_atual": VERSAO_ATUAL, **await asyncio.to_thread(verificar)}
+
+
+@app.get("/api/versao/notas")
+async def api_versao_notas():
+    """Notas da versão instalada (fonte: empacotamento/versao.json embutido).
+
+    Alimenta o botão "NOVIDADE" do rodapé — mostra o que mudou nesta versão.
+    """
+    from atualizador import VERSAO_ATUAL, manifesto_local
+    m = manifesto_local()
+    return {"versao": m.get("versao") or VERSAO_ATUAL, "notas": m.get("notas", "")}
 
 
 @app.post("/api/versao/baixar")
@@ -802,10 +813,11 @@ async def api_criar_piloto(nome: str = Query(...), apelido: str = Query(""),
                            fonia: str = Query(""),
                            telefone: str = Query(""),
                            funcoes: str = Query(""),
+                           numero: Optional[int] = Query(None),
                            transponders: Optional[str] = Query(None)):
     try:
         return {"ok": True, **estado.criar_piloto(nome, apelido, fonia, transponders,
-                                                   telefone, funcoes)}
+                                                   telefone, funcoes, numero)}
     except ValueError as e:
         return {"ok": False, "erro": str(e)}
 
@@ -815,18 +827,20 @@ async def api_editar_piloto(piloto_id: int = Query(...), nome: str = Query(...),
                             apelido: str = Query(""), fonia: str = Query(""),
                             ativo: bool = Query(True),
                             telefone: str = Query(""), funcoes: str = Query(""),
+                            numero: Optional[int] = Query(None),
                             transponders: Optional[str] = Query(None)):
     try:
         return {"ok": True, **estado.editar_piloto(piloto_id, nome, apelido, fonia,
-                                                   ativo, transponders, telefone, funcoes)}
+                                                   ativo, transponders, telefone, funcoes,
+                                                   numero)}
     except ValueError as e:
         return {"ok": False, "erro": str(e)}
 
 
 @app.delete("/api/pilotos/{piloto_id}")
-async def api_excluir_piloto(piloto_id: int):
+async def api_excluir_piloto(piloto_id: int, total: bool = Query(False)):
     try:
-        return {"ok": True, **estado.excluir_piloto(piloto_id)}
+        return {"ok": True, **estado.excluir_piloto(piloto_id, total=total)}
     except ValueError as e:
         return {"ok": False, "erro": str(e)}
 
@@ -926,9 +940,18 @@ async def api_ranking(campeonato_id: int):
 
 
 # ---------------------------------------------------------------- histórico (Central de Voltas)
-@app.get("/api/historico")
-async def api_historico():
-    return {"sessoes": estado.historico()}
+@app.get("/api/participante/qrcode")
+async def participante_qrcode(request: Request):
+    """QR Code público para a página de tempos do participante."""
+    if not qr_disponivel():
+        return {"ok": False, "erro": "biblioteca de QR indisponível"}
+    try:
+        base = qr_base_url(request.url.hostname, request.url.port)
+        url = f"{base}/participante"
+        imagem = qr_data_uri(url, escala=8)
+        return {"ok": True, "url": url, "qrcode": imagem}
+    except (RuntimeError, ValueError) as e:
+        return {"ok": False, "erro": str(e)}
 
 
 @app.get("/api/historico/{sessao_id}")
@@ -1304,6 +1327,11 @@ async def tela_telao():
 @app.get("/gerente")
 async def tela_gerente():
     return FileResponse(DIR_INTERFACE / "gerente.html")
+
+
+@app.get("/participante")
+async def tela_participante():
+    return FileResponse(DIR_INTERFACE / "participante.html")
 
 
 @app.websocket("/ws/gerente")

@@ -38,7 +38,6 @@ function beep(freq = 880, dur = 0.08, vol = 0.18) {
 function beepPassing() { beep(1200, 0.06, 0.15); }   // bip curto ao passar
 function beepVolta() { beep(880, 0.12, 0.22); }       // bip volta completada
 function beepRecorde() { beep(1500, 0.2, 0.25); }      // bip recorde
-function beepNotificacao() { beep(660, 0.1, 0.16); setTimeout(() => beep(990, 0.1, 0.16), 120); }
 
 // ---------------------------------------------------------------- navegação
 // Shell persistente: o menu lateral está sempre visível; aqui só alterna o
@@ -55,6 +54,55 @@ function marcarNav(btn) {
   if (btn) btn.classList.add("on");
 }
 
+function cicloProgresso(btn) {
+  const key = btn.dataset.key || "item";
+  const niveis = [0, 25, 50, 75, 100];
+  // direção atual (sobe ou desce) guardada no dataset
+  let dir = parseInt(btn.dataset.dir || "1", 10);
+  let nivel = parseInt(btn.dataset.nivel || "0", 10);
+  const idx = niveis.indexOf(nivel);
+  let novoIdx = idx + dir;
+  if (novoIdx >= niveis.length) { dir = -1; novoIdx = niveis.length - 2; }
+  if (novoIdx < 0) { dir = 1; novoIdx = 1; }
+  nivel = niveis[novoIdx];
+  btn.dataset.nivel = nivel;
+  btn.dataset.dir = dir;
+  btn.dataset.nivelnum = novoIdx;
+  if (nivel === 100) {
+    btn.textContent = "100% funcional";
+  } else {
+    btn.textContent = nivel + "%";
+  }
+  // cor via data-nivel
+  btn.setAttribute("data-nivel", String(nivel));
+  // persistir
+  try {
+    const estado = JSON.parse(localStorage.getItem("kchrono_prog") || "{}");
+    estado[key] = { nivel, dir };
+    localStorage.setItem("kchrono_prog", JSON.stringify(estado));
+  } catch (e) {}
+}
+// Restaurar estado ao carregar
+function restaurarProgresso() {
+  let estado = {};
+  try { estado = JSON.parse(localStorage.getItem("kchrono_prog") || "{}"); } catch (e) {}
+  document.querySelectorAll(".prog-btn").forEach(btn => {
+    const key = btn.dataset.key;
+    const salvo = estado[key];
+    if (salvo) {
+      btn.dataset.nivel = salvo.nivel;
+      btn.dataset.dir = salvo.dir;
+      btn.setAttribute("data-nivel", String(salvo.nivel));
+      if (salvo.nivel === 100) btn.textContent = "100% funcional";
+      else btn.textContent = salvo.nivel + "%";
+    } else {
+      btn.dataset.nivel = 0;
+      btn.dataset.dir = 1;
+      btn.setAttribute("data-nivel", "0");
+      btn.textContent = "0%";
+    }
+  });
+}
 function mostrar(id) {
   const op = document.getElementById("operador");
   const adm = document.getElementById("admin-conteudo");
@@ -425,16 +473,29 @@ function _agendarRecon(ms) {
   if (_reconTimer) return;
   _reconTimer = setTimeout(() => { _reconTimer = null; conectarWS(); }, ms || 1500);
 }
+// reflete o estado do servidor local (o que serve esta interface) no menu lateral
+function renderConexaoServidor(ok) {
+  const led = document.getElementById("side-servidor-led");
+  if (led) led.classList.toggle("on", !!ok);
+  const nome = document.getElementById("side-servidor-nome");
+  if (nome) {
+    nome.textContent = ok ? "Servidor: conectado" : "Servidor: desconectado";
+    nome.style.color = ok ? "var(--accent-green)" : "var(--accent-red)";
+  }
+  const sub = document.getElementById("side-servidor-sub");
+  if (sub) sub.textContent = `KChrono local · ${location.host}`;
+}
+
 function conectarWS() {
   if (ws && ws.readyState <= 1) return;
   const proto = location.protocol === "https:" ? "wss" : "ws";
   try {
     ws = new WebSocket(`${proto}://${location.host}/ws`);
   } catch (e) { _agendarRecon(1000); return; }
-  const status = document.getElementById("ws-status");
-  ws.onopen = () => { _ultimoMsgWS = Date.now(); if (status) { status.textContent = "Conectado com o servidor"; status.style.color = "var(--accent-green)"; } };
-  ws.onclose = () => { if (status) { status.textContent = "Desconectado do servidor"; status.style.color = "var(--accent-red)"; } _agendarRecon(1500); };
-  ws.onerror = () => { if (status) { status.textContent = "Desconectado do servidor"; status.style.color = "var(--accent-red)"; } try { ws.close(); } catch (e) {} };
+  renderConexaoServidor(false);   // mostra o endereço já na abertura
+  ws.onopen = () => { _ultimoMsgWS = Date.now(); renderConexaoServidor(true); };
+  ws.onclose = () => { renderConexaoServidor(false); _agendarRecon(1500); };
+  ws.onerror = () => { renderConexaoServidor(false); try { ws.close(); } catch (e) {} };
   ws.onmessage = (ev) => { _ultimoMsgWS = Date.now(); try { tratarEvento(JSON.parse(ev.data)); } catch (e) {} };
 }
 // watchdog: se ficar 6s sem mensagem, força reconexão (evita painel "morto")
@@ -453,8 +514,6 @@ function tratarEvento(ev) {
     case "volta":
       marcarRxDecoder();
       if (ev.recorde) {
-        notificar("recorde",
-          `Novo recorde ${ev.recorde === "pista" ? "da pista" : "pessoal"}: ${ev.tempo}s`, "⏱️");
         beepRecorde();
         break;
       }
@@ -470,17 +529,38 @@ function tratarEvento(ev) {
     case "sync":
       logMsg(`[sync] ${ev.msg}`, "l-admin", "log-operador");
       if (/enfileirad|fila|falh|erro/i.test(ev.msg || ""))
-        notificar("fila_upload", ev.msg, "📤");
       break;
     case "classificacao": renderClassificacao(ev); break;
     case "voltas":
       renderVoltaAVolta(ev);
       renderFeedAoVivo(ev);
       renderLiveFeed(ev);
+      // Mantém a sessão aberta no C23 sincronizada com o ao vivo, sem F5
+      // e sem polling HTTP: usa os dados do próprio evento WebSocket.
+      if (sessaoAberta && sessaoAberta === ultimoSessaoId) {
+        try {
+          const evPilotos = ev.pilotos || [];
+          const maxV = Math.max(0, ...evPilotos.map(p => (p.voltas || []).length));
+          const todosT = evPilotos.flatMap(p => (p.voltas || []).map(v => v.tempo));
+          const melhorGeral = todosT.length ? Math.min(...todosT) : null;
+          const d = {
+            max_voltas: maxV,
+            melhor_geral: melhorGeral,
+            pilotos: evPilotos.map(p => ({
+              nome: p.nome,
+              voltas: (p.voltas || []).map(v => ({ numero: v.numero, tempo: v.tempo }))
+            })),
+            simulacao: (sessoesCache.find(x => x.id === sessaoAberta) || {}).simulacao
+          };
+          document.getElementById("detalhe-titulo").textContent =
+            `Voltas volta a volta — ${d.pilotos.length} piloto(s), ${maxV} voltas` +
+            (d.simulacao ? " · SIMULAÇÃO (teste — não oficial)" : "");
+          renderTabelaHistorico(d);
+        } catch (e) { /* ignore */ }
+      }
       break;
     case "ghost_lap":
       logMsg(`GHOST LAP descartado — transponder ${ev.transponder}`, "l-aviso", "log-operador");
-      notificar("ghost_lap", `Ghost lap descartado — transponder ${ev.transponder}`, "👻");
       break;
     case "aviso": logMsg(`AVISO: ${ev.msg}`, "l-aviso", "log-operador"); break;
     case "atualizacao":
@@ -501,7 +581,6 @@ function tratarEvento(ev) {
       logMsg(`bandeira: ${ev.bandeira || ev.cor}${ev.motivo ? " — " + ev.motivo : ""}`,
         "l-aviso", "log-operador");
       if (ev.bandeira === "vermelha" || ev.bandeira === "fechada")
-        notificar("decoder_offline", `Pista ${ev.bandeira}${ev.motivo ? " — " + ev.motivo : ""}`, "🚩");
       break;
     case "checkin":
       if (Array.isArray(ev.presentes)) { checkinCache.presentes = ev.presentes; renderCheckin(); }
@@ -514,13 +593,13 @@ function tratarEvento(ev) {
       break;
     case "sessao":
       logMsg(`sessão: ${ev.estado}`, "l-sistema", "log-operador");
-      document.getElementById("operador-estado").textContent = ev.estado;
       if (ev.id && ev.id !== ultimoSessaoId) {
         ultimoSessaoId = ev.id;
         ultimaClassificacao = { linhas: [] };
         ultimasVoltasData = { pilotos: [], parametros: {} };
         renderClassificacao({ linhas: [] });
         renderVoltaAVolta();
+        renderLiveFeed();
       }
       if (ev.classificacao) renderClassificacao({ linhas: ev.classificacao });
       // estado otimista imediato
@@ -550,8 +629,7 @@ function tratarEvento(ev) {
       marcarRxDecoder();
       logMsg(ev.msg, "", "log-dashboard");
       if (ev.msg && /desconect|offline|perd/i.test(ev.msg))
-        notificar("decoder_offline", ev.msg, "🔌");
-      break;
+        break;
     case "semaforo":
       renderMiniSemaforo(ev.acesas || 0, ev.fase || "vermelho");
       atualizarRelogioLargada(ev);
@@ -625,6 +703,15 @@ function pilotoDaTecla(n) {
     return pilotoPorId(id) || { id: Number(id), nome: `Piloto ${id}` };
   }
   return listaPilotosCorrida()[n - 1] || null;
+}
+
+// Tecla F<n> associada a um piloto (inverso de pilotoDaTecla).
+function teclaDoPiloto(pilotoId) {
+  for (let n = 1; n <= 12; n++) {
+    const p = pilotoDaTecla(n);
+    if (p && Number(p.id) === Number(pilotoId)) return n;
+  }
+  return null;
 }
 
 document.addEventListener("keydown", (e) => {
@@ -801,9 +888,9 @@ function renderMiniSemaforo(acesas, fase) {
   const verde = box.querySelector(".mluz.verde");
   vermelhas.forEach((l, i) => l.classList.toggle("on", fase === "vermelho" && i < acesas));
   if (verde) verde.classList.toggle("on", fase === "verde");
-  // botão Largada piscar vermelho durante a contagem regressiva (semáforo vermelho)
+  // botão Largada: durante a contagem regressiva (semáforo vermelho) fica em AMARELO FIXO
   const btn = document.getElementById("btn-acao-principal");
-  if (btn) btn.classList.toggle("btn-regressiva-piscar", fase === "vermelho");
+  if (btn) btn.classList.toggle("btn-largada-amarelo", fase === "vermelho");
 }
 
 // Durante a contagem, o display "Tempo" vira o número da regressiva (o servidor
@@ -824,18 +911,16 @@ function renderSessao(s) {
   if (css) css.textContent =
     s.id ? `sessão ${s.id.slice(0, 8)}${s.simulacao ? " · SIMULAÇÃO" : ""}` +
            `${s.pausada ? " · pausada" : ""}` : "nenhuma sessão ativa";
-  const opEst = document.getElementById("operador-estado");
-  if (opEst) opEst.textContent = s.estado || "sem sessão";
-  const opSes = document.getElementById("operador-sessao");
-  if (opSes) opSes.textContent = s.id ? s.id.slice(0, 8) : "—";
-  const opSim = document.getElementById("operador-sim");
-  if (opSim) opSim.hidden = !(s.id && s.simulacao);
   // estado da sessão → botão principal de ação
   estadoSessao = s.estado || "parado";
   sessaoAtiva = !!(s.id && !["parado", "finalizado"].includes(estadoSessao));
   sessaoPausada = !!s.pausada;
   atualizarBotaoPrincipal();
   atualizarBotaoPausa();
+  // painel de check-in ("Pilotos na pista") só faz sentido antes de uma sessão ativa:
+  // depois que a sessão inicia, o quadro de pilotos na pista é o "Ao Vivo"
+  const cardCheckin = document.getElementById("card-checkin");
+  if (cardCheckin) cardCheckin.style.display = sessaoAtiva ? "none" : "";
   // mini-semáforo acompanha o estado (a sequência de largada pilota via evento)
   if (estadoSessao === "largada") renderMiniSemaforo(0, "vermelho");
   else if (["treino", "classificacao", "correndo"].includes(estadoSessao)) renderMiniSemaforo(0, "verde");
@@ -850,6 +935,42 @@ function renderSessao(s) {
   };
   // atualiza já (não espera o timer local, que pode estar freado em 2º plano)
   tickRelogioSessao();
+  renderResumoSessao();
+}
+
+// Resumo compacto da sessão (C01): enquanto a sessão está ativa, o card
+// "Configuração da sessão" fica recolhido e acima do botão de ação aparece
+// só um texto curto com as informações básicas escolhidas.
+function renderResumoSessao() {
+  const el = document.getElementById("sessao-resumo");
+  const txt = document.getElementById("sessao-resumo-txt");
+  const cardCfg = document.getElementById("card-config-sessao");
+  if (!el || !txt) return;
+  const ativa = sessaoAtiva && !["parado", "finalizado"].includes(estadoSessao);
+  if (!ativa) {
+    el.style.display = "none";
+    if (cardCfg) cardCfg.style.display = "";
+    return;
+  }
+  // sessão ativa → recolhe o card de configuração: só o resumo curto acima do botão
+  if (cardCfg) cardCfg.style.display = "none";
+  if (el) el.style.display = "block";
+  const tipo = (document.getElementById("cfg-tipo") || {}).value || "treino";
+  const criterio = (document.getElementById("cfg-criterio") || {}).value || "Tempo";
+  const livre = String(criterio).toLowerCase().startsWith("livre");
+  const durEl = _campoDuracao(tipo);
+  let duracao = parseFloat(durEl && durEl.value);
+  if (!Number.isFinite(duracao) || duracao < 0) duracao = DURACOES_PADRAO[tipo] ?? 10;
+  if (livre) duracao = 0;
+  const unidade = String(criterio).toLowerCase().startsWith("voltas") ? "voltas" : "min";
+  const durTxt = duracao > 0 ? `${duracao} ${unidade}` : "sem limite";
+  const contador = parseInt((document.getElementById("cfg-contador") || {}).value, 10) || 10;
+  const paradas = parseInt((document.getElementById("cfg-aviso-saida") || {}).value, 10) || 0;
+  const paraTerminar = parseInt((document.getElementById("cfg-terminar") || {}).value, 10) || 0;
+  const tmin = parseInt((document.getElementById("cfg-tempo-minimo") || {}).value, 10) || 0;
+  txt.textContent =
+    `${tipo === "treino" ? "Treino" : tipo === "classificacao" ? "Classificação" : tipo === "corrida" ? "Corrida" : "Campeonato"}` +
+    ` · duração ${durTxt} · contagem ${contador}s · aviso saída ${paradas}s · tempo pra terminar ${paraTerminar}s · mín. volta ${tmin}s`;
 }
 
 // cronômetro da sessão no display "Tempo" enquanto não há líder com voltas.
@@ -1302,184 +1423,131 @@ function renderFeedAoVivo(dados) {
 // - Outros pilotos têm "slots reservados" vazios até completarem a volta
 // ============================================================
 function renderLiveFeed(dados) {
-  if (dados) ultimasVoltasData = dados;
+  // Normalizar estrutura
+  let dadosNormalizados = null;
+  if (dados && dados.pilotos) {
+    dadosNormalizados = dados;
+  } else if (dados && dados.voltas && dados.voltas.pilotos) {
+    dadosNormalizados = dados.voltas;
+  } else if (dados && Array.isArray(dados)) {
+    dadosNormalizados = { pilotos: dados };
+  } else if (typeof ultimasVoltasData !== 'undefined') {
+    dadosNormalizados = ultimasVoltasData;
+  }
+  if (dadosNormalizados) ultimasVoltasData = dadosNormalizados;
+
   const box = document.getElementById("ao-vivo-grid");
   if (!box) return;
 
   const pilotos = (ultimasVoltasData.pilotos || []).slice();
+
+  // Preservar rolagem
+  const _scrollAntes = { top: box.scrollTop, left: box.scrollLeft };
+
   if (!pilotos.length) {
-    box.innerHTML = '<p class="hint">Aguardando primeira passagem...</p>';
+    box.innerHTML = '<p class="hint" style="padding:20px;text-align:center;">Aguardando primeira volta...</p>';
+    box.scrollTop = _scrollAntes.top;
+    box.scrollLeft = _scrollAntes.left;
     return;
   }
 
-  // Construir mapa de voltas por piloto
-  const voltasPorPiloto = {};
+  // Melhor volta de cada piloto (p.melhor ou min das voltas)
+  const melhorPorPiloto = {};
+  pilotos.forEach(p => {
+    const voltas = p.voltas || [];
+    let m = (typeof p.melhor === 'number') ? p.melhor : null;
+    if (m == null && voltas.length) {
+      m = Math.min(...voltas.map(v => v.tempo));
+    }
+    melhorPorPiloto[p.piloto_id] = m;
+  });
+
+  // Melhor volta geral (menor tempo de volta entre todos os pilotos)
+  const todosTempos = pilotos.flatMap(p => (p.voltas || []).map(v => v.tempo));
+  const melhorGeral = todosTempos.length ? Math.min(...todosTempos) : null;
+
+  // Número máximo de voltas
   let maxVolta = 0;
   pilotos.forEach(p => {
     const voltas = (p.voltas || []).slice().sort((a, b) => a.numero - b.numero);
-    voltasPorPiloto[p.piloto_id] = voltas;
-    if (voltas.length > 0) {
-      maxVolta = Math.max(maxVolta, voltas[voltas.length - 1].numero);
-    }
+    if (voltas.length) maxVolta = Math.max(maxVolta, voltas[voltas.length - 1].numero);
   });
 
-  // Obter classificação atual para gaps e posição
-  const classif = ultimaClassificacao.linhas || [];
-  const posPorPiloto = {};
-  const gapPorPiloto = {};
-  const totalTempoPorPiloto = {};
-  classif.forEach(l => {
-    posPorPiloto[l.piloto_id] = l.posicao;
-    gapPorPiloto[l.piloto_id] = l.gap;
-    totalTempoPorPiloto[l.piloto_id] = l.tempo;
+  // Mapa de voltas por piloto por número
+  const porNumPorPiloto = {};
+  pilotos.forEach(p => {
+    const m = {};
+    (p.voltas || []).forEach(v => { m[v.numero] = v; });
+    porNumPorPiloto[p.piloto_id] = m;
   });
 
-  // Determinar piloto líder (posição 1)
-  const liderId = classif[0]?.piloto_id;
+  // Ordem de primeira aparição (estável)
+  const ordemPrimeira = new Map();
+  pilotos.forEach((p, idx) => { ordemPrimeira.set(p.piloto_id, idx); });
 
-  // Construir linhas: uma para cada número de volta (maxVolta até 1)
-  // Cada linha tem colunas: [Nº Volta] [Piloto] [Tempo] [Gap]
-  let html = '';
+  // Montar matriz: pilotos em colunas, voltas em linhas (mais recente no topo)
+  let html = '<div class="vv-tabela">';
 
-  // Cabeçalho fixo
-  html += `
-    <div class="ao-vivo-controls">
-      <span style="font-size:11px; color:var(--text-muted);">Volta mais recente no topo</span>
-    </div>
-    <div class="ao-vivo-header">
-      <div class="col-volta">VOLTA</div>
-      <div class="col-piloto">PILOTO</div>
-      <div class="col-tempo">TEMPO</div>
-      <div class="col-gap">GAP</div>
-    </div>
-  `;
-
-  // Para cada volta (da mais recente para a primeira)
+  // Coluna fixa "Volta"
+  html += '<div class="vv-piloto vv-fixa"><div class="vv-cab" style="display:flex;align-items:center;justify-content:center;height:auto;"><div class="vv-nome" style="font-weight:bold;margin:0;">Volta</div></div>';
   for (let n = maxVolta; n >= 1; n--) {
-    let voltaTeveDados = false;
-    const pilotosNaVolta = [];
-
-    // Coletar dados de todos os pilotos para esta volta
-    pilotos.forEach(p => {
-      const voltas = voltasPorPiloto[p.piloto_id] || [];
-      const volta = voltas.find(v => v.numero === n);
-      const pos = posPorPiloto[p.piloto_id];
-      const gap = gapPorPiloto[p.piloto_id];
-      const totalTempo = totalTempoPorPiloto[p.piloto_id];
-      const isLider = p.piloto_id === liderId;
-
-      if (volta) {
-        voltaTeveDados = true;
-        pilotosNaVolta.push({
-          piloto: p,
-          volta: volta,
-          pos: pos,
-          gap: gap,
-          totalTempo: totalTempo,
-          isLider: isLider,
-          temVolta: true
-        });
-      } else {
-        // Piloto ainda não completou esta volta
-        // Só mostrar slot se houver pilotos mais rápidos que já completaram
-        const pilotoMaisRapido = pilotos.find(p2 => {
-          const v2 = (voltasPorPiloto[p2.piloto_id] || []).find(v => v.numero === n);
-          return v2 && (posPorPiloto[p2.piloto_id] || 999) <= (pos || 999);
-        });
-        if (pilotoMaisRapido || pos) {
-          pilotosNaVolta.push({
-            piloto: p,
-            volta: null,
-            pos: pos,
-            gap: gap,
-            totalTempo: totalTempo,
-            isLider: isLider,
-            temVolta: false
-          });
-        }
-      }
-    });
-
-    // Ordenar pela posição atual na classificação
-    pilotosNaVolta.sort((a, b) => (a.pos || 999) - (b.pos || 999));
-
-    // Renderizar cada piloto nesta volta
-    pilotosNaVolta.forEach((item, idx) => {
-      const p = item.piloto;
-      const v = item.volta;
-      const pos = item.pos;
-      const gap = item.gap;
-      const isLider = item.isLider;
-      const temVolta = item.temVolta;
-
-      const classeLinha = [];
-      if (!temVolta) classeLinha.push('volta-aberta');
-      if (isLider) classeLinha.push('volta-lider');
-      const classeStr = classeLinha.length ? ` class="${classeLinha.join(' ')}"` : '';
-
-      let tempoHtml = '';
-      let gapHtml = '';
-      let badgesHtml = '';
-
-      if (temVolta && v) {
-        const tempoFormatado = fmtVolta(v.tempo);
-        let tempoClass = '';
-        if (v.melhor) tempoClass = ' melhor';
-        if (v.recorde) tempoClass = ' recorde';
-        tempoHtml = `<div class="col-tempo${tempoClass}">${tempoFormatado}</div>`;
-
-        // Badges
-        if (v.melhor) badgesHtml += `<span class="ao-vivo-badge melhor">MELHOR</span>`;
-        if (v.recorde) badgesHtml += `<span class="ao-vivo-badge recorde">RECORDE</span>`;
-        if (isLider) badgesHtml += `<span class="ao-vivo-badge lider">LÍDER</span>`;
-
-        // Gap para o líder
-        if (gap && gap !== '' && !isLider) {
-          gapHtml = `<div class="col-gap">+${gap}</div>`;
-        } else if (isLider) {
-          gapHtml = `<div class="col-gap leader">LÍDER</div>`;
-        } else {
-          gapHtml = `<div class="col-gap">—</div>`;
-        }
-      } else {
-        // Slot vazio - esperando o piloto completar a volta
-        tempoHtml = `<div class="col-tempo"><span class="ao-vivo-slot-vazio pendente">⏳ aguardando</span></div>`;
-        if (gap && gap !== '') {
-          gapHtml = `<div class="col-gap">+${gap} (proj.)</div>`;
-        } else {
-          gapHtml = `<div class="col-gap"><span class="ao-vivo-slot-vazio">—</span></div>`;
-        }
-      }
-
-      const pilotoNome = _esc(p.nome);
-      const pilotoAbrev = p.abreviado ? _esc(p.abreviado) : '';
-      const pilotoNum = p.numero ? `#${p.numero}` : '';
-
-      html += `
-        <div${classeStr}>
-          <div class="col-volta">${n}</div>
-          <div class="col-piloto">
-            <div class="piloto-info">
-              <div class="piloto-nome">${pilotoNome} ${pilotoAbrev ? `<span style="color:var(--accent-gold);font-size:10px;margin-left:6px;">${pilotoAbrev}</span>` : ''} ${pilotoNum ? `<span style="color:var(--text-muted);font-size:10px;margin-left:4px;">${pilotoNum}</span>` : ''} ${badgesHtml}</div>
-              <div class="piloto-meta">Pos: ${pos || '—'} · Total: ${totalTempo || '—'}</div>
-            </div>
-          </div>
-          ${tempoHtml}
-          ${gapHtml}
-        </div>
-      `;
-    });
-
-    // Se ninguém fez esta volta ainda, não renderizar a linha
-    // (já controlado pelo loop - só entra se tiver pilotosNaVolta)
+    html += `<div class="vv-cel vv-num" style="min-width:80px;text-align:center;">${n}</div>`;
   }
+  html += '</div>';
 
-  // Se não houve nenhuma volta
+  // Uma coluna por piloto
+  pilotos.forEach(p => {
+    const pid = p.piloto_id;
+    const pos = (ultimaClassificacao.linhas || []).find(l => l.piloto_id === pid);
+    const posicao = pos ? pos.posicao : '';
+    const totalVoltas = (p.voltas || []).length;
+    const gap = pos && pos.gap ? pos.gap : '';
+    const melhorPiloto = melhorPorPiloto[pid];
+
+    html += '<div class="vv-piloto">';
+    html += `<div class="vv-cab">
+      <div class="vv-pos">${posicao || ''}</div>
+      <div class="vv-nome" title="${_esc(p.nome)}" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:140px;">${_esc(p.nome)}</div>
+      <div class="vv-total">${totalVoltas} volta(s)</div>
+      ${gap ? `<div class="vv-gap" title="gap para o líder">${_esc(gap)}</div>` : ''}
+    </div>`;
+
+    const porNum = porNumPorPiloto[pid] || {};
+    for (let n = maxVolta; n >= 1; n--) {
+      const v = porNum[n];
+      if (v) {
+        const isMelhorPiloto = (melhorPiloto != null && v.tempo === melhorPiloto);
+        const isMelhorGeral = (melhorGeral != null && v.tempo === melhorGeral);
+        let cls = 'vv-cel';
+        if (isMelhorGeral) cls += ' vv-recorde';
+        else if (isMelhorPiloto) cls += ' vv-melhor';
+        const badge = isMelhorGeral ? ' ⭐' : (isMelhorPiloto ? ' 🏆' : (v.recorde ? ' ⭐' : ''));
+        html += `<div class="${cls}" title="volta ${n}${isMelhorGeral ? ' — melhor volta geral' : (isMelhorPiloto ? ' — melhor do piloto' : '')}" style="min-width:80px;text-align:center;">${fmtVolta(v.tempo)}${badge}</div>`;
+      } else {
+        html += '<div class="vv-cel vv-vazia" style="min-width:80px;text-align:center;">—</div>';
+      }
+    }
+    html += '</div>';
+  });
+
+  html += '</div>';
+
+  // Resumo abaixo
+  html += `<div style="margin-top:8px;padding:6px 10px;font-size:11px;color:var(--text-muted);display:flex;gap:16px;flex-wrap:wrap;">
+    <span>Melhor volta geral: <b style="color:var(--accent-gold)">${melhorGeral != null ? fmtVolta(melhorGeral) : '—'}</b></span>
+    ${pilotos.map(p => {
+      const m = melhorPorPiloto[p.piloto_id];
+      return `<span>${_esc(p.nome)}: <b>${m != null ? fmtVolta(m) : '—'}</b></span>`;
+    }).join('')}
+  </div>`;
+
   if (maxVolta === 0) {
-    html += '<p class="hint" style="padding: 20px; text-align: center;">Aguardando primeira volta...</p>';
+    html = '<p class="hint" style="padding:20px;text-align:center;">Aguardando primeira volta...</p>';
   }
 
   box.innerHTML = html;
+  box.scrollTop = _scrollAntes.top;
+  box.scrollLeft = _scrollAntes.left;
 }
 
 function fmtVolta(t) {
@@ -1501,15 +1569,22 @@ function iniciarSessaoConfigurada() {
   const tipo = document.getElementById("cfg-tipo").value;
   if (tipo === "campeonato") { iniciarCampeonatoEscolhido(); return; }
   const criterio = document.getElementById("cfg-criterio").value;
-  const duracao = parseFloat(document.getElementById("cfg-duracao").value) || 10;
+  const livre = criterio.toLowerCase().startsWith("livre");
+  const durEl = _campoDuracao(tipo);
+  let duracao = parseFloat(durEl && durEl.value);
+  // 0 é uma duração válida (sem limite / infinito) — não usar "|| 10".
+  if (!Number.isFinite(duracao) || duracao < 0) duracao = DURACOES_PADRAO[tipo] ?? 10;
+  if (livre) duracao = 0;
   const tmin = parseFloat(document.getElementById("cfg-tempo-minimo").value) || 0;
   const contador = parseInt(document.getElementById("cfg-contador").value, 10) || 10;
   const mediaN = parseInt((document.getElementById("cfg-media-n") || {}).value, 10) || 0;
+  const unidade = criterio.toLowerCase().startsWith("voltas") ? "voltas" : "min";
+  const durTxt = duracao > 0 ? `${duracao} ${unidade}` : "sem limite";
   api(`sessao/iniciar?tipo=${tipo}&tempo_minimo_s=${tmin}` +
       `&duracao=${duracao}&criterio=${encodeURIComponent(criterio)}` +
       `&contador_s=${contador}&media_n=${mediaN}`).then(r => {
     if (r.ok === false) { logMsg(`sessão: ${r.erro || "não iniciada"}`, "l-erro", "log-operador"); return; }
-    logMsg(`sessão iniciada (${tipo}, ${duracao} min, contador ${contador}s)`, "l-sistema", "log-operador");
+    logMsg(`sessão iniciada (${tipo}, ${durTxt}, contador ${contador}s)`, "l-sistema", "log-operador");
     abrirOperador();
   });
 }
@@ -1889,6 +1964,24 @@ async function abrirSessao(id) {
   }
   filtrarSessoes();
   renderTabelaHistorico(d);
+  // Reflete a sessão selecionada no C04 · Ao Vivo (matriz em tempo real)
+  try {
+    const liveData = {
+      pilotos: (d.pilotos || []).map((p, idx) => {
+        const vs = (p.voltas || []).map(v => ({ numero: v.numero, tempo: v.tempo }));
+        const m = vs.length ? Math.min(...vs.map(v => v.tempo)) : null;
+        const voltas = vs.map(v => ({
+          numero: v.numero, tempo: v.tempo,
+          melhor: (m != null && v.tempo === m),
+          recorde: (d.melhor_geral != null && v.tempo === d.melhor_geral)
+        }));
+        return { piloto_id: idx + 1, nome: p.nome, voltas, melhor: m };
+      })
+    };
+    const _live = ultimasVoltasData;
+    renderLiveFeed(liveData);
+    ultimasVoltasData = _live;
+  } catch (e) { /* ignore */ }
 }
 
 async function enviarSessaoCTAD() {
@@ -1962,6 +2055,966 @@ function renderTabelaHistorico(d) {
     '+x,xxxs = diferença acumulada para o líder naquela volta';
 }
 
+
+// ---------------------------------------------------------------- sincronia de pilotos (CTAD)
+function _syncPlStatus(txt, cor) {
+  const el = document.getElementById("sync-pl-status");
+  if (el) { el.textContent = txt; el.style.color = cor || "var(--text-muted)"; }
+}
+
+function _escTxt(s) { return String(s == null ? "" : s); }
+
+function _renderSyncPilotos(r) {
+  const el = document.getElementById("sync-pl-resultado");
+  if (!el) return;
+  if (!r || r.ok === false) {
+    el.innerHTML = `<p class="hint" style="color:var(--accent-red)">${_escTxt(r && r.erro || "falha ao consultar o CTAD")}</p>`;
+    return;
+  }
+  const vinculo = v => v === "telefone" ? "chave primária"
+    : v === "nome-adotou-telefone" ? "adotou o telefone"
+    : v === "nome" ? "por nome (site sem telefone)" : "";
+  const linhas = [];
+  (r.novos || []).forEach(n =>
+    linhas.push(`<tr><td><b>${_esc(n.nome)}</b></td><td>${_esc(n.apelido || "—")}</td>
+      <td><b>${_esc(n.telefone || "—")}</b></td>
+      <td><span class="pill ${r.preview ? "novo" : "ok"}">${r.preview ? "será criado" : "criado"}</span></td></tr>`));
+  (r.adotados || []).forEach(a =>
+    linhas.push(`<tr><td><b>${_esc(a.nome)}</b></td><td>${_esc(a.apelido || "—")}</td>
+      <td><b>${_esc(a.telefone)}</b></td>
+      <td><span class="pill ${r.preview ? "novo" : "ok"}">adota a chave primária</span></td></tr>`));
+  (r.atualizados || []).forEach(a =>
+    linhas.push(`<tr><td><b>${_esc(a.nome)}</b></td><td>${_esc(a.apelido || "—")}</td>
+      <td><b>${_esc(a.telefone || "—")}</b></td>
+      <td><span class="pill novo">atualiza ${(a.campos || []).join(", ")}</span>
+          <span class="hint" style="display:block">${vinculo(a.vinculado_por)}</span></td></tr>`));
+  (r.conflitos || []).forEach(c =>
+    linhas.push(`<tr><td><b>${_esc(c.piloto)}</b></td><td colspan="2"></td>
+      <td><span class="pill erro">${_esc(c.motivo)}</span></td></tr>`));
+
+  const resumo = `${r.remotos} no site · <b style="color:var(--accent-green)">${(r.novos || []).length} novos</b>`
+    + (r.adotados && r.adotados.length
+        ? ` · <b style="color:var(--accent-green)">${r.adotados.length} adotou a chave primária</b>` : "")
+    + ` · <b style="color:var(--accent-gold)">${(r.atualizados || []).length} a atualizar</b> · `
+    + `${r.iguais} já iguais`
+    + ((r.conflitos || []).length ? ` · <b style="color:var(--accent-red)">${r.conflitos.length} conflito(s)</b>` : "");
+
+  el.innerHTML = `
+    <div class="admin-secao-tit">${r.preview ? "Prévia" : "Resultado"} — pilotos do CTAD</div>
+    <p class="hint">${resumo}</p>
+    <div class="tabela-wrap"><table class="admin-tabela">
+      <tr><th>Piloto</th><th>Apelido</th><th>Telefone (chave primária)</th><th>Ação</th></tr>
+      ${linhas.join("") || '<tr><td colspan="4" style="color:var(--text-muted)">nada a fazer</td></tr>'}
+    </table></div>
+    ${r.preview && (linhas.length) ? `<div class="acoes" style="margin-top:12px">
+      <button class="destaque" onclick="importarPilotosSite(true)">⬇ Confirmar importação</button></div>` : ""}`;
+}
+
+async function previaPilotosSite() {
+  _syncPlStatus("consultando o CTAD…", "var(--accent-blue)");
+  let r;
+  try { r = await api("sync/pilotos?previa=true", "GET"); }
+  catch (e) { _syncPlStatus("falha de conexão", "var(--accent-red)"); return; }
+  if (r && r.ok === false) { _syncPlStatus(r.erro, "var(--accent-red)"); _renderSyncPilotos(r); return; }
+  _syncPlStatus(`prévia: ${(r.novos || []).length} novo(s)`, "var(--accent-gold)");
+  logMsg(`sync/pilotos: prévia do site — ${r.remotos} pilotos`, "l-sistema", "log-operador");
+  _renderSyncPilotos(r);
+}
+
+async function importarPilotosSite(confirmado) {
+  if (!confirmado && !confirm("Importar os pilotos do CTAD para o KChrono?\n\n"
+    + "Fonia, funções e transponders locais NÃO são alterados.")) return;
+  _syncPlStatus("importando…", "var(--accent-blue)");
+  let r;
+  try { r = await api("sync/pilotos?previa=false", "GET"); }
+  catch (e) { _syncPlStatus("falha de conexão", "var(--accent-red)"); return; }
+  if (r && r.ok === false) { _syncPlStatus(r.erro, "var(--accent-red)"); _renderSyncPilotos(r); return; }
+  _syncPlStatus(`importado: ${(r.novos || []).length} novo(s)`, "var(--accent-green)");
+  logMsg(`sync/pilotos: ${(r.novos || []).length} criados, `
+    + `${(r.atualizados || []).length} atualizados do CTAD`, "l-sistema", "log-operador");
+  _renderSyncPilotos(r);
+  carregarPilotos();
+}
+
+async function exportarPilotoSite() {
+  if (pilotoEditando == null) {
+    alert("Selecione um piloto na lista (botão ✏️ Editar) para enviá-lo ao site.");
+    return;
+  }
+  const p = pilotosCache.find(x => x.id === pilotoEditando);
+  if (!p) return;
+  if (!confirm(`Criar "${p.nome}" no cadastro do CTAD?\n\n`
+    + "Se o piloto já existir lá, nada é alterado.")) return;
+  _syncPlStatus("enviando…", "var(--accent-blue)");
+  const r = await api(`sync/pilotos/exportar?piloto_id=${pilotoEditando}`);
+  if (r && r.ok === false) {
+    _syncPlStatus(r.erro, "var(--accent-red)");
+    logMsg(`sync/pilotos: ${r.erro}`, "l-erro", "log-operador");
+    return;
+  }
+  _syncPlStatus(r.criado ? `criado: ${r.nome}` : "já existia no site", "var(--accent-green)");
+  logMsg(`sync/pilotos: ${r.msg || r.nome}`, "l-sistema", "log-operador");
+}
+
+function carregarCamposSyncCamp() {
+  const sel = document.getElementById("sync-camp-local");
+  if (!sel) return;
+  const lista = (campAtual ? [campAtual] : []);
+  // usa a lista completa de campeonatos (camp-select) quando disponível
+  const options = [];
+  const selAll = document.getElementById("camp-select");
+  if (selAll) {
+    options.push(...Array.from(selAll.options)
+      .filter(o => o.value)
+      .map(o => `<option value="${o.value}">${_escTxt(o.textContent)}</option>`));
+  } else {
+    options.push(...lista.map(id => `<option value="${id}">#${id}</option>`));
+  }
+  sel.innerHTML = options.join("") || '<option value="">— nenhum campeonato —</option>';
+  if (campAtual) sel.value = String(campAtual);
+}
+
+function _renderSyncCamp(r) {
+  const el = document.getElementById("sync-pl-resultado");
+  if (!el) return;
+  if (!r || r.ok === false) {
+    el.innerHTML = `<p class="hint" style="color:var(--accent-red)">${_escTxt(r && r.erro || "falha ao consultar o CTAD")}</p>`;
+    return;
+  }
+  const cfg = r.config_aplicada || {};
+  const ROT = { pilotos_por_chave: "máx. por chave", numero_provas: "nº de provas",
+                inverter_bateria: "inverter bateria", pontuacao_tabela: "tabela de pontos" };
+  const cfgLinhas = Object.keys(cfg).map(k =>
+    `<tr><td>${ROT[k] || k}</td><td>${_escTxt(Array.isArray(cfg[k]) ? cfg[k].join(", ") : cfg[k])}</td></tr>`).join("");
+  const insc = (r.a_inscrever || []).map(i => `<li>${_esc(i.nome)}</li>`).join("");
+  el.innerHTML = `
+    <div class="admin-secao-tit">${r.preview ? "Prévia" : "Resultado"} — campeonato do CTAD</div>
+    <p class="hint">Campeonato <b>${_esc(r.campeonato)}</b> · ${r.inscritos_site} inscrito(s) no site ·
+      ${r.inscritos_agora} no KChrono ${r.pilotos_criados && r.pilotos_criados.length
+        ? ` · ${r.pilotos_criados.length} piloto(s) criado(s)` : ""}.</p>
+    ${cfgLinhas ? `<div class="tabela-wrap"><table class="admin-tabela">
+      <tr><th>Configuração</th><th>Valor vindo do site</th></tr>${cfgLinhas}</table></div>`
+      : '<p class="hint">Configuração já estava igual à do site.</p>'}
+    ${insc ? `<p class="hint" style="margin-top:8px">A inscrever:</p><ul style="margin:0 0 0 18px">${insc}</ul>` : ""}
+    ${r.preview ? `<div class="acoes" style="margin-top:12px">
+      <button class="destaque" onclick="importarCampeonatoSite(true)">⬇ Confirmar importação</button></div>` : ""}`;
+}
+
+async function previaCampeonatoSite() {
+  const cid = document.getElementById("sync-camp-local").value;
+  const chave = document.getElementById("sync-camp-chave").value.trim();
+  if (!cid || !chave) { alert("Informe o campeonato local e a chave no CTAD."); return; }
+  _syncPlStatus("consultando…", "var(--accent-blue)");
+  let r;
+  try { r = await api(`sync/campeonatos/${cid}/importar?chave=${encodeURIComponent(chave)}&previa=true`); }
+  catch (e) { _syncPlStatus("falha de conexão", "var(--accent-red)"); return; }
+  _syncPlStatus(r.ok === false ? r.erro : "prévia pronta",
+                r.ok === false ? "var(--accent-red)" : "var(--accent-gold)");
+  _renderSyncCamp(r);
+}
+
+async function importarCampeonatoSite(confirmado) {
+  const cid = document.getElementById("sync-camp-local").value;
+  const chave = document.getElementById("sync-camp-chave").value.trim();
+  if (!cid || !chave) { alert("Informe o campeonato local e a chave no CTAD."); return; }
+  if (!confirmado && !confirm(`Importar configuração e inscritos de "${chave}"?\n\n`
+    + "O limite de pilotos por chave será alinhado com o do site.")) return;
+  _syncPlStatus("importando…", "var(--accent-blue)");
+  let r;
+  try { r = await api(`sync/campeonatos/${cid}/importar?chave=${encodeURIComponent(chave)}&previa=false`); }
+  catch (e) { _syncPlStatus("falha de conexão", "var(--accent-red)"); return; }
+  if (r && r.ok === false) {
+    _syncPlStatus(r.erro, "var(--accent-red)");
+    _renderSyncCamp(r);
+    return;
+  }
+  _syncPlStatus("campeonato importado", "var(--accent-green)");
+  logMsg(`sync/campeonato: "${chave}" importado — `
+    + `${(r.a_inscrever || []).length} inscrito(s)`, "l-sistema", "log-operador");
+  _renderSyncCamp(r);
+  carregarCampeonatos();
+  abrirCampeonato();
+}
+
+async function excluirPiloto(id) {
+  const p = pilotosCache.find(x => x.id === id);
+  const nome = p ? p.nome : `#${id}`;
+  if (!confirm(`Excluir o piloto "${nome}"?\n\nSe ele tiver voltas no histórico, será inativado ` +
+               `(não some das provas antigas).`)) return;
+  const r = await api(`pilotos/${id}`, "DELETE");
+  if (r.ok) {
+    logMsg(`piloto ${nome}: ${r.msg}`, "l-sistema", "log-operador");
+    carregarPilotos();
+  } else {
+    alert(`Não foi possível excluir: ${r.erro || "erro"}`);
+  }
+}
+
+// ---------------------------------------------------------------- voz & som (Admin)
+function rotuloVolume() {
+  const el = document.getElementById("som-volume");
+  const txt = document.getElementById("som-volume-txt");
+  if (el && txt) txt.textContent = `${el.value}%`;
+}
+
+function rotuloVelocidade() {
+  const el = document.getElementById("som-velocidade");
+  const txt = document.getElementById("som-velocidade-txt");
+  if (el && txt) txt.textContent = `${el.value} ppm`;
+}
+
+function ajustesSom() {
+  const vol = parseInt((document.getElementById("som-volume") || {}).value, 10);
+  const vel = parseInt((document.getElementById("som-velocidade") || {}).value, 10);
+  return {
+    volume: Number.isFinite(vol) ? vol / 100 : 0.9,
+    velocidade: Number.isFinite(vel) ? vel : 180,
+    voz: (document.getElementById("som-voz") || {}).value || null,
+  };
+}
+
+function atualizarVozes() {
+  carregarSom();
+  logMsg("lista de vozes atualizada", "l-sistema", "log-operador");
+}
+
+async function baixarVozNeural() {
+  const btn = document.getElementById("som-baixar-voz");
+  const st = document.getElementById("som-voz-status");
+  let livres = [];
+  try {
+    const r = await api("vozes", "GET");
+    livres = (r.modelos || []).filter(m => !m.instalado);
+  } catch (e) {}
+  if (!livres.length) { carregarSom(); return; }
+  const alvo = livres[0].id;
+  const rotulo = livres[0].rotulo;
+  if (!confirm("Baixar a voz neural " + rotulo + "?\n\n" +
+      "O download acontece uma unica vez e depois o locutor funciona " +
+      "offline, sem internet na pista.")) return;
+  const original = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = "baixando... (pode levar alguns minutos)";
+  if (st) st.textContent = "baixando " + alvo + "...";
+  try {
+    const r = await api("vozes/instalar?modelo=" + encodeURIComponent(alvo),
+                        "POST", "", "");
+    if (r.ok) {
+      logMsg("voz neural instalada: " + r.modelo, "l-admin", "log-operador");
+      alert("Voz neural '" + r.modelo + "' instalada e em uso.\n\n" +
+            "Clique em Testar voz para ouvir.");
+    } else {
+      logMsg("voz neural: " + (r.erro || "falha no download"), "l-erro", "log-operador");
+      alert("Nao foi possivel baixar: " + (r.erro || "erro"));
+    }
+  } catch (e) {
+    logMsg("voz neural: " + e, "l-erro", "log-operador");
+    alert("Falha ao baixar: " + e);
+  }
+  btn.disabled = false;
+  btn.textContent = original;
+  carregarSom();
+}
+
+async function carregarSom() {
+  const r = await api("som", "GET");
+  const sel = document.getElementById("som-voz");
+  sel.innerHTML = "";
+  const vozes = r.vozes || [];
+  if (vozes.length) {
+    vozes.forEach(v => {
+      const o = document.createElement("option");
+      o.value = v.id;
+      // 🧠 marca as vozes neurais offline (Piper)
+      o.textContent = (v.fonte === "piper" ? "🧠 " : "") +
+        `${v.nome}${v.idiomas ? ` (${v.idiomas})` : ""}`;
+      if (v.id === r.voz_id) o.selected = true;
+      sel.appendChild(o);
+    });
+  } else {
+    sel.innerHTML = '<option value="">— nenhuma voz (instale pyttsx3) —</option>';
+  }
+  document.getElementById("som-volume").value = Math.round((r.volume ?? 0.9) * 100);
+  document.getElementById("som-velocidade").value = r.velocidade ?? 180;
+  rotuloVolume();
+  rotuloVelocidade();
+  const st = document.getElementById("som-status");
+  const nomeBackend = { piper: "neural offline (Piper)", sapi: "SAPI do Windows",
+                         log: "modo log/bipes" }[r.backend] || r.backend || "—";
+  st.textContent = r.tts_ativo ? `TTS ativo — ${nomeBackend}` : "TTS indisponível (modo log/bipes)";
+  const nPiper = vozes.filter(v => v.fonte === "piper").length;
+  const ptbr = vozes.filter(v => (v.idiomas || "").toLowerCase().startsWith("pt")).length;
+  st.textContent += nPiper ? ` · ${nPiper} voz(es) neural(is)` : "";
+  st.textContent += ptbr ? ` · ${ptbr} voz(es) pt-BR` : "";
+  st.style.color = r.tts_ativo
+    ? (r.backend === "piper" ? "var(--accent-green)" : "var(--accent-gold)")
+    : "var(--accent-red)";
+  // dica sobre a voz escolhida + estado do download
+  const dica = document.getElementById("som-voz-dica");
+  if (dica) {
+    const atual = vozes.find(v => v.id === r.voz_id);
+    dica.innerHTML = atual && atual.fonte === "piper"
+      ? "A voz <b>neural</b> roda offline, direto no computador — sem internet na pista."
+      : "As vozes SAPI/OneCore soam mais “robotizadas”. Instale uma voz <b>neural</b> (🧠) para ter entonação.";
+  }
+  const bs = document.getElementById("som-voz-status");
+  const bb = document.getElementById("som-baixar-voz");
+  if (r.piper_disponivel) {
+    if (bs) bs.innerHTML = nPiper
+      ? `${nPiper} modelo(s) neural(is) em <code>dados/vozes</code>.`
+      : "Nenhum modelo neural instalado — baixe um para ter voz natural (≈60 MB).";
+    if (bb) bb.style.display = nPiper ? "none" : "";
+  } else {
+    if (bs) bs.innerHTML = "Para usar voz neural, instale o pacote <code>piper-tts</code> (requirements.txt).";
+    if (bb) bb.style.display = "none";
+  }
+  const op = r.opcoes || {};
+  document.getElementById("som-intervalo").value = op.intervalo_posicoes ?? 0;
+  document.getElementById("som-a-cada-voltas").value = op.anunciar_a_cada_voltas ?? 0;
+  document.getElementById("som-topo").value = op.posicoes_topo ?? 3;
+  document.getElementById("som-anunciar-volta").checked = !!op.anunciar_volta;
+  document.getElementById("som-anunciar-rec-pessoal").checked =
+    op.anunciar_recorde_pessoal !== false;
+  document.getElementById("som-anunciar-rec-pista").checked =
+    op.anunciar_recorde_pista !== false;
+  document.getElementById("som-passagem").checked = op.som_passagem !== false;
+  document.getElementById("som-lider").checked = op.som_lider !== false;
+  document.getElementById("som-menor-volta").checked = op.som_menor_volta !== false;
+  document.getElementById("bip-luz").checked = op.bip_luz !== false;
+  document.getElementById("bip-vai").checked = op.bip_vai !== false;
+  // anúncio de posições por tipo de sessão (durante/depois)
+  document.getElementById("som-pos-class-durante").checked =
+    op.anunciar_posicoes_classificacao_durante !== false;
+  document.getElementById("som-pos-class-depois").checked =
+    op.anunciar_posicoes_classificacao_depois === true;
+  document.getElementById("som-pos-corrida-depois").checked =
+    op.anunciar_posicoes_corrida_depois === true;
+  // Anúncios estendidos
+  const selChamar = document.getElementById("som-chamar-pilotos");
+  if (selChamar) selChamar.value = op.chamar_pilotos_por || "nome";
+  const setV = (id, v, d) => { const e = document.getElementById(id); if (e) e.value = (v != null ? v : d); };
+  setV("som-comecar-volta", op.comecar_leitura_volta_n, 1);
+  setV("som-casas-decimais", op.casas_decimais_volta, 3);
+  setV("som-ignorar-maiores", op.ignorar_voltas_maiores_que, 0);
+  setV("som-class-cada-min", op.ler_classificacao_cada_min, 0);
+  setV("som-est-cada-voltas", op.ler_estimativa_cada_voltas, 0);
+  setV("som-tempo-restante-seg", op.tempo_restante_seg, 30);
+  setV("som-tempo-restante-repetir", op.tempo_restante_repetir_seg, 30);
+  setV("som-pos-troca-lider", op.posicoes_troca_lider, 3);
+  const setChk = (id, v, d) => { const e = document.getElementById(id); if (e) e.checked = (v != null ? !!v : d); };
+  setChk("som-alarme-fim", op.alarme_fim_corrida, true);
+  setChk("som-falar-tempo-restante", op.falar_tempo_restante, true);
+  setChk("som-ler-tempos-treino", op.ler_tempos_treino, false);
+  setChk("som-ler-estimativa-mudanca", op.ler_estimativa_mudanca, true);
+  setChk("som-ler-recorde-baterias", op.ler_recorde_melhor_volta_baterias, true);
+  setChk("som-ler-todas-voltas-livre", op.ler_todas_voltas_treino_livre, false);
+  setChk("som-ler-class-durante-corrida", op.ler_classificacao_durante_corrida, true);
+  setChk("som-omitir-minutos-ritmo", op.omitir_minutos_ritmo, false);
+  carregarVozContagem();   // checkbox "voz na contagem" mora nesta seção agora
+  const audios = {};
+  (r.audios || []).forEach(a => { audios[a.chave] = a.arquivo; });
+  document.getElementById("som-frases").innerHTML = (r.frases || []).map(f => {
+    const temAudio = !!audios[f.chave];
+    const tag = temAudio
+      ? `<span class="audio-tag" title="áudio: ${_esc(audios[f.chave])}">🎵 ${_esc(audios[f.chave])}
+           <button class="btn-mini" onclick="removerAudio('${f.chave}')" title="remover áudio">✕</button></span>`
+      : "";
+    return `
+    <div class="frase-input">
+      <label class="chk-linha" title="ativar/desativar este som">
+        <input type="checkbox" class="frase-hab" data-chave="${f.chave}"
+               ${f.habilitado !== false ? "checked" : ""}></label>
+      <span class="rot">${_esc(f.rotulo)}${temAudio ? " 🔊" : ""}</span>
+      <input id="frase-${f.chave}" value="${_esc(f.texto)}">
+      <button class="btn-mini" onclick="ouvirFrase('${f.chave}')">▶ Ouvir</button>
+      <button class="btn-mini" onclick="escolherAudio('${f.chave}')"
+              title="usar um áudio no lugar desta frase">📁 Áudio</button>
+      ${tag}
+    </div>`;
+  }).join("");
+}
+
+async function escolherAudio(chave) {
+  const inp = document.createElement("input");
+  inp.type = "file";
+  inp.accept = "audio/*,.wav,.mp3,.ogg,.m4a,.wma,.aac,.flac";
+  inp.onchange = async () => {
+    const arq = inp.files && inp.files[0];
+    if (!arq) return;
+    const url = `/api/som/audio?chave=${encodeURIComponent(chave)}` +
+      `&nome=${encodeURIComponent(arq.name)}`;
+    try {
+      const resp = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": arq.type || "application/octet-stream" },
+        body: arq,
+      });
+      const r = await resp.json();
+      if (r.ok) {
+        logMsg(`áudio definido para "${chave}" (${r.arquivo})`, "l-sistema", "log-operador");
+        carregarSom();
+      } else {
+        alert(`Não foi possível enviar o áudio: ${r.erro || "erro"}`);
+      }
+    } catch (e) {
+      alert(`Falha no envio do áudio: ${e}`);
+    }
+  };
+  inp.click();
+}
+
+async function removerAudio(chave) {
+  const r = await api(`som/audio?chave=${encodeURIComponent(chave)}`, "DELETE");
+  if (r.ok) {
+    logMsg(`áudio removido de "${chave}"`, "l-sistema", "log-operador");
+    carregarSom();
+  } else {
+    alert(r.erro || "erro ao remover o áudio");
+  }
+}
+
+async function ouvirFrase(chave) {
+  const el = document.getElementById(`frase-${chave}`);
+  const texto = el ? el.value : "";
+  if (!texto.trim()) { alert("A frase está vazia."); return; }
+  const r = await api("som/ouvir", "POST", "", { texto, chave, ...ajustesSom() });
+  const prev = document.getElementById("som-preview");
+  if (r.ok) {
+    if (prev) prev.innerHTML = `🔊 <b>${_esc(r.texto)}</b>`;
+    if (!r.tts_ativo)
+      logMsg("TTS indisponível — a frase foi enviada ao log.", "l-sistema", "log-operador");
+  } else {
+    alert(`Não foi possível ouvir: ${r.erro || "erro"}`);
+  }
+}
+
+async function testarVoz() {
+  const r = await api("som/ouvir", "POST", "", {
+    texto: "Atenção pilotos, preparem-se para a largada!",
+    ...ajustesSom(),
+  });
+  const prev = document.getElementById("som-preview");
+  if (r.ok && prev) prev.innerHTML = `🔊 Teste de voz — <b>${_esc(r.texto)}</b>`;
+}
+
+async function testarSomPassagem() {
+  const r = await api("som/testar_passagem", "POST");
+  if (r.ok) {
+    logMsg("Teste do bip de passagem executado", "l-sistema", "log-operador");
+  } else {
+    alert("Não foi possível testar: " + (r.erro || "erro"));
+  }
+}
+
+async function testarSomLider() {
+  const r = await api("som/testar_lider", "POST");
+  if (r.ok) {
+    logMsg("Teste do bip do líder executado", "l-sistema", "log-operador");
+  } else {
+    alert("Não foi possível testar: " + (r.erro || "erro"));
+  }
+}
+
+async function testarMenorVolta() {
+  const r = await api("som/testar_menor_volta", "POST");
+  if (r.ok) logMsg("Teste do bip da menor volta executado", "l-sistema", "log-operador");
+  else alert("Não foi possível testar: " + (r.erro || "erro"));
+}
+
+async function testarBipLuz() {
+  const r = await api("som/testar_luz", "POST");
+  if (r.ok) logMsg("Teste do bipe da luz executado", "l-sistema", "log-operador");
+  else alert("Não foi possível testar: " + (r.erro || "erro"));
+}
+
+async function testarBipVai() {
+  const r = await api("som/testar_vai", "POST");
+  if (r.ok) logMsg("Teste do bipe do verde executado", "l-sistema", "log-operador");
+  else alert("Não foi possível testar: " + (r.erro || "erro"));
+}
+
+async function salvarSom(silencioso) {
+  if (!document.getElementById("som-volume")) return;   // seção ainda não carregada
+  const frases = {};
+  document.querySelectorAll("#som-frases input[id^='frase-']").forEach(inp => {
+    frases[inp.id.replace("frase-", "")] = inp.value;
+  });
+  const habilitados = {};
+  document.querySelectorAll("#som-frases .frase-hab").forEach(cb => {
+    habilitados[cb.getAttribute("data-chave")] = cb.checked;
+  });
+  const opcoes = {
+    intervalo_posicoes: parseInt(document.getElementById("som-intervalo").value, 10) || 0,
+    anunciar_a_cada_voltas: parseInt(document.getElementById("som-a-cada-voltas").value, 10) || 0,
+    posicoes_topo: parseInt(document.getElementById("som-topo").value, 10) || 3,
+    anunciar_volta: document.getElementById("som-anunciar-volta").checked,
+    anunciar_recorde_pessoal: document.getElementById("som-anunciar-rec-pessoal").checked,
+    anunciar_recorde_pista: document.getElementById("som-anunciar-rec-pista").checked,
+    som_passagem: document.getElementById("som-passagem").checked,
+    som_lider: document.getElementById("som-lider").checked,
+    som_menor_volta: document.getElementById("som-menor-volta").checked,
+    bip_luz: document.getElementById("bip-luz").checked,
+    bip_vai: document.getElementById("bip-vai").checked,
+    anunciar_posicoes_classificacao_durante:
+      document.getElementById("som-pos-class-durante").checked,
+    anunciar_posicoes_classificacao_depois:
+      document.getElementById("som-pos-class-depois").checked,
+    anunciar_posicoes_corrida_durante:
+      !!(document.getElementById("som-ler-class-durante-corrida") || {}).checked,
+    anunciar_posicoes_corrida_depois:
+      document.getElementById("som-pos-corrida-depois").checked,
+  chamar_pilotos_por: (document.getElementById("som-chamar-pilotos") || {}).value || "nome",
+  comecar_leitura_volta_n: parseInt((document.getElementById("som-comecar-volta") || {}).value, 10) || 1,
+  casas_decimais_volta: parseInt((document.getElementById("som-casas-decimais") || {}).value, 10) || 3,
+  ignorar_voltas_maiores_que: parseInt((document.getElementById("som-ignorar-maiores") || {}).value, 10) || 0,
+  ler_classificacao_cada_min: parseInt((document.getElementById("som-class-cada-min") || {}).value, 10) || 0,
+  ler_estimativa_cada_voltas: parseInt((document.getElementById("som-est-cada-voltas") || {}).value, 10) || 0,
+  tempo_restante_seg: parseInt((document.getElementById("som-tempo-restante-seg") || {}).value, 10) || 30,
+  tempo_restante_repetir_seg: parseInt((document.getElementById("som-tempo-restante-repetir") || {}).value, 10) || 30,
+  posicoes_troca_lider: parseInt((document.getElementById("som-pos-troca-lider") || {}).value, 10) || 3,
+  alarme_fim_corrida: !!(document.getElementById("som-alarme-fim") || {}).checked,
+  falar_tempo_restante: !!(document.getElementById("som-falar-tempo-restante") || {}).checked,
+  ler_tempos_treino: !!(document.getElementById("som-ler-tempos-treino") || {}).checked,
+  ler_estimativa_mudanca: !!(document.getElementById("som-ler-estimativa-mudanca") || {}).checked,
+  ler_recorde_melhor_volta_baterias: !!(document.getElementById("som-ler-recorde-baterias") || {}).checked,
+  ler_todas_voltas_treino_livre: !!(document.getElementById("som-ler-todas-voltas-livre") || {}).checked,
+  ler_classificacao_durante_corrida: !!(document.getElementById("som-ler-class-durante-corrida") || {}).checked,
+  omitir_minutos_ritmo: !!(document.getElementById("som-omitir-minutos-ritmo") || {}).checked,
+  };
+  const r = await api("som/salvar", "POST", "", { frases, habilitados, ...ajustesSom(), ...opcoes });
+  if (r.ok) {
+    if (!silencioso) logMsg("preferências de voz/som salvas", "l-sistema", "log-operador");
+  } else if (!silencioso) {
+    alert(`Não foi possível salvar: ${r.erro || "erro"}`);
+  }
+}
+
+// Toda mudança em Voz & Som é persistida automaticamente (config.json),
+// para valer também nas próximas vezes em que o programa for aberto.
+let _somAutoTimer = null;
+function somAutoSalvar() {
+  clearTimeout(_somAutoTimer);
+  _somAutoTimer = setTimeout(() => { salvarSom(true); }, 700);
+}
+function configurarAutoSalvarSom() {
+  const sec = document.getElementById("a-voz");
+  if (!sec || sec.dataset.autoSalvar === "1") return;
+  sec.dataset.autoSalvar = "1";
+  // checkboxes/selects/textos: salva ao confirmar a mudança
+  sec.addEventListener("change", (e) => {
+    if (e.target && e.target.closest("#a-voz")) somAutoSalvar();
+  });
+  // sliders e digitação: salva com debounce
+  sec.addEventListener("input", (e) => {
+    if (e.target && (e.target.type === "range" || e.target.tagName === "INPUT"))
+      somAutoSalvar();
+  });
+}
+
+async function anunciarPosicoes() {
+  const r = await api("som/anunciar");
+  if (r.ok) logMsg(`posições anunciadas (${r.pilotadas})`, "l-sistema", "log-operador");
+  else alert(r.erro || "nada para anunciar");
+}
+
+function adminSecao(btn, id) {
+  if (!btn) {
+    const nav = Array.from(document.querySelectorAll(".menu nav a"));
+    btn = nav.find(a => (a.getAttribute("onclick") || "").includes(`'${id}'`));
+  }
+  marcarNav(btn);
+  mostrar("admin");
+  document.querySelectorAll(".admin-sec").forEach(s => s.classList.remove("on"));
+  const sec = document.getElementById(id);
+  if (sec) sec.classList.add("on");
+  adminSecaoAtual = id;
+  const titulo = document.getElementById("admin-titulo");
+  if (titulo) titulo.textContent = btn ? btn.textContent.replace(/Fase\s*\d+/i, "").trim() : "Admin";
+  if (id === "a-config") carregarAparenciaForm();
+  if (id === "a-upload") atualizarSync();
+  if (id === "a-camp") { carregarCampeonatos(); carregarPlanoCampeonato(); }
+  if (id === "a-pilotos") { carregarPilotos(); carregarCamposSyncCamp(); }
+  if (id === "a-voz") carregarSom();
+  if (id === "a-sobre") verificarVersao();
+  if (id === "a-gerente") carregarGerente();
+  if (id === "a-pista") carregarEditorPista();
+  if (id === "a-relatorio") carregarRelatorioResumo();
+  if (id === "a-voltas") carregarHistorico();
+  if (id === "a-auditoria") carregarAuditoria();
+}
+
+// ---------------------------------------------------------------- ferramenta de auditoria (baterias CTAD)
+let auditoriaCache = [];
+let auditoriaAtual = null;
+let auditoriaRegistro = null;
+
+async function carregarAuditoria() {
+  const r = await api("auditoria/baterias", "GET");
+  if (!r.ok) {
+    document.getElementById("lista-auditoria").innerHTML = `<p class="hint" style="color:var(--accent-red)">${r.erro || "erro"}</p>`;
+    return;
+  }
+  auditoriaCache = r.baterias || [];
+  filtrarAuditoria();
+}
+
+function filtrarAuditoria() {
+  const q = (document.getElementById("busca-auditoria")?.value || "").toLowerCase();
+  const lista = auditoriaCache.filter(b =>
+    !q || `${b.chave} ${b.sessao} ${b.pistaId}`.toLowerCase().includes(q));
+  document.getElementById("lista-auditoria").innerHTML = lista.map(b => {
+    const quando = b.uploadedAt ? new Date(b.uploadedAt).toLocaleString("pt-BR") : "—";
+    return `<div class="item-sessao ${auditoriaAtual === b.chave ? "on" : ""}" onclick="abrirAuditoria('${b.chave}')">
+      <div class="t">${_esc(b.sessao || b.chave)}</div>
+      <div class="m">${b.chave} · ${b.dados_n || 0} pilotos · ${quando}</div>
+    </div>`;
+  }).join("") || '<p class="hint">nenhuma bateria encontrada</p>';
+}
+
+async function abrirAuditoria(chave) {
+  auditoriaAtual = chave;
+  filtrarAuditoria();
+  const r = await api(`auditoria/bateria/${encodeURIComponent(chave)}`, "GET");
+  if (!r.ok) {
+    document.getElementById("auditoria-conteudo").innerHTML = `<p class="hint" style="color:var(--accent-red)">${r.erro || "erro"}</p>`;
+    return;
+  }
+  auditoriaRegistro = JSON.parse(JSON.stringify(r.registro || {}));
+  document.getElementById("auditoria-titulo").textContent = `Auditoria — ${r.registro?.sessao || chave}`;
+  document.getElementById("acoes-auditoria").style.display = "flex";
+  renderAuditoria();
+}
+
+function renderAuditoria() {
+  const reg = auditoriaRegistro || {};
+  const dados = reg.dados || [];
+  if (!dados.length) {
+    document.getElementById("auditoria-conteudo").innerHTML = '<p class="hint">Sem pilotos nesta bateria</p>';
+    return;
+  }
+  let html = `<div style="margin-bottom:10px; display:flex; gap:8px; flex-wrap:wrap">
+    <button class="btn-mini" onclick="auditoriaRecalcular()">🔁 Recalcular estatísticas</button>
+  </div>`;
+  dados.forEach((d, idx) => {
+    const laps = d.laps || [];
+    html += `<div class="card" style="margin-bottom:12px" data-aud-idx="${idx}">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px">
+        <div><b>${_esc(d.piloto || ("Piloto " + (idx+1)))}</b> · <span class="hint">${d.pos || ""} · ${laps.length} volta(s)</span></div>
+        <div style="display:flex; gap:6px">
+          <button class="btn-mini" onclick="auditoriaMover(${idx}, -1)">⬆ Mover</button>
+          <button class="btn-mini" onclick="auditoriaMover(${idx}, 1)">⬇ Mover</button>
+        </div>
+      </div>
+      <div class="tabela-wrap">
+        <table class="tabela-voltas" style="min-width:600px">
+          <tr><th>#</th><th>Tempo (s)</th><th>Ações</th></tr>
+          ${laps.map((t, lidx) => `<tr>
+            <td>${lidx+1}º</td>
+            <td><input type="number" step="0.001" value="${t}" style="width:110px" onchange="auditoriaEditarLap(${idx}, ${lidx}, this.value)"></td>
+            <td><button class="btn-mini perigo" onclick="auditoriaRemoverLap(${idx}, ${lidx})">🗑 Eliminar volta</button></td>
+          </tr>`).join("")}
+        </table>
+      </div>
+      <div style="margin-top:6px; font-size:12px" class="hint">Melhor: ${d.melhorVoltaTxt || "-"} · Média: ${d.mediaTxt || "-"} · Desvio: ${d.desvio || "-"}</div>
+    </div>`;
+  });
+  document.getElementById("auditoria-conteudo").innerHTML = html;
+}
+
+function auditoriaRemoverLap(pIdx, lIdx) {
+  if (!auditoriaRegistro) return;
+  const laps = auditoriaRegistro.dados[pIdx].laps || [];
+  if (laps.length <= 1 && !confirm("Remover a última volta deste piloto?")) return;
+  laps.splice(lIdx, 1);
+  auditoriaRegistro.dados[pIdx].laps = laps;
+  auditoriaRecalcular();
+  renderAuditoria();
+}
+
+function auditoriaEditarLap(pIdx, lIdx, val) {
+  if (!auditoriaRegistro) return;
+  let v = parseFloat(val);
+  if (isNaN(v) || v <= 0) { alert("Tempo inválido"); renderAuditoria(); return; }
+  auditoriaRegistro.dados[pIdx].laps[lIdx] = Math.round(v * 1000) / 1000;
+  auditoriaRecalcular();
+  renderAuditoria();
+}
+
+function auditoriaMover(pIdx, dir) {
+  if (!auditoriaRegistro) return;
+  const arr = auditoriaRegistro.dados;
+  const novo = pIdx + dir;
+  if (novo < 0 || novo >= arr.length) return;
+  const tmp = arr[pIdx]; arr[pIdx] = arr[novo]; arr[novo] = tmp;
+  renderAuditoria();
+}
+
+function auditoriaRecalcular() {
+  if (!auditoriaRegistro) return;
+  const dados = auditoriaRegistro.dados || [];
+  for (let d of dados) {
+    let laps = [];
+    for (let l of (d.laps || [])) {
+      let v = parseFloat(l);
+      if (!isNaN(v) && v > 0) laps.push(Math.round(v * 1000) / 1000);
+    }
+    d.laps = laps;
+    const n = laps.length;
+    d.voltasTotais = n;
+    if (n == 0) {
+      d.melhorVoltaVal = null; d.melhorVoltaTxt = "-";
+      d.mediaVal = null; d.mediaTxt = "-";
+      d.desvioVal = null; d.desvio = "-";
+      continue;
+    }
+    const melhor = Math.min(...laps);
+    const media = laps.reduce((a,b)=>a+b,0)/n;
+    const desvio = Math.sqrt(laps.reduce((s,t)=>s + Math.pow(t-media,2), 0)/n);
+    d.melhorVoltaVal = Math.round(melhor*1000)/1000;
+    d.melhorVoltaTxt = melhor.toFixed(3).replace(".", ",") + "s";
+    d.mediaVal = Math.round(media*1000)/1000;
+    d.mediaTxt = media.toFixed(3).replace(".", ",") + "s";
+    d.desvioVal = Math.round(desvio*1000)/1000;
+    d.desvio = "±" + desvio.toFixed(3).replace(".", ",") + "s";
+  }
+  dados.sort((a,b) => {
+    const va = a.voltasTotais || 0, vb = b.voltasTotais || 0;
+    if (vb != va) return vb - va;
+    const ma = a.melhorVoltaVal == null ? 999999 : a.melhorVoltaVal;
+    const mb = b.melhorVoltaVal == null ? 999999 : b.melhorVoltaVal;
+    return ma - mb;
+  });
+  dados.forEach((d,i) => { d.pos = (i+1) + "º"; });
+}
+
+async function salvarAuditoria() {
+  if (!auditoriaAtual || !auditoriaRegistro) return;
+  if (!confirm("Salvar alterações nesta bateria no CTAD?")) return;
+  auditoriaRecalcular();
+  renderAuditoria();
+  const r = await api(`auditoria/bateria/${encodeURIComponent(auditoriaAtual)}`, "POST", "", { registro: auditoriaRegistro });
+  if (r.ok) {
+    alert("Bateria atualizada com sucesso!");
+    carregarAuditoria();
+  } else {
+    alert("Erro ao salvar: " + (r.erro || "desconhecido"));
+  }
+}
+
+// ---------------------------------------------------------------- busca global (topbar)
+let buscaTimer = null;
+function buscaGlobalDebounce() {
+  clearTimeout(buscaTimer);
+  buscaTimer = setTimeout(buscaGlobal, 220);
+}
+async function buscaGlobal() {
+  const inp = document.getElementById("busca-global");
+  const box = document.getElementById("busca-resultados");
+  if (!inp || !box) return;
+  const q = inp.value.trim();
+  if (!q) { box.classList.remove("on"); box.innerHTML = ""; return; }
+  let r = { pilotos: [], sessoes: [], campeonatos: [], baterias: [] };
+  try { r = await api(`busca?q=${encodeURIComponent(q)}`, "GET"); } catch (e) {}
+  renderBuscaGlobal(q, r);
+}
+function _secoesAdmin() {
+  return Array.from(document.querySelectorAll("#adm-nav a")).map(a => ({
+    id: (a.getAttribute("onclick") || "").match(/'(a-[^']+)'/)?.[1],
+    titulo: a.textContent.trim(),
+    chaves: ((a.getAttribute("data-titulo") || "") + " " + a.textContent).toLowerCase(),
+  })).filter(s => s.id);
+}
+function renderBuscaGlobal(q, r) {
+  const box = document.getElementById("busca-resultados");
+  if (!box) return;
+  const alvo = q.toLowerCase();
+  let html = "";
+  const acoes = BUSCA_ACOES.filter(a =>
+    (`${a.rotulo} ${a.chaves}`).toLowerCase().includes(alvo));
+  if (acoes.length) {
+    html += '<div class="busca-grupo-tit">Ações</div>' +
+      acoes.map(a => `<div class="busca-item" onclick="buscaIr('acao','${a.chave}')">
+        ${a.icone} ${_esc(a.rotulo)}</div>`).join("");
+  }
+  if (r.pilotos && r.pilotos.length) {
+    html += '<div class="busca-grupo-tit">Pilotos</div>' +
+      r.pilotos.map(p => `<div class="busca-item" onclick="buscaIr('piloto',${p.id})">
+        🏎️ ${_esc(p.nome)}<span class="m">${(p.transponders || []).join(", ") || "sem transponder"}</span></div>`).join("");
+  }
+  if (r.sessoes && r.sessoes.length) {
+    html += '<div class="busca-grupo-tit">Sessões</div>' +
+      r.sessoes.map(s => `<div class="busca-item" onclick="buscaIr('sessao','${s.id}')">
+        🏁 ${_esc(s.rotulo)}<span class="m">${s.voltas} voltas</span></div>`).join("");
+  }
+  if (r.campeonatos && r.campeonatos.length) {
+    html += '<div class="busca-grupo-tit">Campeonatos</div>' +
+      r.campeonatos.map(c => `<div class="busca-item" onclick="buscaIr('campeonato',${c.id})">
+        🏆 ${_esc(c.nome)}<span class="m">${c.provas} provas</span></div>`).join("");
+  }
+  if (r.baterias && r.baterias.length) {
+    html += '<div class="busca-grupo-tit">Baterias</div>' +
+      r.baterias.map(b => `<div class="busca-item" onclick="buscaIr('bateria','${b.campeonato_id}:${b.bateria_id}')">
+        🚦 ${_esc(b.nome)}<span class="m">${_esc(b.campeonato)}</span></div>`).join("");
+  }
+  const sec = _secoesAdmin().filter(s => s.chaves.includes(alvo));
+  if (sec.length) {
+    html += '<div class="busca-grupo-tit">Configurações</div>' +
+      sec.map(s => `<div class="busca-item" onclick="buscaIr('config','${s.id}')">
+        ⚙️ ${_esc(s.titulo)}</div>`).join("");
+  }
+  box.innerHTML = html || `<div class="busca-vazio">nada encontrado para “${_esc(q)}”</div>`;
+  box.classList.add("on");
+}
+
+// ---------------------------------------------------------------- índice de ações (a busca executa funções)
+const BUSCA_ACOES = [
+  { chave: "largada", icone: "▶", rotulo: "Largada", chaves: "largar começar correr iniciar prova",
+    ir: () => largada() },
+  { chave: "pausar", icone: "⏸", rotulo: "Pausar sessão", chaves: "pausar parar congelar",
+    ir: () => pausar(true) },
+  { chave: "retomar", icone: "⏵", rotulo: "Retomar sessão", chaves: "retomar continuar despausar",
+    ir: () => pausar(false) },
+  { chave: "finalizar", icone: "⏹", rotulo: "Finalizar sessão", chaves: "finalizar terminar encerrar parar",
+    ir: () => finalizar() },
+  { chave: "treino", icone: "🏁", rotulo: "Iniciar treino", chaves: "iniciar treino",
+    ir: () => iniciarSessao("treino") },
+  { chave: "classificacao", icone: "⏱", rotulo: "Iniciar classificação", chaves: "iniciar classificacao qualy tomada tempo",
+    ir: () => iniciarSessao("classificacao") },
+  { chave: "corrida", icone: "🏆", rotulo: " Preparar para Largada!", chaves: "iniciar corrida final",
+    ir: () => iniciarSessao("corrida") },
+  { chave: "proxima-etapa", icone: "⏭", rotulo: "Próxima etapa (campeonato)", chaves: "proxima etapa avancar campeonato",
+    ir: () => proximaEtapa() },
+  { chave: "gerar-qr", icone: "📱", rotulo: "Gerar QR Code de acesso", chaves: "qr qrcode codigo acesso gerente celular senha",
+    ir: () => { adminIr("a-gerente"); adminGerarQR(); } },
+  { chave: "enviar-sessao", icone: "📤", rotulo: "Enviar sessão ao CTAD", chaves: "enviar sincronizar upload ctad",
+    ir: () => enviarSessao() },
+  { chave: "processar-fila", icone: "🔄", rotulo: "Processar fila de envio", chaves: "processar fila retry reenviar",
+    ir: () => processarFila() },
+  { chave: "conectar-decoder", icone: "🔌", rotulo: "Conectar decoder", chaves: "conectar decoder ligar mylaps",
+    ir: () => conectarDecoder() },
+  { chave: "abrir-telao", icone: "📺", rotulo: "Abrir telão", chaves: "telao tv placar torcida",
+    ir: () => abrirTelao() },
+];
+
+function buscaIr(tipo, valor) {
+  const box = document.getElementById("busca-resultados");
+  if (box) box.classList.remove("on");
+  if (tipo === "config") { adminIr(valor); return; }
+  if (tipo === "sessao") { adminIr("a-voltas"); abrirSessao(valor); return; }
+  if (tipo === "campeonato") {
+    campSelecionarPendente = String(valor);
+    adminIr("a-camp");
+    return;
+  }
+  if (tipo === "bateria") {
+    const [cid, bid] = String(valor).split(":");
+    adminIr("a-camp");
+    const sel = document.getElementById("camp-select");
+    if (sel) { sel.value = String(cid); abrirCampeonato(); }
+    setTimeout(() => {
+      const el = document.getElementById(`bat-${bid}`);
+      if (el) { el.scrollIntoView({ block: "center" }); el.style.outline = "2px solid var(--accent-blue)"; setTimeout(() => { el.style.outline = ""; }, 2200); }
+    }, 350);
+    return;
+  }
+  if (tipo === "acao") {
+    const a = BUSCA_ACOES.find(x => x.chave === String(valor));
+    if (a) { try { a.ir(); } catch (e) { alert("não foi possível executar a ação"); } }
+    return;
+  }
+  if (tipo === "piloto") {
+    adminIr("a-pilotos");
+    const tr = document.querySelector(`#tabela-pilotos tr[data-piloto="${valor}"]`);
+    if (tr) { tr.scrollIntoView({ block: "center" }); tr.style.outline = "2px solid var(--accent-blue)"; setTimeout(() => { tr.style.outline = ""; }, 2200); }
+  }
+}
+
+// ---------------------------------------------------------------- sistema de chaves (CTAD)
+async function carregarGrids() {
+  const el = document.getElementById("camp-grids");
+  if (!campAtual) { if (el) el.innerHTML = ""; return; }
+  const r = await api(`campeonatos/${campAtual}/grids`, "GET");
+  if (!r || r.ok === false) {
+    if (el) el.innerHTML = `<p class="hint">${r && r.erro ? r.erro : "erro ao carregar grids"}</p>`;
+    return;
+  }
+  // valores vigentes (somente leitura — vêm da criação ou da importação do CTAD)
+  const val = document.getElementById("camp-chave-max-valor");
+  if (val) val.textContent = r.max_por_chave;
+  const inpInv = document.getElementById("camp-chave-inv");
+  if (inpInv) inpInv.checked = !!r.inverter_bateria;
+  renderGrids(r);
+}
+
+function renderGrids(r) {
+  const el = document.getElementById("camp-grids");
+  if (!el) return;
+  if (!r.grids || !r.grids.length || !r.inscritos) {
+    el.innerHTML = '<p class="hint">sem inscritos — inscreva pilotos para montar as chaves</p>';
+    return;
+  }
+  el.innerHTML = r.grids.map(g => {
+    const multi = g.distribuicao.length > 1;
+    const titulo = multi
+      ? `🏁 Grid — Prova ${g.prova} <span class="hint">(dividida em ${g.distribuicao.length} chaves)</span>`
+      : `🏁 Grid — Prova ${g.prova}`;
+    const chaves = g.chaves.map(c => {
+      const linhas = c.pilotos.map((p, k) =>
+        `<tr><td>${k + 1}</td><td>${p.nome}</td><td class="hint">${g.criterio}</td></tr>`).join("");
+      const cab = multi
+        ? `<div class="admin-secao-tit">🔑 ${c.nome}
+             <span class="hint">(${c.pilotos.length} ${c.pilotos.length === 1 ? "piloto" : "pilotos"})</span></div>`
+        : "";
+      return `<div class="camp-grid-bloco">${cab}
+        <div class="card"><div class="tabela-wrap"><table class="admin-tabela">
+          <tr><th>Pos</th><th>Piloto</th><th>Critério</th></tr>${linhas}
+        </table></div></div>
+      </div>`;
+    }).join("");
+    return `<div class="camp-grid"><div class="admin-secao-tit">${titulo}
+      <span class="hint">critério: ${g.criterio}</span></div>${chaves}</div>`;
+  }).join("");
+}
+
+// Inverte a ordem da bateria seguinte (salva na hora; o nº máximo por chave
+// não é editado aqui — vem da criação do campeonato ou da importação do CTAD).
+async function salvarInversaoChaves() {
+  if (!campAtual) { logMsg("campeonato: crie/selecione um campeonato", "l-aviso", "log-operador"); return; }
+  const inv = document.getElementById("camp-chave-inv").checked ? 1 : 0;
+  const r = await api(`campeonatos/${campAtual}/chaves?inverter_bateria=${inv}`, "POST");
+  if (r && r.ok !== false) {
+    logMsg(`inversão da bateria seguinte: ${inv ? "ligada" : "desligada"}`,
+           "l-admin", "log-operador");
+    renderGrids(r);
+  } else {
+    logMsg(`campeonato: ${r && r.erro ? r.erro : "erro ao salvar a inversão"}`,
+           "l-erro", "log-operador");
+    carregarGrids();
+  }
+}
+
+function renderBaterias(baterias) {
+  const el = document.getElementById("baterias-lista");
+  if (!baterias.length) { el.innerHTML = '<p class="hint">nenhuma bateria — clique em "Gerar heats &amp; finais"</p>'; return; }
+  el.innerHTML = baterias.map(b => {
+    const ok = b.espectro.ok;
+    const status = ok ? "LIBERADA" : `BLOQUEADA — ${b.espectro.conflitos.length} conflito(s)`;
+    const conflitos = b.espectro.conflitos.map(c =>
+      `<li>${c.pilotos[0]} × ${c.pilotos[1]} — ${c.tipo} (${c.valor})</li>`).join("");
+    return `<div class="card" id="bat-${b.id}" style="margin-bottom:10px">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px">
+        <b style="color:#fff">${b.nome}</b>
+        <span class="pill ${ok ? "ok" : "err"}">${status}</span>
+      </div>
+      <div style="font-size:12.5px; color:var(--text-muted)">${(b.pilotos || []).map(p => p.nome).join(" · ") || "—"}</div>
+      ${conflitos ? `<ul class="lista-conflitos">${conflitos}</ul>` : ""}
+      <div class="acoes" style="margin-top:10px">
+        <button onclick="lancarResultado(${b.id})">📤 Lançar resultado da sessão atual</button>
+      </div>
+    </div>`;
+  }).join("");
+}
+
 // ---------------------------------------------------------------- admin
 // ---------------------------------------------------------------- pilotos (Admin)
 let pilotosCache = [];
@@ -1994,13 +3047,14 @@ async function carregarPilotos() {
 function renderPilotos() {
   const q = (document.getElementById("pil-busca")?.value || "").toLowerCase().trim();
   const lista = pilotosCache.filter(p =>
-    !q || `${p.nome} ${p.apelido || ""} ${p.fonia || ""} ${p.telefone || ""} ${(p.funcoes || []).join(" ")} ${(p.transponders || []).join(" ")}`
+    !q || `${p.numero || ""} ${p.nome} ${p.apelido || ""} ${p.fonia || ""} ${p.telefone || ""} ${(p.funcoes || []).join(" ")} ${(p.transponders || []).join(" ")}`
       .toLowerCase().includes(q));
   const FUNC = { superuser: "superuser", admin: "admin", gestor: "gestor" };
   const linhas = lista.map(p => {
     const funcoes = (p.funcoes || []).filter(f => FUNC[f]);
     return `
     <tr class="${p.ativo ? "" : "linha-inativa"}" data-piloto="${p.id}">
+      <td>${p.numero ? `<span class="pill num">${p.numero}</span>` : "—"}</td>
       <td><b>${_esc(p.nome)}</b></td>
       <td>${p.apelido ? _esc(p.apelido) : "—"}</td>
       <td>${p.fonia ? `🔊 ${_esc(p.fonia)}` : "—"}</td>
@@ -2012,16 +3066,36 @@ function renderPilotos() {
       <td>
         <button class="btn-mini" onclick="editarPiloto(${p.id})">✏️ Editar</button>
         <button class="btn-mini perigo" onclick="excluirPiloto(${p.id})">🗑 Excluir</button>
+        <button class="btn-mini perigo btn-dev-total" onclick="excluirPilotoTotal(${p.id})"
+                data-help="Exclusão total (modo desenvolvimento): apaga o piloto E todo o histórico dele — voltas, inscrições, resultados e transponders. Não dá para desfazer.">☠️ Excluir tudo</button>
       </td>
     </tr>`; }).join("");
   document.getElementById("tabela-pilotos").innerHTML =
-    "<tr><th>Nome</th><th>Apelido</th><th>Fonia</th><th>Telefone</th><th>Funções</th><th>Transponder(s)</th><th>Status</th><th>Ações</th></tr>" +
-    (linhas || '<tr><td colspan="8" style="color:var(--text-muted)">nenhum piloto encontrado</td></tr>');
+    "<tr><th>Nº</th><th>Nome</th><th>Apelido</th><th>Fonia</th><th>Telefone</th><th>Funções</th><th>Transponder(s)</th><th>Status</th><th>Ações</th></tr>" +
+    (linhas || '<tr><td colspan="9" style="color:var(--text-muted)">nenhum piloto encontrado</td></tr>');
+}
+
+// Exclusão TOTAL do piloto (modo desenvolvimento): apaga cadastro + histórico.
+// Visível só quando "Ativar etiquetas de identidade" (C61) está ligado.
+async function excluirPilotoTotal(id) {
+  const p = pilotosCache.find(x => x.id === id);
+  const nome = p ? p.nome : `#${id}`;
+  if (!confirm(`EXCLUSÃO TOTAL do piloto "${nome}"?\n\nIsto apaga o cadastro E todo o histórico: ` +
+               `voltas, inscrições e resultados. Não dá para desfazer.\n\nContinuar?`)) return;
+  if (!confirm(`Tem certeza? Esta é a última confirmação para apagar "${nome}" em definitivo.`)) return;
+  const r = await api(`pilotos/${id}?total=true`, "DELETE");
+  if (r.ok) {
+    logMsg(`piloto ${nome}: exclusão total — ${r.msg}`, "l-sistema", "log-operador");
+    carregarPilotos();
+  } else {
+    alert(`Não foi possível excluir totalmente: ${r.erro || "erro"}`);
+  }
 }
 
 function novoPiloto() {
   pilotoEditando = null;
   document.getElementById("piloto-form-tit").textContent = "Novo piloto";
+  document.getElementById("pil-numero").value = "";
   document.getElementById("pil-nome").value = "";
   document.getElementById("pil-apelido").value = "";
   document.getElementById("pil-fonia").value = "";
@@ -2036,6 +3110,7 @@ function editarPiloto(id) {
   if (!p) return;
   pilotoEditando = id;
   document.getElementById("piloto-form-tit").textContent = `Editar piloto — ${p.nome}`;
+  document.getElementById("pil-numero").value = p.numero || "";
   document.getElementById("pil-nome").value = p.nome;
   document.getElementById("pil-apelido").value = p.apelido || "";
   document.getElementById("pil-fonia").value = p.fonia || "";
@@ -2049,6 +3124,7 @@ function editarPiloto(id) {
 async function salvarPiloto() {
   const nome = document.getElementById("pil-nome").value.trim();
   if (!nome) { alert("Informe o nome do piloto."); return; }
+  const numeroTxt = document.getElementById("pil-numero").value.trim();
   const apelido = document.getElementById("pil-apelido").value.trim();
   const fonia = document.getElementById("pil-fonia").value.trim();
   const telefone = document.getElementById("pil-telefone").value.trim();
@@ -2057,7 +3133,8 @@ async function salvarPiloto() {
   const ativo = document.getElementById("pil-ativo").value === "1";
   const params = `nome=${encodeURIComponent(nome)}&apelido=${encodeURIComponent(apelido)}` +
     `&fonia=${encodeURIComponent(fonia)}&telefone=${encodeURIComponent(telefone)}` +
-    `&funcoes=${encodeURIComponent(funcoes)}&transponders=${encodeURIComponent(transp)}`;
+    `&funcoes=${encodeURIComponent(funcoes)}&transponders=${encodeURIComponent(transp)}` +
+    (numeroTxt ? `&numero=${encodeURIComponent(numeroTxt)}` : "");
   const r = pilotoEditando
     ? await api(`pilotos/editar?piloto_id=${pilotoEditando}&ativo=${ativo}&${params}`)
     : await api(`pilotos/criar?${params}`);
@@ -2401,10 +3478,29 @@ async function carregarSom() {
     op.anunciar_posicoes_classificacao_durante !== false;
   document.getElementById("som-pos-class-depois").checked =
     op.anunciar_posicoes_classificacao_depois === true;
-  document.getElementById("som-pos-corrida-durante").checked =
-    op.anunciar_posicoes_corrida_durante !== false;
   document.getElementById("som-pos-corrida-depois").checked =
     op.anunciar_posicoes_corrida_depois === true;
+  // Anúncios estendidos
+  const selChamar = document.getElementById("som-chamar-pilotos");
+  if (selChamar) selChamar.value = op.chamar_pilotos_por || "nome";
+  const setV = (id, v, d) => { const e = document.getElementById(id); if (e) e.value = (v != null ? v : d); };
+  setV("som-comecar-volta", op.comecar_leitura_volta_n, 1);
+  setV("som-casas-decimais", op.casas_decimais_volta, 3);
+  setV("som-ignorar-maiores", op.ignorar_voltas_maiores_que, 0);
+  setV("som-class-cada-min", op.ler_classificacao_cada_min, 0);
+  setV("som-est-cada-voltas", op.ler_estimativa_cada_voltas, 0);
+  setV("som-tempo-restante-seg", op.tempo_restante_seg, 30);
+  setV("som-tempo-restante-repetir", op.tempo_restante_repetir_seg, 30);
+  setV("som-pos-troca-lider", op.posicoes_troca_lider, 3);
+  const setChk = (id, v, d) => { const e = document.getElementById(id); if (e) e.checked = (v != null ? !!v : d); };
+  setChk("som-alarme-fim", op.alarme_fim_corrida, true);
+  setChk("som-falar-tempo-restante", op.falar_tempo_restante, true);
+  setChk("som-ler-tempos-treino", op.ler_tempos_treino, false);
+  setChk("som-ler-estimativa-mudanca", op.ler_estimativa_mudanca, true);
+  setChk("som-ler-recorde-baterias", op.ler_recorde_melhor_volta_baterias, true);
+  setChk("som-ler-todas-voltas-livre", op.ler_todas_voltas_treino_livre, false);
+  setChk("som-ler-class-durante-corrida", op.ler_classificacao_durante_corrida, true);
+  setChk("som-omitir-minutos-ritmo", op.omitir_minutos_ritmo, false);
   carregarVozContagem();   // checkbox "voz na contagem" mora nesta seção agora
   const audios = {};
   (r.audios || []).forEach(a => { audios[a.chave] = a.arquivo; });
@@ -2555,9 +3651,26 @@ async function salvarSom(silencioso) {
     anunciar_posicoes_classificacao_depois:
       document.getElementById("som-pos-class-depois").checked,
     anunciar_posicoes_corrida_durante:
-      document.getElementById("som-pos-corrida-durante").checked,
+      !!(document.getElementById("som-ler-class-durante-corrida") || {}).checked,
     anunciar_posicoes_corrida_depois:
       document.getElementById("som-pos-corrida-depois").checked,
+  chamar_pilotos_por: (document.getElementById("som-chamar-pilotos") || {}).value || "nome",
+  comecar_leitura_volta_n: parseInt((document.getElementById("som-comecar-volta") || {}).value, 10) || 1,
+  casas_decimais_volta: parseInt((document.getElementById("som-casas-decimais") || {}).value, 10) || 3,
+  ignorar_voltas_maiores_que: parseInt((document.getElementById("som-ignorar-maiores") || {}).value, 10) || 0,
+  ler_classificacao_cada_min: parseInt((document.getElementById("som-class-cada-min") || {}).value, 10) || 0,
+  ler_estimativa_cada_voltas: parseInt((document.getElementById("som-est-cada-voltas") || {}).value, 10) || 0,
+  tempo_restante_seg: parseInt((document.getElementById("som-tempo-restante-seg") || {}).value, 10) || 30,
+  tempo_restante_repetir_seg: parseInt((document.getElementById("som-tempo-restante-repetir") || {}).value, 10) || 30,
+  posicoes_troca_lider: parseInt((document.getElementById("som-pos-troca-lider") || {}).value, 10) || 3,
+  alarme_fim_corrida: !!(document.getElementById("som-alarme-fim") || {}).checked,
+  falar_tempo_restante: !!(document.getElementById("som-falar-tempo-restante") || {}).checked,
+  ler_tempos_treino: !!(document.getElementById("som-ler-tempos-treino") || {}).checked,
+  ler_estimativa_mudanca: !!(document.getElementById("som-ler-estimativa-mudanca") || {}).checked,
+  ler_recorde_melhor_volta_baterias: !!(document.getElementById("som-ler-recorde-baterias") || {}).checked,
+  ler_todas_voltas_treino_livre: !!(document.getElementById("som-ler-todas-voltas-livre") || {}).checked,
+  ler_classificacao_durante_corrida: !!(document.getElementById("som-ler-class-durante-corrida") || {}).checked,
+  omitir_minutos_ritmo: !!(document.getElementById("som-omitir-minutos-ritmo") || {}).checked,
   };
   const r = await api("som/salvar", "POST", "", { frases, habilitados, ...ajustesSom(), ...opcoes });
   if (r.ok) {
@@ -2565,34 +3678,6 @@ async function salvarSom(silencioso) {
   } else if (!silencioso) {
     alert(`Não foi possível salvar: ${r.erro || "erro"}`);
   }
-}
-
-// Toda mudança em Voz & Som é persistida automaticamente (config.json),
-// para valer também nas próximas vezes em que o programa for aberto.
-let _somAutoTimer = null;
-function somAutoSalvar() {
-  clearTimeout(_somAutoTimer);
-  _somAutoTimer = setTimeout(() => { salvarSom(true); }, 700);
-}
-function configurarAutoSalvarSom() {
-  const sec = document.getElementById("a-voz");
-  if (!sec || sec.dataset.autoSalvar === "1") return;
-  sec.dataset.autoSalvar = "1";
-  // checkboxes/selects/textos: salva ao confirmar a mudança
-  sec.addEventListener("change", (e) => {
-    if (e.target && e.target.closest("#a-voz")) somAutoSalvar();
-  });
-  // sliders e digitação: salva com debounce
-  sec.addEventListener("input", (e) => {
-    if (e.target && (e.target.type === "range" || e.target.tagName === "INPUT"))
-      somAutoSalvar();
-  });
-}
-
-async function anunciarPosicoes() {
-  const r = await api("som/anunciar");
-  if (r.ok) logMsg(`posições anunciadas (${r.pilotadas})`, "l-sistema", "log-operador");
-  else alert(r.erro || "nada para anunciar");
 }
 
 function adminSecao(btn, id) {
@@ -2619,387 +3704,9 @@ function adminSecao(btn, id) {
   if (id === "a-relatorio") carregarRelatorioResumo();
   if (id === "a-voltas") carregarHistorico();
   if (id === "a-auditoria") carregarAuditoria();
-  if (id === "a-notificacoes") carregarNotificacoes();
 }
 
-// ---------------------------------------------------------------- ferramenta de auditoria (baterias CTAD)
-let auditoriaCache = [];
-let auditoriaAtual = null;
-let auditoriaRegistro = null;
 
-async function carregarAuditoria() {
-  const r = await api("auditoria/baterias", "GET");
-  if (!r.ok) {
-    document.getElementById("lista-auditoria").innerHTML = `<p class="hint" style="color:var(--accent-red)">${r.erro || "erro"}</p>`;
-    return;
-  }
-  auditoriaCache = r.baterias || [];
-  filtrarAuditoria();
-}
-
-function filtrarAuditoria() {
-  const q = (document.getElementById("busca-auditoria")?.value || "").toLowerCase();
-  const lista = auditoriaCache.filter(b =>
-    !q || `${b.chave} ${b.sessao} ${b.pistaId}`.toLowerCase().includes(q));
-  document.getElementById("lista-auditoria").innerHTML = lista.map(b => {
-    const quando = b.uploadedAt ? new Date(b.uploadedAt).toLocaleString("pt-BR") : "—";
-    return `<div class="item-sessao ${auditoriaAtual === b.chave ? "on" : ""}" onclick="abrirAuditoria('${b.chave}')">
-      <div class="t">${_esc(b.sessao || b.chave)}</div>
-      <div class="m">${b.chave} · ${b.dados_n || 0} pilotos · ${quando}</div>
-    </div>`;
-  }).join("") || '<p class="hint">nenhuma bateria encontrada</p>';
-}
-
-async function abrirAuditoria(chave) {
-  auditoriaAtual = chave;
-  filtrarAuditoria();
-  const r = await api(`auditoria/bateria/${encodeURIComponent(chave)}`, "GET");
-  if (!r.ok) {
-    document.getElementById("auditoria-conteudo").innerHTML = `<p class="hint" style="color:var(--accent-red)">${r.erro || "erro"}</p>`;
-    return;
-  }
-  auditoriaRegistro = JSON.parse(JSON.stringify(r.registro || {}));
-  document.getElementById("auditoria-titulo").textContent = `Auditoria — ${r.registro?.sessao || chave}`;
-  document.getElementById("acoes-auditoria").style.display = "flex";
-  renderAuditoria();
-}
-
-function renderAuditoria() {
-  const reg = auditoriaRegistro || {};
-  const dados = reg.dados || [];
-  if (!dados.length) {
-    document.getElementById("auditoria-conteudo").innerHTML = '<p class="hint">Sem pilotos nesta bateria</p>';
-    return;
-  }
-  let html = `<div style="margin-bottom:10px; display:flex; gap:8px; flex-wrap:wrap">
-    <button class="btn-mini" onclick="auditoriaRecalcular()">🔁 Recalcular estatísticas</button>
-  </div>`;
-  dados.forEach((d, idx) => {
-    const laps = d.laps || [];
-    html += `<div class="card" style="margin-bottom:12px" data-aud-idx="${idx}">
-      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px">
-        <div><b>${_esc(d.piloto || ("Piloto " + (idx+1)))}</b> · <span class="hint">${d.pos || ""} · ${laps.length} volta(s)</span></div>
-        <div style="display:flex; gap:6px">
-          <button class="btn-mini" onclick="auditoriaMover(${idx}, -1)">⬆ Mover</button>
-          <button class="btn-mini" onclick="auditoriaMover(${idx}, 1)">⬇ Mover</button>
-        </div>
-      </div>
-      <div class="tabela-wrap">
-        <table class="tabela-voltas" style="min-width:600px">
-          <tr><th>#</th><th>Tempo (s)</th><th>Ações</th></tr>
-          ${laps.map((t, lidx) => `<tr>
-            <td>${lidx+1}º</td>
-            <td><input type="number" step="0.001" value="${t}" style="width:110px" onchange="auditoriaEditarLap(${idx}, ${lidx}, this.value)"></td>
-            <td><button class="btn-mini perigo" onclick="auditoriaRemoverLap(${idx}, ${lidx})">🗑 Eliminar volta</button></td>
-          </tr>`).join("")}
-        </table>
-      </div>
-      <div style="margin-top:6px; font-size:12px" class="hint">Melhor: ${d.melhorVoltaTxt || "-"} · Média: ${d.mediaTxt || "-"} · Desvio: ${d.desvio || "-"}</div>
-    </div>`;
-  });
-  document.getElementById("auditoria-conteudo").innerHTML = html;
-}
-
-function auditoriaRemoverLap(pIdx, lIdx) {
-  if (!auditoriaRegistro) return;
-  const laps = auditoriaRegistro.dados[pIdx].laps || [];
-  if (laps.length <= 1 && !confirm("Remover a última volta deste piloto?")) return;
-  laps.splice(lIdx, 1);
-  auditoriaRegistro.dados[pIdx].laps = laps;
-  auditoriaRecalcular();
-  renderAuditoria();
-}
-
-function auditoriaEditarLap(pIdx, lIdx, val) {
-  if (!auditoriaRegistro) return;
-  let v = parseFloat(val);
-  if (isNaN(v) || v <= 0) { alert("Tempo inválido"); renderAuditoria(); return; }
-  auditoriaRegistro.dados[pIdx].laps[lIdx] = Math.round(v * 1000) / 1000;
-  auditoriaRecalcular();
-  renderAuditoria();
-}
-
-function auditoriaMover(pIdx, dir) {
-  if (!auditoriaRegistro) return;
-  const arr = auditoriaRegistro.dados;
-  const novo = pIdx + dir;
-  if (novo < 0 || novo >= arr.length) return;
-  const tmp = arr[pIdx]; arr[pIdx] = arr[novo]; arr[novo] = tmp;
-  renderAuditoria();
-}
-
-function auditoriaRecalcular() {
-  if (!auditoriaRegistro) return;
-  const dados = auditoriaRegistro.dados || [];
-  for (let d of dados) {
-    let laps = [];
-    for (let l of (d.laps || [])) {
-      let v = parseFloat(l);
-      if (!isNaN(v) && v > 0) laps.push(Math.round(v * 1000) / 1000);
-    }
-    d.laps = laps;
-    const n = laps.length;
-    d.voltasTotais = n;
-    if (n == 0) {
-      d.melhorVoltaVal = null; d.melhorVoltaTxt = "-";
-      d.mediaVal = null; d.mediaTxt = "-";
-      d.desvioVal = null; d.desvio = "-";
-      continue;
-    }
-    const melhor = Math.min(...laps);
-    const media = laps.reduce((a,b)=>a+b,0)/n;
-    const desvio = Math.sqrt(laps.reduce((s,t)=>s + Math.pow(t-media,2), 0)/n);
-    d.melhorVoltaVal = Math.round(melhor*1000)/1000;
-    d.melhorVoltaTxt = melhor.toFixed(3).replace(".", ",") + "s";
-    d.mediaVal = Math.round(media*1000)/1000;
-    d.mediaTxt = media.toFixed(3).replace(".", ",") + "s";
-    d.desvioVal = Math.round(desvio*1000)/1000;
-    d.desvio = "±" + desvio.toFixed(3).replace(".", ",") + "s";
-  }
-  dados.sort((a,b) => {
-    const va = a.voltasTotais || 0, vb = b.voltasTotais || 0;
-    if (vb != va) return vb - va;
-    const ma = a.melhorVoltaVal == null ? 999999 : a.melhorVoltaVal;
-    const mb = b.melhorVoltaVal == null ? 999999 : b.melhorVoltaVal;
-    return ma - mb;
-  });
-  dados.forEach((d,i) => { d.pos = (i+1) + "º"; });
-}
-
-async function salvarAuditoria() {
-  if (!auditoriaAtual || !auditoriaRegistro) return;
-  if (!confirm("Salvar alterações nesta bateria no CTAD?")) return;
-  auditoriaRecalcular();
-  renderAuditoria();
-  const r = await api(`auditoria/bateria/${encodeURIComponent(auditoriaAtual)}`, "POST", "", { registro: auditoriaRegistro });
-  if (r.ok) {
-    alert("Bateria atualizada com sucesso!");
-    carregarAuditoria();
-  } else {
-    alert("Erro ao salvar: " + (r.erro || "desconhecido"));
-  }
-}
-
-// ---------------------------------------------------------------- busca global (topbar)
-let buscaTimer = null;
-function buscaGlobalDebounce() {
-  clearTimeout(buscaTimer);
-  buscaTimer = setTimeout(buscaGlobal, 220);
-}
-async function buscaGlobal() {
-  const inp = document.getElementById("busca-global");
-  const box = document.getElementById("busca-resultados");
-  if (!inp || !box) return;
-  const q = inp.value.trim();
-  if (!q) { box.classList.remove("on"); box.innerHTML = ""; return; }
-  let r = { pilotos: [], sessoes: [], campeonatos: [], baterias: [] };
-  try { r = await api(`busca?q=${encodeURIComponent(q)}`, "GET"); } catch (e) {}
-  renderBuscaGlobal(q, r);
-}
-function _secoesAdmin() {
-  return Array.from(document.querySelectorAll("#adm-nav a")).map(a => ({
-    id: (a.getAttribute("onclick") || "").match(/'(a-[^']+)'/)?.[1],
-    titulo: a.textContent.trim(),
-    chaves: ((a.getAttribute("data-titulo") || "") + " " + a.textContent).toLowerCase(),
-  })).filter(s => s.id);
-}
-function renderBuscaGlobal(q, r) {
-  const box = document.getElementById("busca-resultados");
-  if (!box) return;
-  const alvo = q.toLowerCase();
-  let html = "";
-  const acoes = BUSCA_ACOES.filter(a =>
-    (`${a.rotulo} ${a.chaves}`).toLowerCase().includes(alvo));
-  if (acoes.length) {
-    html += '<div class="busca-grupo-tit">Ações</div>' +
-      acoes.map(a => `<div class="busca-item" onclick="buscaIr('acao','${a.chave}')">
-        ${a.icone} ${_esc(a.rotulo)}</div>`).join("");
-  }
-  if (r.pilotos && r.pilotos.length) {
-    html += '<div class="busca-grupo-tit">Pilotos</div>' +
-      r.pilotos.map(p => `<div class="busca-item" onclick="buscaIr('piloto',${p.id})">
-        🏎️ ${_esc(p.nome)}<span class="m">${(p.transponders || []).join(", ") || "sem transponder"}</span></div>`).join("");
-  }
-  if (r.sessoes && r.sessoes.length) {
-    html += '<div class="busca-grupo-tit">Sessões</div>' +
-      r.sessoes.map(s => `<div class="busca-item" onclick="buscaIr('sessao','${s.id}')">
-        🏁 ${_esc(s.rotulo)}<span class="m">${s.voltas} voltas</span></div>`).join("");
-  }
-  if (r.campeonatos && r.campeonatos.length) {
-    html += '<div class="busca-grupo-tit">Campeonatos</div>' +
-      r.campeonatos.map(c => `<div class="busca-item" onclick="buscaIr('campeonato',${c.id})">
-        🏆 ${_esc(c.nome)}<span class="m">${c.provas} provas</span></div>`).join("");
-  }
-  if (r.baterias && r.baterias.length) {
-    html += '<div class="busca-grupo-tit">Baterias</div>' +
-      r.baterias.map(b => `<div class="busca-item" onclick="buscaIr('bateria','${b.campeonato_id}:${b.bateria_id}')">
-        🚦 ${_esc(b.nome)}<span class="m">${_esc(b.campeonato)}</span></div>`).join("");
-  }
-  const sec = _secoesAdmin().filter(s => s.chaves.includes(alvo));
-  if (sec.length) {
-    html += '<div class="busca-grupo-tit">Configurações</div>' +
-      sec.map(s => `<div class="busca-item" onclick="buscaIr('config','${s.id}')">
-        ⚙️ ${_esc(s.titulo)}</div>`).join("");
-  }
-  box.innerHTML = html || `<div class="busca-vazio">nada encontrado para “${_esc(q)}”</div>`;
-  box.classList.add("on");
-}
-
-// ---------------------------------------------------------------- índice de ações (a busca executa funções)
-const BUSCA_ACOES = [
-  { chave: "largada", icone: "▶", rotulo: "Largada", chaves: "largar começar correr iniciar prova",
-    ir: () => largada() },
-  { chave: "pausar", icone: "⏸", rotulo: "Pausar sessão", chaves: "pausar parar congelar",
-    ir: () => pausar(true) },
-  { chave: "retomar", icone: "⏵", rotulo: "Retomar sessão", chaves: "retomar continuar despausar",
-    ir: () => pausar(false) },
-  { chave: "finalizar", icone: "⏹", rotulo: "Finalizar sessão", chaves: "finalizar terminar encerrar parar",
-    ir: () => finalizar() },
-  { chave: "treino", icone: "🏁", rotulo: "Iniciar treino", chaves: "iniciar treino",
-    ir: () => iniciarSessao("treino") },
-  { chave: "classificacao", icone: "⏱", rotulo: "Iniciar classificação", chaves: "iniciar classificacao qualy tomada tempo",
-    ir: () => iniciarSessao("classificacao") },
-  { chave: "corrida", icone: "🏆", rotulo: " Preparar para Largada!", chaves: "iniciar corrida final",
-    ir: () => iniciarSessao("corrida") },
-  { chave: "proxima-etapa", icone: "⏭", rotulo: "Próxima etapa (campeonato)", chaves: "proxima etapa avancar campeonato",
-    ir: () => proximaEtapa() },
-  { chave: "gerar-qr", icone: "📱", rotulo: "Gerar QR Code de acesso", chaves: "qr qrcode codigo acesso gerente celular senha",
-    ir: () => { adminIr("a-gerente"); adminGerarQR(); } },
-  { chave: "enviar-sessao", icone: "📤", rotulo: "Enviar sessão ao CTAD", chaves: "enviar sincronizar upload ctad",
-    ir: () => enviarSessao() },
-  { chave: "processar-fila", icone: "🔄", rotulo: "Processar fila de envio", chaves: "processar fila retry reenviar",
-    ir: () => processarFila() },
-  { chave: "conectar-decoder", icone: "🔌", rotulo: "Conectar decoder", chaves: "conectar decoder ligar mylaps",
-    ir: () => conectarDecoder() },
-  { chave: "abrir-telao", icone: "📺", rotulo: "Abrir telão", chaves: "telao tv placar torcida",
-    ir: () => abrirTelao() },
-];
-
-function buscaIr(tipo, valor) {
-  const box = document.getElementById("busca-resultados");
-  if (box) box.classList.remove("on");
-  if (tipo === "config") { adminIr(valor); return; }
-  if (tipo === "sessao") { adminIr("a-voltas"); abrirSessao(valor); return; }
-  if (tipo === "campeonato") {
-    campSelecionarPendente = String(valor);
-    adminIr("a-camp");
-    return;
-  }
-  if (tipo === "bateria") {
-    const [cid, bid] = String(valor).split(":");
-    adminIr("a-camp");
-    const sel = document.getElementById("camp-select");
-    if (sel) { sel.value = String(cid); abrirCampeonato(); }
-    setTimeout(() => {
-      const el = document.getElementById(`bat-${bid}`);
-      if (el) { el.scrollIntoView({ block: "center" }); el.style.outline = "2px solid var(--accent-blue)"; setTimeout(() => { el.style.outline = ""; }, 2200); }
-    }, 350);
-    return;
-  }
-  if (tipo === "acao") {
-    const a = BUSCA_ACOES.find(x => x.chave === String(valor));
-    if (a) { try { a.ir(); } catch (e) { alert("não foi possível executar a ação"); } }
-    return;
-  }
-  if (tipo === "piloto") {
-    adminIr("a-pilotos");
-    const tr = document.querySelector(`#tabela-pilotos tr[data-piloto="${valor}"]`);
-    if (tr) { tr.scrollIntoView({ block: "center" }); tr.style.outline = "2px solid var(--accent-blue)"; setTimeout(() => { tr.style.outline = ""; }, 2200); }
-  }
-}
-
-// ---------------------------------------------------------------- notificações (sino da topbar)
-let notifPrefs = { decoder_offline: true, ghost_lap: true, fila_upload: true,
-                   recorde: true, navegador: false, som_alerta: true };
-let notifLista = [];
-let _notifAutoTimer = null;
-let _notifListenersOk = false;
-
-async function carregarNotificacoes() {
-  try {
-    const r = await api("notificacoes", "GET");
-    if (r.notificacoes) notifPrefs = r.notificacoes;
-  } catch (e) {}
-  Object.keys(notifPrefs).forEach(k => {
-    const el = document.getElementById("ntf-" + k);
-    if (el) el.checked = !!notifPrefs[k];
-  });
-  // qualquer mudança é salva sozinha (sem precisar clicar em "Salvar")
-  if (!_notifListenersOk) {
-    const sec = document.getElementById("a-notificacoes");
-    if (sec) {
-      sec.addEventListener("change", (e) => {
-        if (e.target && e.target.id && e.target.id.startsWith("ntf-")) {
-          clearTimeout(_notifAutoTimer);
-          _notifAutoTimer = setTimeout(() => salvarNotificacoes(true), 400);
-        }
-      });
-      _notifListenersOk = true;
-    }
-  }
-}
-async function salvarNotificacoes(silencioso) {
-  const vals = {};
-  Object.keys(notifPrefs).forEach(k => {
-    const el = document.getElementById("ntf-" + k);
-    vals[k] = el ? el.checked : notifPrefs[k];
-  });
-  const r = await api("notificacoes", "POST", "", vals);
-  if (r.ok) {
-    notifPrefs = r.notificacoes;
-    if (!silencioso) {
-      logMsg("notificações: preferências salvas", "l-admin", "log-operador");
-      notificar("sistema", "Preferências de notificação salvas.", "🔔");
-    }
-  } else if (!silencioso) alert(r.erro || "erro");
-}
-function pedirPermissaoNotificacoes() {
-  if (!("Notification" in window)) { alert("Este navegador não suporta notificações."); return; }
-  Notification.requestPermission().then(p => {
-    alert(p === "granted" ? "Notificações do navegador autorizadas."
-                          : "Permissão não concedida pelo navegador.");
-  });
-}
-function notificar(tipo, texto, icone) {
-  if (notifPrefs[tipo] === false) return;
-  notifLista.unshift({ tipo, texto, icone: icone || "🔔",
-                       ts: new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) });
-  notifLista = notifLista.slice(0, 30);
-  renderNotificacoes();
-  if (notifPrefs.som_alerta) {
-    try { beepNotificacao(); } catch (e) {}
-  }
-  if (notifPrefs.navegador && "Notification" in window && Notification.permission === "granted") {
-    try { new Notification("KChrono", { body: texto }); } catch (e) {}
-  }
-}
-function renderNotificacoes() {
-  const badge = document.getElementById("notif-badge");
-  if (badge) {
-    if (notifLista.length) { badge.hidden = false; badge.textContent = notifLista.length; }
-    else badge.hidden = true;
-  }
-  const lista = document.getElementById("notif-lista");
-  if (!lista) return;
-  lista.innerHTML = notifLista.length
-    ? notifLista.map(n => `<div class="mini-notif"><span class="ico">${n.icone}</span>
-        <span>${_esc(n.texto)}</span><span class="ts">${n.ts}</span></div>`).join("")
-    : '<div class="drop-vazio">sem notificações</div>';
-}
-async function renderUploadDrop() {
-  const el = document.getElementById("upload-lista");
-  if (!el) return;
-  let s;
-  try { s = await api("sync/status", "GET"); } catch (e) {
-    el.innerHTML = '<div class="drop-vazio">indisponível</div>'; return;
-  }
-  el.innerHTML =
-    `<div class="mini-notif"><span class="ico">📥</span><span>na fila</span><span class="ts">${s.pendentes ?? 0}</span></div>` +
-    `<div class="mini-notif"><span class="ico">✅</span><span>enviados hoje</span><span class="ts">${s.enviados ?? 0}</span></div>` +
-    `<div class="mini-notif"><span class="ico">⚠️</span><span>falhas</span><span class="ts">${s.falhas ?? 0}</span></div>` +
-    `<div class="mini-notif"><span class="ico">🔗</span><span>CTAD</span><span class="ts">` +
-      `${s.configurado ? "conectado " + (s.nivel || "") : "não configurado"}</span></div>`;
-}
 
 // ---------------------------------------------------------------- gerente de pista (Admin)
 let checkinCache = { pilotos: [], presentes: [] };
@@ -3148,6 +3855,10 @@ function aplicarAparencia() {
   const a = carregarAparencia();
   const alpha = 1 - Math.min(80, Math.max(0, Number(a.transparencia) || 0)) / 100;
   document.documentElement.style.setProperty("--card-alpha", alpha.toFixed(2));
+  // Modo desenvolvimento: liga/desliga as etiquetas de identidade dos cards.
+  document.documentElement.classList.toggle("modo-desenvolvimento", !!a.modo_desenvolvimento);
+  // Texto explicativo: mostra ajuda abaixo de cada função/botão (só com modo dev ativo)
+  document.documentElement.classList.toggle("modo-dev-texto", !!a.modo_desenvolvimento && !!a.modo_dev_texto);
   const url = wallpaperAtual(a);
   document.querySelectorAll(".corpo, #operador .conteudo").forEach(el => {
     el.classList.toggle("papel-parede", !!url);
@@ -3161,6 +3872,10 @@ function carregarAparenciaForm() {
   if (range) range.value = t;
   const txt = document.getElementById("cfg-transparencia-txt");
   if (txt) txt.textContent = `${t}%`;
+  const chkDev = document.getElementById("cfg-modo-dev");
+  if (chkDev) chkDev.checked = !!a.modo_desenvolvimento;
+  const chkDevTexto = document.getElementById("cfg-modo-dev-texto");
+  if (chkDevTexto) chkDevTexto.checked = !!a.modo_dev_texto;
   // o campo mostra a URL em uso (a padrão, quando nada foi escolhido)
   const url = document.getElementById("cfg-wallpaper-url");
   if (url) {
@@ -3217,6 +3932,19 @@ function mudarTransparencia(v) {
   salvarAparencia(a); aplicarAparencia();
   const txt = document.getElementById("cfg-transparencia-txt");
   if (txt) txt.textContent = `${t}%`;
+}
+
+function mudarModoDesenvolvimento(ativo) {
+  const a = carregarAparencia();
+  a.modo_desenvolvimento = !!ativo;
+  salvarAparencia(a);
+  aplicarAparencia();
+}
+function mudarModoDesenvolvimentoTexto(ativo) {
+  const a = carregarAparencia();
+  a.modo_dev_texto = !!ativo;
+  salvarAparencia(a);
+  aplicarAparencia();
 }
 
 function mudarIdioma(lang) {
@@ -3303,13 +4031,15 @@ function renderCheckin() {
   const lst = checkinCache.pilotos.filter(p => !q || p.nome.toLowerCase().includes(q));
   el.innerHTML = lst.map(p => {
     const on = checkinCache.presentes.includes(p.id);
+    const tecla = teclaDoPiloto(p.id);
+    const teclaHtml = tecla ? `<span class="ck-atalho">F${tecla}</span>` : '';
     return `<label class="ck-piloto ${on ? "on" : ""}">
       <input type="checkbox" ${on ? "checked" : ""} onchange="toggleCheckin(${p.id}, this.checked)">
-      ${_esc(p.nome)}</label>`;
+      <span class="ck-nome">${_esc(p.nome)}</span>
+      ${teclaHtml}</label>`;
   }).join("") || '<p class="hint">nenhum piloto</p>';
   const n = document.getElementById("op-checkin-n");
   if (n) n.textContent = checkinCache.presentes.length;
-  renderAtalhos();
 }
 async function toggleCheckin(id, presente) {
   const r = await api(`checkin?piloto_id=${id}&presente=${presente}`);
@@ -3379,35 +4109,155 @@ function baixarRelatorio(tipo) {
 
 // ---------------------------------------------------------------- campeonato (plano de etapas)
 let planoCamp = null;
+
+// ---------------------------------------------------------------- durações por tipo de sessão
+// Cada tipo tem dois valores: minutos (critério Tempo) e voltas (critério Voltas).
+// Treino 60 min · Classificação 10 min · Corrida 4 min.
+// Voltas: 20 até a primeira alteração. Campeonato lê o plano do CTAD (C56).
+const DURACOES_KEY = "kchrono_duracoes_sessao";
+const VOLTAS_KEY = "kchrono_voltas_sessao";
+const DURACOES_PADRAO = { treino: 60, classificacao: 10, corrida: 4 };
+const VOLTAS_PADRAO = { treino: 20, classificacao: 20, corrida: 20 };
+const TIPOS_DURACAO = Object.keys(DURACOES_PADRAO);
+const ROTULOS_DURACAO = { treino: "treino", classificacao: "classificação", corrida: "corrida" };
+//: modo atualmente exibido nos campos: "tempo" | "voltas" | "livre"
+let modoDuracaoAplicado = "tempo";
+
+function _carregarMapa(chave, padrao) {
+  let salvo = {};
+  try { salvo = JSON.parse(localStorage.getItem(chave)) || {}; } catch (e) {}
+  const d = {};
+  TIPOS_DURACAO.forEach(t => {
+    const n = Number(salvo[t]);
+    d[t] = Number.isFinite(n) && n >= 0 ? n : padrao[t];
+  });
+  return d;
+}
+function _salvarMapa(chave, d) {
+  try { localStorage.setItem(chave, JSON.stringify(d)); } catch (e) {}
+}
+function carregarDuracoesSessao() { return _carregarMapa(DURACOES_KEY, DURACOES_PADRAO); }
+function carregarVoltasSessao() { return _carregarMapa(VOLTAS_KEY, VOLTAS_PADRAO); }
+
+function _campoDuracao(tipo) {
+  return document.getElementById("cfg-duracao-" + tipo);
+}
+
+function _modoCriterio() {
+  const sel = document.getElementById("cfg-criterio");
+  const v = ((sel && sel.value) || "").toLowerCase();
+  if (v.startsWith("livre")) return "livre";
+  if (v.startsWith("voltas")) return "voltas";
+  return "tempo";
+}
+
+// Preenche os campos com os valores do modo atual (tempo, voltas ou livre).
+// Tempo ↔ Voltas troca unidade, valor, rótulo e o armazenamento usado.
+function _aplicarValoresDuracao() {
+  const modo = _modoCriterio();
+  modoDuracaoAplicado = modo;
+  const vals = modo === "voltas" ? carregarVoltasSessao() : carregarDuracoesSessao();
+  const unidade = modo === "voltas" ? "voltas" : "min";
+  TIPOS_DURACAO.forEach(t => {
+    const el = _campoDuracao(t);
+    if (!el) return;
+    const lbl = document.getElementById("lbl-duracao-" + t);
+    if (modo === "livre") {
+      el.value = 0;
+      el.disabled = true;
+      el.title = "tempo livre: 0 = sem limite (infinito)";
+      if (lbl) lbl.textContent = `Duração ${ROTULOS_DURACAO[t]} (sem limite)`;
+    } else {
+      el.value = vals[t];
+      el.disabled = false;
+      el.title = "0 = sem limite (infinito)";
+      if (lbl) lbl.textContent = `Duração ${ROTULOS_DURACAO[t]} (${unidade})`;
+    }
+  });
+}
+
+function preencherDuracoesSessao() {
+  _aplicarValoresDuracao();
+}
+
+// Grava os campos no armazenamento do modo exibido (tempo ou voltas).
+// No tempo livre nada é gravado: os valores originais ficam preservados.
+function salvarDuracoesSessao() {
+  if (modoDuracaoAplicado !== "tempo" && modoDuracaoAplicado !== "voltas") return;
+  const voltas = modoDuracaoAplicado === "voltas";
+  const d = voltas ? carregarVoltasSessao() : carregarDuracoesSessao();
+  const padrao = voltas ? VOLTAS_PADRAO : DURACOES_PADRAO;
+  TIPOS_DURACAO.forEach(t => {
+    const el = _campoDuracao(t);
+    if (!el || el.disabled) return;
+    let n = parseFloat(el.value);
+    if (!Number.isFinite(n) || n < 0) n = padrao[t];
+    n = voltas ? Math.round(n) : Math.round(n * 100) / 100;
+    el.value = n;
+    d[t] = n;
+  });
+  _salvarMapa(voltas ? VOLTAS_KEY : DURACOES_KEY, d);
+}
+
+function _tipoSessaoAtual() {
+  return (document.getElementById("cfg-tipo") || {}).value || "treino";
+}
+
+// Mostra as durações do tipo escolhido; no Campeonato exibe o resumo do CTAD.
+function atualizarDuracoesVisiveis() {
+  const camp = _tipoSessaoAtual() === "campeonato";
+  TIPOS_DURACAO.forEach(t => {
+    const wrap = document.getElementById("wrap-duracao-" + t);
+    if (wrap) wrap.style.display = camp ? "none" : "";
+  });
+  const wrapCamp = document.getElementById("wrap-duracao-campeonato");
+  if (wrapCamp) wrapCamp.style.display = camp ? "" : "none";
+  if (camp) { carregarPlanoCampeonato(); _renderDuracaoCampeonato(); }
+}
+
+function _renderDuracaoCampeonato() {
+  const el = document.getElementById("cfg-duracao-camp");
+  if (!el) return;
+  if (!planoCamp) { el.textContent = "— (veja C56 · Regras)"; return; }
+  const t = planoCamp.treino_min ?? 10;
+  const c = planoCamp.classificacao_min ?? 10;
+  const r = planoCamp.corrida_min ?? 20;
+  el.textContent = `Treino ${t} · Classificação ${c} · Corrida ${r} (min)`;
+  el.title = "Durações de C56 · Regras vindas do CTAD (Admin → 🏆 Campeonatos)";
+}
+
 function tipoSessaoMudou() {
   const escolha = document.getElementById("cfg-camp-escolha");
-  const tipo = document.getElementById("cfg-tipo").value;
+  const tipo = _tipoSessaoAtual();
   const camp = tipo === "campeonato";
   if (escolha) escolha.style.display = camp ? "block" : "none";
   // o card "Campeonato em andamento" só faz sentido no tipo Campeonato
   const cardCamp = document.getElementById("card-camp-ativo");
   if (cardCamp) cardCamp.style.display = camp ? "block" : "none";
   if (camp) carregarCampeonatosOperador();
-  // Treino livre por padrão: tempo corre pra cima, sem limite.
-  // (Ao sair do treino, volta para "Tempo" se estava em livre.)
+  // Treino tem duração própria (60 min por padrão) e pode ser posto em tempo livre.
+  // Nos demais tipos, "tempo livre" volta para "Tempo" (evita sessão sem limite por engano).
   const crit = document.getElementById("cfg-criterio");
   if (crit && !camp) {
     const livre = crit.value.toLowerCase().startsWith("livre");
-    if (tipo === "treino" && !livre) crit.value = "livre";
-    else if (tipo !== "treino" && livre) crit.value = "Tempo";
+    if (tipo !== "treino" && livre) crit.value = "Tempo";
   }
+  atualizarDuracoesVisiveis();
   criterioMudou();
   atualizarBotaoPrincipal();
 }
 
-// "Tempo livre" não usa duração (sem limite): desabilita o campo.
+// Troca os campos entre minutos e voltas. Antes de trocar, grava o que estava
+// sendo editado no modo antigo; depois carrega os valores do novo modo.
+// Tempo livre = 0 (sem limite) e não grava nada.
 function criterioMudou() {
-  const sel = document.getElementById("cfg-criterio");
-  const dur = document.getElementById("cfg-duracao");
-  if (!sel || !dur) return;
-  const livre = sel.value.toLowerCase().startsWith("livre");
-  dur.disabled = livre;
-  dur.title = livre ? "tempo livre: sem limite de duração" : "";
+  if (!document.getElementById("cfg-criterio")) return;
+  const novoModo = _modoCriterio();
+  if (novoModo !== modoDuracaoAplicado &&
+      (modoDuracaoAplicado === "tempo" || modoDuracaoAplicado === "voltas")) {
+    salvarDuracoesSessao();
+  }
+  _aplicarValoresDuracao();
 }
 
 // ---------------------------------------------------------------- escolha do campeonato (painel do operador)
@@ -3478,23 +4328,44 @@ let sessaoPausada = false;
 const ROTULO_ACAO = {
   treino: "▶ Iniciar treino",
   classificacao: "▶ Iniciar classificação",
-  corrida: "▶ Preparar para Largada!",
+  corrida: "▶ Preparar para a Largada",
 };
 function atualizarBotaoPrincipal() {
   const btn = document.getElementById("btn-acao-principal");
   if (!btn) return;
   const tipo = (document.getElementById("cfg-tipo") || {}).value || "treino";
-  if (tipo === "campeonato") { btn.style.display = "none"; return; }  // tem botões próprios no plano
+  if (tipo === "campeonato") { btn.style.display = "none"; btn.classList.remove("btn-regressiva-piscar"); btn.classList.remove("btn-largada-amarelo"); btn.classList.remove("btn-preparar-piscar"); return; }  // tem botões próprios no plano
   btn.style.display = "";
   if (sessaoAtiva && estadoSessao === "largada") {
-    btn.disabled = false;
-    btn.textContent = "▶ Largada";
+    // Durante a corrida (estado LARGADA/CORRENDO): botão transparente (sem interação visual)
+    btn.disabled = true;
+    btn.textContent = "Preparar para a Largada";
+    btn.style.opacity = "0.5";
+    btn.classList.remove("btn-regressiva-piscar");
+    btn.classList.remove("btn-largada-amarelo");
+    btn.classList.remove("btn-preparar-piscar");
   } else if (sessaoAtiva) {
+    // Sessão em andamento (treino/classificação/correndo): botão desabilitado visível
     btn.disabled = true;
     btn.textContent = "● Em andamento";
+    btn.style.opacity = "0.7";
+    btn.classList.remove("btn-regressiva-piscar");
+    btn.classList.remove("btn-largada-amarelo");
+    btn.classList.remove("btn-preparar-piscar");
   } else {
+    // Aguardando o operador clicar: botão azul FIXO, sem piscar
     btn.disabled = false;
     btn.textContent = ROTULO_ACAO[tipo] || "▶ Iniciar";
+    btn.style.opacity = "1";
+    btn.classList.remove("btn-regressiva-piscar");
+    btn.classList.remove("btn-largada-amarelo");
+    if (tipo === "corrida") {
+      // Modo corrida: azul fixo com texto "Preparar para a Largada"
+      btn.classList.remove("btn-preparar-piscar");
+    } else {
+      // Treino/classificação: texto padrão (▶ Iniciar treino / ▶ Iniciar classificação)
+      btn.classList.add("btn-preparar-piscar");  // pisca em AMARELO enquanto aguarda o clique
+    }
   }
 }
 function acaoPrincipal() {
@@ -3510,6 +4381,7 @@ async function carregarPlanoCampeonato() {
   const np = document.getElementById("camp-num-provas");
   if (np) np.value = r.numero_provas || 1;
   renderPlanoCampeonato();
+  _renderDuracaoCampeonato();
 }
 async function remontarPlanoCampeonato() {
   const n = parseInt((document.getElementById("camp-num-provas") || {}).value, 10) || 1;
@@ -3568,6 +4440,7 @@ function renderPlanoCampeonato() {
     cards.forEach((c, i) => c.classList.toggle("atual", i === ultimoEstadoCamp.indice));
   }
   atualizarTotalCamp();
+  _renderDuracaoCampeonato();
 }
 function lerPlanoCampeonato() {
   return (planoCamp && planoCamp.etapas) || [];
@@ -3749,6 +4622,7 @@ function fecharDialogoAtualizacao() {
   const modal = document.getElementById("modal-atualizacao");
   if (modal) modal.style.display = "none";
 }
+
 async function atualizarAgoraPeloDialogo() {
   const status = document.getElementById("upd-dlg-status");
   if (status) status.textContent = "baixando e preparando a atualização…";
@@ -3817,10 +4691,10 @@ async function configurarSync() {
   const pista = document.getElementById("sync-pista").value.trim() || "krathus";
   if (!email || !senha) { atualizarSyncTexto("informe e-mail e senha", "var(--accent-gold)"); return; }
   atualizarSyncTexto("conectando…", "var(--accent-blue)");
-  const r = await api(`sync/configurar?email=${encodeURIComponent(email)}&password=${encodeURIComponent(senha)}&pista_id=${encodeURIComponent(pista)}`);
+  const r = await api("sync/configurar", "POST", "", {email, password: senha, pista_id: pista});
   if (r.ok) {
-    atualizarSyncTexto(`conectado (${r.nivel})`, "var(--accent-green)");
-    document.getElementById("sync-nivel").textContent = r.nivel;
+    atualizarSyncTexto(`conectado${r.nivel ? ` (${r.nivel})` : ""}`, "var(--accent-green)");
+    document.getElementById("sync-nivel").textContent = r.nivel ?? "—";
     logMsg(`sync: conectado ao CTAD como ${r.nivel}`, "l-admin", "log-operador");
   } else {
     // credenciais ficam salvas mesmo com o teste falhando (rede/login)
@@ -3876,15 +4750,24 @@ async function atualizarSync() {
   set("up-fila", s.pendentes ?? 0);
   set("up-enviados", s.enviados ?? 0);
   set("up-falhas", s.falhas ?? 0);
-  const rodape = document.getElementById("rodape-sync");
-  if (rodape) {
-    rodape.textContent = s.configurado
-      ? `CTAD: conectado (${s.nivel || "?"}) · ${s.pendentes ?? 0} na fila`
-      : "CTAD: não configurado";
-    rodape.style.color = s.configurado ? "var(--accent-green)" : "var(--text-muted)";
+  // menu lateral: estado da conexão com o CTAD (nível + fila)
+  const ctadLed = document.getElementById("side-ctad-led");
+  if (ctadLed) ctadLed.classList.toggle("on", !!s.configurado);
+  const ctadNome = document.getElementById("side-ctad-nome");
+  if (ctadNome) {
+    ctadNome.textContent = s.configurado
+      ? `CTAD: conectado${s.nivel ? ` (${s.nivel})` : ""}` : "CTAD: não configurado";
+    ctadNome.style.color = s.configurado ? "var(--accent-green)" : "var(--text-muted)";
   }
-  if (!document.getElementById("sync-status-text").textContent.startsWith("conectado")) {
-    atualizarSyncTexto(s.configurado ? `conectado (${s.nivel})` : "não configurado",
+  const ctadSub = document.getElementById("side-ctad-sub");
+  if (ctadSub) {
+    ctadSub.textContent = s.configurado
+      ? `${s.pendentes ?? 0} na fila · ${s.enviados ?? 0} enviados`
+      : "sem conta configurada";
+  }
+  const sst = document.getElementById("sync-status-text");
+  if (sst && !sst.textContent.startsWith("conectado")) {
+    atualizarSyncTexto(s.configurado ? `conectado${s.nivel ? ` (${s.nivel})` : ""}` : "não configurado",
       s.configurado ? "var(--accent-green)" : "var(--text-muted)");
   }
 }
@@ -3905,12 +4788,198 @@ function previewNome() {
   document.getElementById("tpl-preview").textContent = nome + ".json";
 }
 
-// init — abre direto no painel completo do operador, com o menu sempre visível
+// Etiquetas de identidade ÚNICAS em todos os cards do dashboard.
+// Cada card recebe um código estável (C01, C02, ...) exibido no canto superior
+// direito e gravado em data-card-id, permitindo direcionar comandos a um card
+// específico sem ambiguidade, mesmo quando dois cards têm o mesmo título.
+const _cardsIdentidade = new Map();        // código -> elemento
+const _cardsPorElemento = new WeakMap();   // elemento -> código
+let _seqCardIdentidade = 0;
+
+function _nomeCard(card) {
+  let nome = "";
+  const h = card.querySelector("h3, h4, .admin-secao-tit");
+  if (h) nome = h.textContent || "";
+
+  // Cards sem título interno herdam o rótulo imediatamente acima
+  // (ex.: #som-frases, precedido de .admin-secao-tit).
+  if (!nome.trim()) {
+    const prev = card.previousElementSibling;
+    if (prev && prev.classList.contains("admin-secao-tit")) nome = prev.textContent || "";
+  }
+
+  // Último recurso: nome da aba (menu lateral) a que o card pertence.
+  if (!nome.trim()) {
+    const sec = card.closest(".admin-sec");
+    const link = sec
+      ? document.querySelector(`.menu nav a[onclick*="'${sec.id}'"]`)
+      : null;
+    if (link) nome = link.textContent || "";
+  }
+
+  if (!nome.trim()) nome = card.id || "Card";
+
+  return nome
+    .replace(/\s+/g, " ")
+    .replace(/\(\s*\d+[^)]*\)/g, "")   // remove contadores dinâmicos: "(5)", "(0 marcados)"
+    .trim()
+    .slice(0, 30) || "Card";
+}
+
+function _proximoCodigoCard() {
+  let codigo;
+  do {
+    _seqCardIdentidade += 1;
+    codigo = "C" + String(_seqCardIdentidade).padStart(2, "0");
+  } while (_cardsIdentidade.has(codigo));
+  return codigo;
+}
+
+function _copiarTexto(texto) {
+  // 1) Cópia síncrona dentro do gesto do usuário — funciona também no
+  //    WebView2/pywebview, onde a Clipboard API pode exigir permissão.
+  try {
+    const ta = document.createElement("textarea");
+    ta.value = texto;
+    ta.setAttribute("readonly", "");
+    ta.style.position = "fixed";
+    ta.style.top = "-1000px";
+    ta.style.opacity = "0";
+    document.body.appendChild(ta);
+    ta.select();
+    ta.setSelectionRange(0, texto.length);
+    const ok = document.execCommand("copy");
+    ta.remove();
+    if (ok) return Promise.resolve(true);
+  } catch (e) { /* tenta a Clipboard API abaixo */ }
+
+  // 2) Clipboard API (assíncrona) como alternativa.
+  try {
+    if (navigator.clipboard && window.isSecureContext) {
+      return navigator.clipboard.writeText(texto).then(() => true).catch(() => false);
+    }
+  } catch (e) { /* sem clipboard */ }
+  return Promise.resolve(false);
+}
+
+function _toastCopiaEtiqueta(texto, ok) {
+  let el = document.getElementById("toast-copia-etiqueta");
+  if (!el) {
+    el = document.createElement("div");
+    el.id = "toast-copia-etiqueta";
+    document.body.appendChild(el);
+  }
+  el.textContent = ok ? `Etiqueta copiada: ${texto}` : `Não foi possível copiar: ${texto}`;
+  el.classList.toggle("erro", !ok);
+  el.classList.add("on");
+  clearTimeout(el._timer);
+  el._timer = setTimeout(() => el.classList.remove("on"), 1800);
+}
+
+function _etiquetaDoCard(card) {
+  // :scope > para não confundir com a etiqueta de um card aninhado
+  let tag = card.querySelector(":scope > .card-etiqueta");
+
+  // Versões antigas criavam um <span> sem clique: converte para botão.
+  if (tag && tag.tagName !== "BUTTON") { tag.remove(); tag = null; }
+
+  if (!tag) {
+    tag = document.createElement("button");
+    tag.type = "button";
+    tag.className = "card-etiqueta";
+    tag.addEventListener("click", ev => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      const texto = card.dataset.cardEtiqueta || tag.textContent || "";
+      if (!texto) return;
+      _copiarTexto(texto).then(ok => {
+        _toastCopiaEtiqueta(texto, ok);
+        clearTimeout(tag._timerCopiado);
+        tag.textContent = ok ? "✓ copiado" : "✗ não copiou";
+        tag.classList.toggle("copiado", ok);
+        tag._timerCopiado = setTimeout(() => {
+          tag._timerCopiado = null;
+          tag.textContent = card.dataset.cardEtiqueta || texto;
+          tag.classList.remove("copiado");
+        }, 1200);
+      });
+    });
+    card.appendChild(tag);
+  }
+  return tag;
+}
+
+function adicionarEtiquetasCards() {
+  document.querySelectorAll(".card").forEach(card => {
+    let codigo = _cardsPorElemento.get(card);
+    if (!codigo) {
+      codigo = _proximoCodigoCard();
+      _cardsPorElemento.set(card, codigo);
+    }
+
+    _cardsIdentidade.set(codigo, card);
+    const nome = _nomeCard(card);
+    card.classList.add("card-identidade");
+    card.dataset.cardId = codigo;
+    card.dataset.cardEtiqueta = `${codigo} · ${nome}`;
+    card.title = `Card ${codigo} — ${nome}`;
+
+    const tag = _etiquetaDoCard(card);
+    if (!tag._timerCopiado) tag.textContent = card.dataset.cardEtiqueta;
+    tag.title = `Clique para copiar: ${card.dataset.cardEtiqueta}`;
+  });
+}
+
+// Registro público para localizar qualquer card pelo código exibido.
+window.kchronoCards = () =>
+  Array.from(_cardsIdentidade, ([id, el]) => ({ id, nome: el.dataset.cardEtiqueta }));
+window.kchronoCard = id => _cardsIdentidade.get(String(id).toUpperCase()) || null;
+
+setTimeout(adicionarEtiquetasCards, 500);
+
+// Cards criados dinamicamente (auditoria, baterias, listas) também recebem etiqueta.
+let _obsCardsTimer = null;
+const _obsCards = new MutationObserver(muts => {
+  let precisa = false;
+  for (const m of muts) {
+    if (m.type !== "childList") continue;
+
+    // Card novo (ou card dentro do nó inserido)
+    for (const node of m.addedNodes) {
+      if (node.nodeType !== 1) continue;
+      if (node.classList?.contains("card") || node.querySelector?.(".card")) {
+        precisa = true;
+        break;
+      }
+    }
+    if (precisa) break;
+
+    // Conteúdo de um card foi substituído (innerHTML): a etiqueta pode ter sumido
+    const alvo = m.target instanceof Element ? m.target.closest(".card") : null;
+    if (alvo && !alvo.querySelector(":scope > .card-etiqueta")) {
+      precisa = true;
+      break;
+    }
+  }
+  if (precisa) {
+    clearTimeout(_obsCardsTimer);
+    _obsCardsTimer = setTimeout(adicionarEtiquetasCards, 120);
+  }
+});
+function _observarCards() {
+  if (document.body) _obsCards.observe(document.body, { childList: true, subtree: true });
+  else setTimeout(_observarCards, 100);
+}
+_observarCards();
+
+// init - abre direto no painel completo do operador, com o menu sempre visível
 previewNome();
 aplicarAparencia();
 carregarIdioma();
 atualizarBotaoPrincipal();
-tipoSessaoMudou();   // treino começa em "Tempo livre" (conta pra cima, sem limite)
+preencherDuracoesSessao(); // durações por tipo (Treino 60 · Classificação 10 · Corrida 4)
+tipoSessaoMudou();         // aplica a duração do tipo escolhido
+carregarPlanoCampeonato(); // durações do CTAD usadas pelo tipo Campeonato
 atualizarBotaoPausa();
 carregarAutoConectar();
 carregarVozContagem();
@@ -3925,9 +4994,9 @@ setInterval(sincronizarBotaoTelao, 2000);   // + ESC dentro do telão atualiza o
 conectarWS();
 carregarCheckin();   // painel do operador: checkboxes de quem está na pista
 carregarAtalhosAssociados();   // F1..F12: associação manual (se houver)
-carregarNotificacoes();
 mostrar("operador");
 gerarQRSessao();
+restaurarProgresso();
 
 // ================================================================
 // EDITOR DE TRAÇADO DE PISTA (Admin → Pista & Traçado)

@@ -77,6 +77,12 @@ class EstadoApp:
         self.inicio_sessao_us: Optional[int] = None
         #: cronômetro da sessão: tempo congelado ao finalizar + pausas acumuladas
         self._tempo_final_s: Optional[float] = None
+        #: carência "Tempo para terminar": estado da graça pós-expiração da duração
+        self._grace_ativo: bool = False
+        self._grace_anunciado_esgotado: bool = False
+        self._grace_pilotos_pendentes: set = set()
+        self._grace_finalizados: set = set()
+        self._grace_todos_anunciado: bool = False
         self._pausa_inicio_us: Optional[int] = None
         self._pausado_total_us: int = 0
         #: regressiva de intervalo (campeonato): {"dur_s", "rotulo", "indice"}
@@ -200,7 +206,11 @@ class EstadoApp:
     def _on_rejeicao(self, transponder: int, tempo_us: int, passing_number):
         """Callback de ghost lap — registra e publica para a interface."""
         self.contadores["ghost_laps"] += 1
-        self.publicar("ghost_lap", {"transponder": transponder})
+        info = self._resolver_transponder(transponder)
+        piloto_id = info[0] if info else None
+        nome = info[1] if info else None
+        self.publicar("ghost_lap", {"transponder": transponder,
+                                    "piloto_id": piloto_id, "nome": nome})
         self.som.ghost_lap()
         log.info("ghost lap rejeitado: transponder %s, delta %.3fs < tempo mínimo",
                  transponder, tempo_us / 1e6)
@@ -617,6 +627,7 @@ class EstadoApp:
             self.publicar("classificacao", {"linhas": self._classificacao()})
             self.publicar("voltas", self.dados_voltas())
             self._anunciar_volta(volta)
+            self._processar_volta_grace(volta.piloto_id)
 
     def _som_passagem(self, passing=None, piloto_id=None):
         """Bip a cada passagem; o líder da sessão tem um bip especial.
@@ -710,19 +721,36 @@ class EstadoApp:
         """Voltas volta a volta da sessão atual (para gráficos e Volta-a-volta)."""
         por: Dict[int, Dict] = {}
 
+        def _info_piloto(pid):
+            # Tenta pegar da classificação atual (mais completo)
+            if self.motor:
+                for l in self.motor.classificacao():
+                    if l.piloto_id == pid:
+                        return {"nome": l.nome, "numero": l.numero, "abreviado": l.abreviado}
+            # Fallback para o nome simples
+            return {"nome": self._piloto_nome(pid), "numero": None, "abreviado": None}
+
         # 1) base do banco persistido
         if self.sessao_id and self.banco:
             try:
                 voltas = self.banco.voltas_da_sessao(self.sessao_id)
                 for v in voltas:
-                    item = por.setdefault(v.piloto_id, {
-                        "piloto_id": v.piloto_id,
-                        "nome": self._piloto_nome(v.piloto_id),
-                        "voltas": []})
-                    item["voltas"].append({
+                    if v.piloto_id not in por:
+                        info = _info_piloto(v.piloto_id)
+                        por[v.piloto_id] = {
+                            "piloto_id": v.piloto_id,
+                            "nome": info["nome"],
+                            "numero": info["numero"],
+                            "abreviado": info["abreviado"],
+                            "voltas": []
+                        }
+
+                    por[v.piloto_id]["voltas"].append({
                         "numero": v.numero,
                         "tempo": round(v.tempo_us / 1e6, 3),
-                        "melhor": bool(v.melhor)})
+                        "melhor": bool(v.melhor),
+                        "recorde": self._recorde_pista_us is not None and v.tempo_us <= self._recorde_pista_us
+                    })
             except Exception:
                 pass
 
@@ -731,12 +759,17 @@ class EstadoApp:
             try:
                 for pid, estado in getattr(self.motor, "_pilotos", {}).items():
                     pid_int = int(pid)
-                    nome = self._piloto_nome(pid_int) or getattr(estado, "nome", "")
-                    item = por.setdefault(pid_int, {
-                        "piloto_id": pid_int,
-                        "nome": nome,
-                        "voltas": []})
+                    if pid_int not in por:
+                        info = _info_piloto(pid_int)
+                        por[pid_int] = {
+                            "piloto_id": pid_int,
+                            "nome": info["nome"],
+                            "numero": info["numero"],
+                            "abreviado": info["abreviado"],
+                            "voltas": []
+                        }
 
+                    item = por[pid_int]
                     mem_voltas = getattr(estado, "voltas", [])
                     # melhor volta para marcar 'melhor'
                     melhor_us = min((getattr(v, "tempo_us", float("inf")) for v in mem_voltas), default=None)
@@ -745,10 +778,12 @@ class EstadoApp:
                         n = getattr(v, "numero", 0)
                         if n in existentes:
                             continue
+                        t_us = getattr(v, "tempo_us", 0)
                         item["voltas"].append({
                             "numero": n,
-                            "tempo": round(getattr(v, "tempo_us", 0) / 1e6, 3),
-                            "melhor": melhor_us is not None and getattr(v, "tempo_us", 0) == melhor_us
+                            "tempo": round(t_us / 1e6, 3),
+                            "melhor": melhor_us is not None and t_us == melhor_us,
+                            "recorde": self._recorde_pista_us is not None and t_us <= self._recorde_pista_us
                         })
                     item["voltas"].sort(key=lambda x: x["numero"])
             except Exception:
@@ -760,9 +795,12 @@ class EstadoApp:
                 for pid in getattr(self.motor, "_pilotos", {}):
                     pid_int = int(pid)
                     if pid_int not in por:
+                        info = _info_piloto(pid_int)
                         por[pid_int] = {
                             "piloto_id": pid_int,
-                            "nome": self._piloto_nome(pid_int) or getattr(self.motor._pilotos[pid], "nome", ""),
+                            "nome": info["nome"],
+                            "numero": info["numero"],
+                            "abreviado": info["abreviado"],
                             "voltas": []
                         }
             except Exception:
@@ -867,6 +905,11 @@ class EstadoApp:
         # (treino/classificação/corrida) — a largada só redefine na corrida.
         self.inicio_sessao_us = agora_monotonic_us()
         self._tempo_final_s = None
+        self._grace_ativo = False
+        self._grace_anunciado_esgotado = False
+        self._grace_pilotos_pendentes = set()
+        self._grace_finalizados = set()
+        self._grace_todos_anunciado = False
         self._pausa_inicio_us = None
         self._pausado_total_us = 0
         self.pausado = False
@@ -939,9 +982,12 @@ class EstadoApp:
                     "pausada": self.pausado,
                     "tempo_s": self.tempo_sessao_s(),
                     "restante_s": self.restante_sessao_s(),
+                    "grace": bool(self._grace_ativo),
                 }, registrar=False)
         except asyncio.CancelledError:
             pass
+        except Exception as e:
+            log.warning("loop tick sessão encerrado: %s", e)
         except Exception as e:
             log.debug("tick da sessão encerrado: %s", e)
 
@@ -1041,7 +1087,7 @@ class EstadoApp:
                                      "simulacao": self.sessao_simulacao,
                                      "tempo_s": self.tempo_sessao_s(),
                                      "restante_s": self.restante_sessao_s(),
-                                     "pausada": False})
+                                     "pausada": False, "grace": False})
             return True
         except RuntimeError:
             return False
@@ -1130,6 +1176,138 @@ class EstadoApp:
         crit = str(self.parametros.get("criterio") or "").strip().lower()
         return crit.startswith("tempo")
 
+    def _publicar_sessao_grace(self):
+        """Publica um evento 'sessao' com restante_s = carência restante."""
+        try:
+            dur_min = float(self.parametros.get("duracao") or 0)
+        except (TypeError, ValueError):
+            dur_min = 0
+        dur_total = dur_min * 60.0
+        tempo_extra = float(self.tempo_terminar_s())
+        decorrido = self._tempo_real_s() or dur_total
+        restante = max(0.0, dur_total + tempo_extra - decorrido)
+        estado = self.motor.estado.value if self.motor else "correndo"
+        self.publicar("sessao", {
+            "id": self.sessao_id,
+            "estado": estado,
+            "tipo": self.motor.tipo.value if self.motor and self.motor.tipo else None,
+            "simulacao": self.sessao_simulacao,
+            "pausada": bool(self.pausado),
+            "tempo_s": dur_total,
+            "restante_s": restante,
+            "grace": True,
+        }, registrar=False)
+
+    def _iniciar_grace(self):
+        """Inicia a carência (Tempo para terminar): anuncia tempo esgotado,
+        congela o cronômetro da prova em dur_total e abre a janela de finalização."""
+        if self._grace_ativo:
+            return
+        self._grace_ativo = True
+        self._grace_anunciado_esgotado = True
+        self._grace_finalizados = set()
+        self._grace_todos_anunciado = False
+        # congela o tempo da prova no instante da expiração (não conta a carência)
+        try:
+            dur_min = float(self.parametros.get("duracao") or 0)
+        except (TypeError, ValueError):
+            dur_min = 0
+        dur_total = dur_min * 60.0
+        if dur_total > 0 and self._tempo_final_s is None:
+            self._tempo_final_s = dur_total
+        if self.motor is not None:
+            try:
+                self._grace_pilotos_pendentes = set(int(pid) for pid in self.motor._pilotos.keys())
+            except Exception:
+                self._grace_pilotos_pendentes = set()
+        else:
+            self._grace_pilotos_pendentes = set()
+        try:
+            tempo_extra = float(self.tempo_terminar_s())
+            self.som.falar("tempo_esgotado", n=int(tempo_extra))
+        except Exception:
+            pass
+        self.publicar("admin", {"msg": "tempo esgotado — aguardando voltas finais"})
+        # publica sessão para o telão/operador trocarem o relógio para a carência
+        self._publicar_sessao_grace()
+
+    def _tempo_real_s(self) -> Optional[float]:
+        """Tempo real decorrido da sessão (ignora congelamento), para a carência."""
+        if not self.inicio_sessao_us:
+            return None
+        fim = self._pausa_inicio_us if self.pausado and self._pausa_inicio_us else agora_monotonic_us()
+        return max(0.0, (fim - self.inicio_sessao_us - self._pausado_total_us) / 1e6)
+        """Publica um evento 'sessao' com restante_s = carência restante, para
+        o telão/operador trocarem o relógio para a contagem da carência."""
+        try:
+            dur_min = float(self.parametros.get("duracao") or 0)
+        except (TypeError, ValueError):
+            dur_min = 0
+        dur_total = dur_min * 60.0
+        tempo_extra = float(self.tempo_terminar_s())
+        decorrido = self.tempo_sessao_s() or dur_total
+        restante = max(0.0, dur_total + tempo_extra - decorrido)
+        estado = self.motor.estado.value if self.motor else "correndo"
+        self.publicar("sessao", {
+            "id": self.sessao_id,
+            "estado": estado,
+            "tempo_s": dur_total,
+            "pausada": bool(self.pausado),
+            "restante_s": restante,
+        })
+
+    def _processar_volta_grace(self, piloto_id: int):
+        """Chamado quando um piloto conclui uma volta durante a carência:
+        anuncia o piloto e, se todos concluíram, anuncia o fim."""
+        # ativa a carência sob demanda (caso a volta chegue antes do 1º poll)
+        if not self._grace_ativo and self.criterio_por_tempo():
+            try:
+                dur_min = float(self.parametros.get("duracao") or 0)
+            except (TypeError, ValueError):
+                dur_min = 0
+            if dur_min > 0:
+                decorrido = self.tempo_sessao_s()
+                if decorrido is not None and decorrido > dur_min * 60.0:
+                    self._iniciar_grace()
+        if not self._grace_ativo:
+            return
+        if piloto_id is None:
+            return
+        pid = int(piloto_id)
+        if pid not in self._grace_pilotos_pendentes:
+            return
+        if pid in self._grace_finalizados:
+            return
+        self._grace_finalizados.add(pid)
+        nome = self._nome_falado(pid)
+        try:
+            self.som.falar("piloto_finalizou", nome=nome)
+        except Exception:
+            pass
+        self._publicar_sessao_grace()
+        # se todos os pendentes concluíram, anuncia o fim e finaliza
+        if (self._grace_pilotos_pendentes and
+                self._grace_finalizados >= self._grace_pilotos_pendentes):
+            self._anunciar_todos_finalizados()
+
+    def _anunciar_todos_finalizados(self):
+        if self._grace_todos_anunciado:
+            return
+        self._grace_todos_anunciado = True
+        # toca o bip de finalização primeiro
+        try:
+            self.som.bip_finalizacao()
+        except Exception:
+            pass
+        try:
+            self.som.falar("todos_finalizaram")
+        except Exception:
+            pass
+        # anuncia a qualificação (se habilitada) — finalizar() fala a frase final + posições
+        if self.motor is not None and getattr(self.motor, "estado", None) is not None \
+                and str(self.motor.estado.value) != "finalizado":
+            self.finalizar(tocar_beep=False)
+
     def restante_sessao_s(self) -> Optional[float]:
         """Regressiva do cronômetro da sessão (None quando o relógio conta pra cima).
 
@@ -1141,7 +1319,10 @@ class EstadoApp:
         """
         if self._regressiva:
             return self.restante_intervalo_s()
-        if not self.criterio_por_tempo() or self._tempo_final_s is not None:
+        # sessão finalizada: sem regressiva
+        if self.motor is None or (self.motor is not None and str(self.motor.estado.value) == "finalizado"):
+            return None
+        if not self.criterio_por_tempo():
             return None
         try:
             dur_min = float(self.parametros.get("duracao") or 0)
@@ -1149,23 +1330,28 @@ class EstadoApp:
             return None
         if dur_min <= 0:
             return None
-        decorrido = self.tempo_sessao_s()
+        decorrido = self._tempo_real_s()
         if decorrido is None:
             return None
         dur_total = dur_min * 60.0
         tempo_extra = float(self.tempo_terminar_s())
-        # Se já expirou a duração principal, aguarda o tempo extra para finalizar
-        if decorrido > dur_total:
-            # se ainda está dentro do tempo extra, devolve o que falta do extra
-            if decorrido < dur_total + tempo_extra:
-                return max(0.0, dur_total + tempo_extra - decorrido)
-            # tempo extra acabou → finaliza automaticamente
-            if not self.pausado and self._tempo_final_s is None:
-                log.info("tempo de terminar expirado; finalizando sessão automaticamente")
-                self.finalizar()
-                return 0.0
+        # duração principal ainda não expirou
+        if decorrido < dur_total:
+            return max(0.0, dur_total - decorrido)
+        # carência: duração expirou, aguarda tempo_extra para concluir voltas
+        if not self._grace_ativo:
+            self._iniciar_grace()
+        if decorrido < dur_total + tempo_extra:
+            return max(0.0, dur_total + tempo_extra - decorrido)
+        # tempo extra acabou → anuncia (se ainda não) e finaliza
+        if not self._grace_todos_anunciado:
+            self._anunciar_todos_finalizados()
+        if not self.pausado and self.motor is not None \
+                and str(self.motor.estado.value) != "finalizado":
+            log.info("tempo de terminar expirado; finalizando sessão automaticamente")
+            self.finalizar()
             return 0.0
-        return max(0.0, dur_total - decorrido)
+        return 0.0
 
     def _cancelar_regressiva(self):
         self._regressiva = None
@@ -1383,13 +1569,16 @@ class EstadoApp:
         except asyncio.CancelledError:
             pass
 
-    def finalizar(self) -> bool:
+    def finalizar(self, tocar_beep: bool = True) -> bool:
         if not self.motor:
             return False
         # 1) congela o cronômetro ANTES de tudo: o evento de fim já sai com o
         #    tempo final e nenhum tick posterior volta a avançar o relógio.
         if self._tempo_final_s is None:
             self._tempo_final_s = self.tempo_sessao_s()
+        # encerra a carência (se ativa) sem reanunciar
+        self._grace_ativo = False
+        self._grace_todos_anunciado = True
         # marca o motor como finalizado SEM tocar o banco (persistência vai
         # para a thread de fundo, para não atrasar o envio do fim de prova)
         from nucleo.modelos import EstadoSessao as _ES
@@ -1448,6 +1637,7 @@ class EstadoApp:
                 grid_ordenado=grid_ordenado,
                 grid_invertido=inverter_grid,
                 resultados=resultados,
+                tocar_beep=tocar_beep,
             )
         except Exception as e:
             log.warning("anúncio de fim de sessão falhou: %s", e)
@@ -1632,6 +1822,7 @@ class EstadoApp:
             self.publicar("admin", {"msg": "volta adicionada manualmente"})
             self.publicar("classificacao", {"linhas": self._classificacao()})
             self.publicar("voltas", self.dados_voltas())
+            self._processar_volta_grace(piloto_id)
         return ok
 
     # ----- volta por atalho F1..F12 -----
@@ -1668,6 +1859,7 @@ class EstadoApp:
         self.publicar("classificacao", {"linhas": self._classificacao()})
         self.publicar("voltas", self.dados_voltas())
         self._anunciar_volta(volta)
+        self._processar_volta_grace(piloto_id)
         return {"ok": True, "tempo_s": float(volta.tempo_s), "tempo": formatar(volta.tempo_us),
                 "piloto_id": piloto_id}
 
@@ -1694,6 +1886,9 @@ class EstadoApp:
             except Exception:
                 continue
         self.atalhos_teclas = m
+        # o número do piloto passa a ser o número do F atribuído (F1..F12)
+        for pid in set(m.values()):
+            self._sincronizar_numero_atalho(pid)
         cfg = dict(self.config)
         cfg["atalhos_teclas"] = m
         self.config = cfg
@@ -2094,6 +2289,7 @@ class EstadoApp:
             saida.append({"id": p["id"], "nome": p["nome"], "apelido": p["apelido"],
                           "fonia": p["fonia"] or "", "ativo": bool(p["ativo"]),
                           "telefone": p["telefone"] or "", "funcoes": funcoes,
+                          "numero": p["numero"] if p["numero"] else None,
                           "transponders": sorted(trad)})
         return saida
 
@@ -2105,25 +2301,77 @@ class EstadoApp:
             raise ValueError("telefone já cadastrado para outro piloto")
         return telefone
 
+    def _numero_por_atalho(self, piloto_id: Optional[int]) -> Optional[int]:
+        """Número F (1..12) associado ao piloto via atalhos de tecla, se houver."""
+        if piloto_id is None:
+            return None
+        try:
+            for k, v in (self.atalhos_teclas or {}).items():
+                if int(v) == int(piloto_id):
+                    n = int(k)
+                    if 1 <= n <= 12:
+                        return n
+        except Exception:
+            pass
+        return None
+
+    def _sincronizar_numero_atalho(self, piloto_id: int) -> None:
+        """Se o piloto tem atalho F<n>, garante que o número dele seja n."""
+        n = self._numero_por_atalho(piloto_id)
+        if n is None:
+            return
+        try:
+            p = self.banco.buscar_piloto(piloto_id)
+            if p:
+                self.banco.atualizar_piloto(
+                    piloto_id, p.nome, p.apelido or "",
+                    p.fonia or "", bool(p.ativo),
+                    p.telefone or "", p.funcoes or "", n)
+        except Exception:
+            pass
+
+    def _proximo_numero_piloto(self, ignorar_id: Optional[int] = None) -> int:
+        """Próximo número livre para piloto (menor inteiro positivo não usado)."""
+        try:
+            usados = set()
+            for p in self.banco.pilotos_detalhado():
+                if ignorar_id is not None and p["id"] == ignorar_id:
+                    continue
+                n = p["numero"]
+                if n:
+                    usados.add(int(n))
+            n = 1
+            while n in usados:
+                n += 1
+            return n
+        except Exception:
+            return 1
+
     def criar_piloto(self, nome: str, apelido: str = "", fonia: str = "",
-                     transponders=None, telefone: str = "", funcoes=None) -> Dict:
+                     transponders=None, telefone: str = "", funcoes=None,
+                     numero: Optional[int] = None) -> Dict:
         nome = (nome or "").strip()
         if not nome:
             raise ValueError("informe o nome do piloto")
         tel = self._validar_telefone(telefone)
         funcs = self._parse_funcoes(funcoes)
+        if not numero:
+            numero = self._proximo_numero_piloto()
         pid = self.banco.criar_piloto(nome, (apelido or "").strip(),
-                                      (fonia or "").strip(), tel, funcs)
+                                      (fonia or "").strip(), tel, funcs, numero)
+        self._sincronizar_numero_atalho(pid)
         codigos = self._parse_transponders(transponders)
         if codigos:
             self.banco.definir_transponders(pid, codigos)
         self.publicar("pilotos", {"msg": f"piloto cadastrado: {nome}"})
         return {"id": pid, "nome": nome, "telefone": tel,
-                "funcoes": funcs.split(",") if funcs else [], "transponders": codigos}
+                "funcoes": funcs.split(",") if funcs else [], "transponders": codigos,
+                "numero": numero}
 
     def editar_piloto(self, piloto_id: int, nome: str, apelido: str = "",
                       fonia: str = "", ativo: bool = True, transponders=None,
-                      telefone: str = "", funcoes=None) -> Dict:
+                      telefone: str = "", funcoes=None,
+                      numero: Optional[int] = None) -> Dict:
         if not self.banco.buscar_piloto(piloto_id):
             raise ValueError("piloto não encontrado")
         nome = (nome or "").strip()
@@ -2131,16 +2379,32 @@ class EstadoApp:
             raise ValueError("informe o nome do piloto")
         tel = self._validar_telefone(telefone, ignorar_id=piloto_id)
         funcs = self._parse_funcoes(funcoes)
+        if not numero:
+            numero = self._numero_por_atalho(piloto_id)
+        if not numero:
+            p = self.banco.buscar_piloto(piloto_id)
+            numero = (p.numero if p and p.numero else None)
+        if not numero:
+            numero = self._proximo_numero_piloto(ignorar_id=piloto_id)
         self.banco.atualizar_piloto(piloto_id, nome, (apelido or "").strip(),
-                                    (fonia or "").strip(), bool(ativo), tel, funcs)
+                                    (fonia or "").strip(), bool(ativo), tel, funcs, numero)
+        self._sincronizar_numero_atalho(piloto_id)
         if transponders is not None:
             self.banco.definir_transponders(piloto_id, self._parse_transponders(transponders))
         self.publicar("pilotos", {"msg": f"piloto atualizado: {nome}"})
         return {"id": piloto_id, "nome": nome, "telefone": tel,
-                "funcoes": funcs.split(",") if funcs else []}
+                "funcoes": funcs.split(",") if funcs else [], "numero": numero}
 
-    def excluir_piloto(self, piloto_id: int) -> Dict:
-        resultado = self.banco.excluir_piloto(piloto_id)
+    def excluir_piloto(self, piloto_id: int, total: bool = False) -> Dict:
+        resultado = self.banco.excluir_piloto(piloto_id, total=total)
+        # remove atalhos F1..F12 que apontavam para este piloto
+        try:
+            restantes = {k: v for k, v in (self.atalhos_teclas or {}).items()
+                         if int(v) != int(piloto_id)}
+            if restantes != (self.atalhos_teclas or {}):
+                self.definir_atalhos_teclas(restantes)
+        except Exception:
+            pass
         self.publicar("pilotos", {"msg": f"piloto {piloto_id}: {resultado['msg']}"})
         return resultado
 

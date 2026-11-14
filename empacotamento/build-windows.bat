@@ -1,8 +1,11 @@
 @echo off
 REM ============================================================
 REM  KChrono - build do executavel Windows (PyInstaller + pywebview)
-REM  Gera: empacotamento\dist\KChrono.exe
+REM  Gera: empacotamento\dist\KChrono-<versao>\ (onedir)
 REM  Requisitos: WebView2 Runtime (já incluso no Windows 10/11 moderno)
+REM
+REM  Prefira "python empacotamento\build.py": ele confere a versao,
+REM  sincroniza o NSIS e assina o .exe se houver certificado configurado.
 REM ============================================================
 setlocal
 cd /d "%~dp0"
@@ -17,14 +20,15 @@ if exist build rmdir /s /q build
 if exist dist rmdir /s /q dist
 
 echo.
-echo [3/5] Compilando KChrono.exe (pode demorar alguns minutos)...
-python -m PyInstaller --clean --noconfirm KChrono.spec || goto :erro
+echo [3/5] Compilando KChrono (onedir, pode demorar alguns minutos)...
+python empacotamento\build.py || goto :erro
 
 echo.
 echo [4/5] Build completo!
 echo.
 echo [5/5] Pronto!
-echo   Executavel: %cd%\dist\KChrono.exe
+echo   Pasta:      %cd%\dist\  (subpasta KChrono-1.1.x, onedir)
+echo   Executavel: dentro dessa pasta: KChrono-1.1.x.exe
 echo   Janela nativa (WebView2) — SEM navegador, SEM barra de endereço.
 echo   Dados (banco/config) em %%APPDATA%%\KChrono no primeiro uso.
 echo.

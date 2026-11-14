@@ -12,17 +12,19 @@ RAIZ="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$RAIZ"
 
 echo "== Python: $(python3 --version)"
-python3 empacotamento/build.py          # gera empacotamento/dist/KChrono (onedir)
+python3 empacotamento/build.py          # gera empacotamento/dist/KChrono-<versao> (onedir)
 
 VER=$(python3 -c "import json; print(json.load(open('empacotamento/versao.json'))['versao'])")
-APP=empacotamento/dist/KChrono
-test -x "$APP/KChrono" || { echo "ERRO: PyInstaller não gerou $APP/KChrono"; exit 1; }
+APP="empacotamento/dist/KChrono-${VER}"
+test -x "$APP/KChrono-${VER}" || { echo "ERRO: PyInstaller não gerou $APP/KChrono-${VER}"; exit 1; }
 
 # ---- AppDir (formato que o appimagetool transforma em AppImage) ----
 DIR=build/appdir
 rm -rf "$DIR"
 mkdir -p "$DIR/usr/bin/KChrono"
 cp -a "$APP/." "$DIR/usr/bin/KChrono/"
+# nome estável do executável dentro do AppImage (sem a versão)
+mv "$DIR/usr/bin/KChrono/KChrono-${VER}" "$DIR/usr/bin/KChrono/KChrono"
 
 cat > "$DIR/KChrono.desktop" <<'EOF'
 [Desktop Entry]

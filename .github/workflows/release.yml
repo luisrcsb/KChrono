@@ -3,7 +3,7 @@
 #   git tag v1.0.5 && git push origin v1.0.5
 #
 # A tag dispara:
-#   windows → KChrono-Setup-<v>.exe (PyInstaller onefile + NSIS)
+#   windows → KChrono-Setup-<v>.exe (PyInstaller onedir + NSIS)
 #   linux   → KChrono-<v>-x86_64.AppImage (container Ubuntu 22.04)
 #   iso     → KChrono-live-<v>-amd64.iso (live-build: Debian + Xfce + KChrono)
 #   publicar → anexa os três arquivos na release da tag
@@ -35,7 +35,7 @@ jobs:
       - name: Dependências
         run: pip install -r requirements.txt pyinstaller==6.22.3
 
-      - name: PyInstaller (onefile)
+      - name: PyInstaller (onedir)
         run: python empacotamento/build.py
 
       - name: NSIS (instalador)
@@ -54,7 +54,7 @@ jobs:
           New-Item -ItemType Directory -Force publicacao\windows | Out-Null
           $v = (Get-Content empacotamento\versao.json | ConvertFrom-Json).versao
           $vf = $v -replace '\.', '-'
-          Copy-Item empacotamento\dist\KChrono.exe publicacao\windows\
+          Copy-Item "empacotamento\dist\KChrono-$v" "publicacao\windows\KChrono-$v" -Recurse
           Copy-Item "empacotamento\KChrono-Setup-$vf.exe" publicacao\windows\
 
       - uses: actions/upload-artifact@v4
@@ -145,7 +145,7 @@ jobs:
         with:
           generate_release_notes: true
           files: |
-            publicacao/windows/*
+            publicacao/windows/*.exe
             publicacao/linux/*
             publicacao/iso/*
 

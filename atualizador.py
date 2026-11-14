@@ -287,7 +287,7 @@ def _instalar_windows(chave: str, destino: Optional[str]) -> Dict:
         except Exception:
             log.exception("falha ao executar o instalador %s", caminho)
 
-    threading.Timer(6.0, _rodar_instalador).start()   # espera o app liberar os arquivos
+    threading.Timer(1.0, _rodar_instalador).start()   # instalador antes do app fechar
     threading.Timer(2.0, _encerrar_app).start()
     log.info("atualização: v%s agendada (%s)", b.get("versao"), caminho)
     return {"ok": True, "arquivo": caminho, "versao": b.get("versao"),

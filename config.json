@@ -4,8 +4,8 @@
     "databaseURL": "https://krathus-telemetria-default-rtdb.firebaseio.com",
     "storageBucket": "krathus-telemetria.firebasestorage.app"
   },
-  "email": "luisrcsb@gmail.com",
-  "password": "DC4cdbrabus*",
+  "email": "teste@teste.com",
+  "password": "senha123",
   "pistaId": "krathus",
   "auto_upload": true,
   "tempo_minimo_volta_s": 3,
@@ -21,7 +21,7 @@
   "sim_velocidade": 1.0,
   "telao_tela": 0,
   "telao_aberto": false,
-  "telao_autostart": false,
+  "telao_autostart": true,
   "telao_fullscreen": true,
   "telao_colunas": [
     "posicao",
@@ -108,8 +108,6 @@
   },
   "checkin": [
     13,
-    14,
-    15,
     16,
     17,
     18
@@ -133,22 +131,22 @@
       {
         "etapa": "treino",
         "rotulo": "Treino",
-        "duracao": 1
+        "duracao": 60
       },
       {
         "etapa": "intervalo",
         "rotulo": "Intervalo",
-        "duracao": 1
+        "duracao": 5
       },
       {
         "etapa": "classificacao",
         "rotulo": "Classificação",
-        "duracao": 1
+        "duracao": 10
       },
       {
         "etapa": "intervalo",
         "rotulo": "Intervalo",
-        "duracao": 1
+        "duracao": 5
       },
       {
         "etapa": "corrida",
@@ -158,7 +156,7 @@
       {
         "etapa": "intervalo",
         "rotulo": "Intervalo",
-        "duracao": 1
+        "duracao": 5
       },
       {
         "etapa": "corrida",
@@ -168,7 +166,7 @@
       {
         "etapa": "intervalo",
         "rotulo": "Intervalo",
-        "duracao": 1
+        "duracao": 5
       },
       {
         "etapa": "corrida",
@@ -178,7 +176,7 @@
       {
         "etapa": "intervalo",
         "rotulo": "Intervalo",
-        "duracao": 1
+        "duracao": 5
       },
       {
         "etapa": "corrida",
@@ -188,7 +186,7 @@
       {
         "etapa": "intervalo",
         "rotulo": "Intervalo",
-        "duracao": 1
+        "duracao": 5
       },
       {
         "etapa": "corrida",
@@ -197,10 +195,10 @@
       }
     ],
     "numero_provas": 5,
-    "treino_min": 1,
-    "classificacao_min": 1,
+    "treino_min": 60,
+    "classificacao_min": 10,
     "corrida_min": 4,
-    "intervalo_min": 1,
+    "intervalo_min": 5,
     "class_3voltas": true
   },
   "banner": [
@@ -221,11 +219,11 @@
     }
   ],
   "gerente_tokens": {
-    "eRxAuOlxNzGOGuEOG_rzvI6oZuMJ7B8p": {
+    "lrOCudQ0n-D0jR0vbOsY55x6zyfLuSkt": {
       "usuario": "qrcode",
       "convite": true,
-      "criado_em": 1794111966.9835043,
-      "expira": 1794198366.9835043
+      "criado_em": 1794674769.0460494,
+      "expira": 1794761169.0460498
     }
   },
   "tempo_terminar_s": 30

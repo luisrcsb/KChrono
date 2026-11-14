@@ -344,6 +344,14 @@ class Banco:
                 self.conn.execute(
                     "INSERT OR REPLACE INTO _migracoes (versao, aplicada_em)"
                     " VALUES (9, ?)", (agora_iso(),))
+            if versao < 10:
+                # Número do piloto (etiqueta) — auto-atribuído se vazio
+                self.conn.execute(
+                    "ALTER TABLE pilotos ADD COLUMN numero INTEGER")
+                self.conn.execute("PRAGMA user_version = 10")
+                self.conn.execute(
+                    "INSERT OR REPLACE INTO _migracoes (versao, aplicada_em)"
+                    " VALUES (10, ?)", (agora_iso(),))
 
     # ----- pistas -----
     def criar_pista(self, nome: str) -> int:
@@ -385,12 +393,13 @@ class Banco:
 
     # ----- pilotos -----
     def criar_piloto(self, nome: str, apelido: str = "", fonia: str = "",
-                     telefone: str = "", funcoes: str = "") -> int:
+                     telefone: str = "", funcoes: str = "",
+                     numero: Optional[int] = None) -> int:
         with self.conn:
             cur = self.conn.execute(
-                "INSERT INTO pilotos (nome, apelido, fonia, telefone, funcoes)"
-                " VALUES (?, ?, ?, ?, ?)",
-                (nome, apelido, fonia, telefone, funcoes))
+                "INSERT INTO pilotos (nome, apelido, fonia, telefone, funcoes, numero)"
+                " VALUES (?, ?, ?, ?, ?, ?)",
+                (nome, apelido, fonia, telefone, funcoes, numero))
         return cur.lastrowid
 
     def garantir_piloto(self, nome: str, apelido: str = "", fonia: str = "") -> int:
@@ -413,17 +422,19 @@ class Banco:
 
     def atualizar_piloto(self, piloto_id: int, nome: str, apelido: str = "",
                          fonia: str = "", ativo: bool = True,
-                         telefone: str = "", funcoes: str = "") -> None:
+                         telefone: str = "", funcoes: str = "",
+                         numero: Optional[int] = None) -> None:
         with self.conn:
             self.conn.execute(
                 "UPDATE pilotos SET nome = ?, apelido = ?, fonia = ?, ativo = ?,"
-                " telefone = ?, funcoes = ? WHERE id = ?",
-                (nome, apelido, fonia, 1 if ativo else 0, telefone, funcoes, piloto_id))
+                " telefone = ?, funcoes = ?, numero = ? WHERE id = ?",
+                (nome, apelido, fonia, 1 if ativo else 0, telefone, funcoes,
+                 numero, piloto_id))
 
     def pilotos_detalhado(self):
         """Pilotos com a lista de transponders agregada (Admin → Pilotos)."""
         return self.conn.execute(
-            "SELECT p.id, p.nome, p.apelido, p.fonia, p.ativo, p.telefone, p.funcoes,"
+            "SELECT p.id, p.nome, p.apelido, p.fonia, p.ativo, p.telefone, p.funcoes, p.numero,"
             " GROUP_CONCAT(t.codigo) AS transponders"
             " FROM pilotos p LEFT JOIN transponders t ON t.piloto_id = p.id"
             " GROUP BY p.id ORDER BY p.ativo DESC, p.nome COLLATE NOCASE").fetchall()
@@ -450,10 +461,23 @@ class Banco:
                 return True
         return False
 
-    def excluir_piloto(self, piloto_id: int) -> Dict:
-        """Remove o piloto e seus transponders; com histórico, apenas inativa."""
+    def excluir_piloto(self, piloto_id: int, total: bool = False) -> Dict:
+        """Remove o piloto e seus transponders; com histórico, apenas inativa.
+
+        Com ``total=True`` (modo desenvolvimento) apaga o piloto e TODO o
+        histórico ligado a ele: voltas, inscrições, resultados e transponders.
+        """
         if not self.buscar_piloto(piloto_id):
             raise ValueError("piloto não encontrado")
+        if total:
+            with self.conn:
+                self.conn.execute("DELETE FROM voltas WHERE piloto_id = ?", (piloto_id,))
+                self.conn.execute("DELETE FROM resultados WHERE piloto_id = ?", (piloto_id,))
+                self.conn.execute("DELETE FROM inscricoes WHERE piloto_id = ?", (piloto_id,))
+                self.conn.execute("DELETE FROM transponders WHERE piloto_id = ?", (piloto_id,))
+                self.conn.execute("DELETE FROM pilotos WHERE id = ?", (piloto_id,))
+            return {"modo": "excluido_total",
+                    "msg": "piloto e todo o histórico (voltas, inscrições e resultados) apagados"}
         if self.piloto_tem_historico(piloto_id):
             with self.conn:
                 self.conn.execute("UPDATE pilotos SET ativo = 0 WHERE id = ?", (piloto_id,))
@@ -470,7 +494,8 @@ class Banco:
             return None
         return Piloto(id=row["id"], nome=row["nome"], apelido=row["apelido"],
                       fonia=row["fonia"] or "", ativo=bool(row["ativo"]),
-                      telefone=row["telefone"] or "", funcoes=row["funcoes"] or "")
+                      telefone=row["telefone"] or "", funcoes=row["funcoes"] or "",
+                      numero=row["numero"] if row["numero"] else None)
 
     # ----- transponders -----
     def vincular_transponder(self, codigo: int, piloto_id: int):

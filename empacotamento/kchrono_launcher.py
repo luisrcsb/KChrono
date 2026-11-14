@@ -287,7 +287,7 @@ def main() -> int:
     pronto = threading.Event()
     if not args.sem_servidor:
         t_server = threading.Thread(
-            target=_rodar_servidor, args=(args.host, args.porta, pronto), daemon=True
+            target=_rodar_servidor, args=("0.0.0.0", args.porta, pronto), daemon=True
         )
         t_server.start()
 

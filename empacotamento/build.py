@@ -61,13 +61,55 @@ def _sincronizar_versao_nsis():
         print(f"[build] aviso: não sincronizei a versão do NSIS ({e})")
 
 
+def _versao_atual() -> str:
+    try:
+        return _carregar_ferramenta_versao().versao_atual()
+    except Exception:
+        return "0.0.0"
+
+
+def _assinar_saida():
+    """Assina o executável recém-gerado (no-op se não houver certificado).
+
+    A assinatura de código é a forma recomendada de reduzir falso positivo
+    de antivírus. Configure as variáveis KCHRONO_SIGN_* (ver assinar.py).
+    """
+    if sys.platform != "win32":
+        return
+    exe = os.path.join(AQUI, "dist", f"KChrono-{_versao_atual()}",
+                       f"KChrono-{_versao_atual()}.exe")
+    if not os.path.isfile(exe):
+        return
+    try:
+        import assinar  # empacotamento/assinar.py
+    except Exception as e:
+        print(f"[build] aviso: script de assinatura indisponível ({e})")
+        return
+    print("[build] assinatura do executável:")
+    assinar.assinar([exe])
+
+
 def main() -> int:
     if not _checar_versao():
         return 1
     _sincronizar_versao_nsis()
     os.chdir(AQUI)
     from PyInstaller.__main__ import run
-    run(["--clean", "--noconfirm", "KChrono.spec"])
+    try:
+        run(["--clean", "--noconfirm", "KChrono.spec"])
+    except SystemExit as e:
+        # O PyInstaller às vezes termina com SystemExit espúrio (código 1)
+        # mesmo com o build concluído — a verificação do artefato decide.
+        if e.code not in (0, None):
+            print(f"[build] aviso: PyInstaller terminou com código {e.code} "
+                  "(verificando o artefato)")
+    exe = os.path.join(AQUI, "dist", f"KChrono-{_versao_atual()}",
+                       f"KChrono-{_versao_atual()}.exe")
+    if not os.path.isfile(exe):
+        print(f"[build] ERRO: artefato não gerado: {exe}")
+        return 1
+    print(f"[build] build completo: {exe}")
+    _assinar_saida()
     return 0
 
 

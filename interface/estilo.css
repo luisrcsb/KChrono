@@ -422,6 +422,32 @@ button{font-family:inherit}
   .dashboard-volta-lateral .volta-volta-wrap{min-height:270px; max-height:420px}
 }
 .card{background:rgb(21 28 40 / var(--card-alpha, 1)); border:1px solid var(--border-card); border-radius:10px; padding:16px 18px}
+.card-identidade{position:relative}
+.card-etiqueta{
+  display:none; position:absolute; top:6px; right:8px;
+  max-width:60%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  font-size:9px; line-height:1; padding:3px 6px; border-radius:4px;
+  background:var(--accent-blue); color:#fff; opacity:.78;
+  border:0; cursor:pointer; z-index:6; font-weight:600; letter-spacing:.3px;
+  font-family:inherit; text-transform:none; appearance:none; -webkit-appearance:none
+}
+/* As etiquetas só aparecem com o Modo desenvolvimento ligado. */
+html.modo-desenvolvimento .card-etiqueta{display:block}
+.card-etiqueta:hover{opacity:1}
+.card-etiqueta:focus-visible{outline:2px solid var(--accent-gold); outline-offset:1px}
+.card-etiqueta.copiado{background:var(--accent-green); opacity:1}
+/* não cobre a alça de arraste dos cards que a possuem */
+.card-identidade:has(.card-handle) > .card-etiqueta{right:40px}
+
+#toast-copia-etiqueta{
+  position:fixed; left:50%; bottom:24px; transform:translate(-50%, 12px);
+  background:#111a2b; color:#fff; border:1px solid var(--accent-green);
+  padding:10px 16px; border-radius:8px; font-size:13px; z-index:9999;
+  opacity:0; pointer-events:none; transition:opacity .15s, transform .15s;
+  max-width:90vw; overflow:hidden; text-overflow:ellipsis; white-space:nowrap
+}
+#toast-copia-etiqueta.on{opacity:1; transform:translate(-50%, 0)}
+#toast-copia-etiqueta.erro{border-color:var(--accent-red)}
 .card h3{font-size:12px; text-transform:uppercase; letter-spacing:1px; color:var(--text-muted);
   font-weight:600; margin-bottom:10px}
 .card .big{font-size:27px; color:var(--text-title); font-weight:700}
@@ -515,7 +541,10 @@ label.btn-slide{line-height:1.4}
 .flag.volta-rapida{background:rgba(230,57,70,.18); color:var(--accent-red);
   border-color:rgba(230,57,70,.5); opacity:.35; transition:opacity .3s}
 .flag.volta-rapida.pisca{opacity:1; animation:piscar .7s infinite}
-.btn-regressiva-piscar{animation:piscar 1s infinite; animation-direction:alternate}
+.btn-largada-amarelo{animation:none; background:linear-gradient(180deg,#f2c14e,#d9a92e) !important; color:#fff; border:none; cursor:pointer}
+/* botão de preparação/largada: pisca em AMARELO enquanto aguarda o operador clicar */
+.btn-preparar-piscar{animation:piscar 1s infinite; animation-direction:alternate;
+  background:linear-gradient(180deg,#f2c14e,#d9a92e) !important; color:#fff; border:none}
 @keyframes piscar{50%{opacity:.3}}
 .form-sessao{display:grid; grid-template-columns:repeat(auto-fit,minmax(120px,1fr)); gap:10px 12px; align-items:end}
 .form-sessao label{display:block; font-size:9.5px; color:var(--text-muted); margin-bottom:3px;
@@ -525,6 +554,35 @@ label.btn-slide{line-height:1.4}
 /* configuração da sessão: rótulos e valores centralizados no box */
 .form-sessao.centro>div{text-align:center}
 .form-sessao.centro select,.form-sessao.centro input{text-align:center; text-align-last:center}
+/* Progresso por item do menu lateral */
+.prog-btn{display:none; min-width:34px; padding:1px 6px; margin-left:auto;
+  border-radius:999px; font-size:9px; font-weight:700; cursor:pointer; user-select:none;
+  text-align:center; transition:background .2s, color .2s; border:1px solid transparent}
+.modo-desenvolvimento .prog-btn{display:inline-block}
+.prog-btn[data-nivel="0"]{background:#2a2f3a; color:#8492a6; border-color:#3a4255}
+.prog-btn[data-nivel="25"]{background:#4a1a1a; color:#ff6b6b; border-color:#ff6b6b}
+.prog-btn[data-nivel="50"]{background:#4a3a1a; color:#ffb703; border-color:#ffb703}
+.prog-btn[data-nivel="75"]{background:#1a3a4a; color:#3a86ff; border-color:#3a86ff}
+.prog-btn[data-nivel="100"]{background:#0e3a2a; color:#2ec4b6; border-color:#2ec4b6}
+.cfg-grupo{margin-top:14px}
+.cfg-grupo:first-of-type{margin-top:0}
+
+/* Modo desenvolvimento: texto explicativo abaixo de cada função/botão */
+.modo-dev-texto [data-help] { position: relative; }
+.modo-dev-texto [data-help]::after {
+  content: attr(data-help);
+  display: block;
+  font-size: 10px;
+  color: var(--text-muted);
+  margin-top: 4px;
+  font-style: italic;
+  line-height: 1.3;
+  opacity: .85;
+  white-space: normal;
+}
+.cfg-grupo-tit{margin:0 0 8px; padding-bottom:4px; font-size:10px; font-weight:600;
+  letter-spacing:.6px; text-transform:uppercase; color:var(--accent-gold);
+  border-bottom:1px solid var(--border-card)}
 .check-inline{display:flex; align-items:center; gap:8px; font-size:12.5px; color:var(--text-main); padding-bottom:8px}
 .tabela-wrap{overflow-x:auto}
 .tabela-op{min-width:1160px; font-size:12.5px}
@@ -574,6 +632,7 @@ label.btn-slide{line-height:1.4}
   background:rgba(255,255,255,.03); border-bottom:1px solid rgba(255,255,255,.04)}
 .vv-cel.vv-vazia{color:#4a5568}
 .vv-cel.vv-melhor{color:var(--accent-green); font-weight:700}
+.vv-cel.vv-recorde{color:#ff006e; font-weight:700; background:rgba(255,0,110,.15)}
 .vv-piloto:hover .vv-cab{background:rgba(58,134,255,.08)}
 
 /* Estilos adicionais para matriz de volta-a-volta */
@@ -619,9 +678,6 @@ label.btn-slide{line-height:1.4}
 .menu nav a .prev{font-size:9px; padding:1px 6px; border-radius:8px; margin-left:auto;
   background:#4c6b22; color:#a4d007}
 .menu nav a .prev.fase{background:#1d3a6e; color:#67c1f5}
-.admin-rodape{font-size:12px; color:#5c6470; text-align:center; padding-top:10px;
-  border-top:1px solid #000; margin-top:8px; line-height:1.6}
-.admin-rodape #ws-status{display:block; font-size:12px; font-weight:600; margin-bottom:4px}
 .corpo{flex:1; padding:22px 28px; overflow:auto}
 .corpo header{display:flex; justify-content:space-between; align-items:center; margin-bottom:20px}
 .corpo h1{color:#fff; font-size:22px; font-weight:600}
@@ -661,6 +717,11 @@ label.btn-slide{line-height:1.4}
   margin-right:6px}
 .btn-mini:hover{border-color:var(--accent-blue)}
 .btn-mini.perigo:hover{border-color:var(--accent-red); color:var(--accent-red)}
+/* Exclusão total do piloto: só aparece no modo desenvolvimento */
+.btn-dev-total{display:none}
+html.modo-desenvolvimento .btn-dev-total{display:inline-block;
+  border-color:var(--accent-red); color:var(--accent-red)}
+html.modo-desenvolvimento .btn-dev-total:hover{background:rgba(230,57,70,.15)}
 .linha-inativa{opacity:.55}
 
 /* ===== ADMIN · VOZ & SOM ===== */
@@ -708,10 +769,12 @@ label.btn-slide{line-height:1.4}
 .rodape-bar{position:fixed; bottom:0; left:0; right:0; height:34px; background:#171a21;
   border-top:1px solid #000; display:flex; align-items:center; justify-content:space-between;
   padding:0 18px; font-size:11px; color:#8f9297; z-index:55}
-.rodape-bar .add{color:#67c1f5; cursor:pointer; font-weight:600}
-.rodape-bar .add:hover{color:#fff}
-.rodape-bar .dir{display:flex; gap:16px}
+.rodape-bar .dir{display:flex; gap:16px; align-items:center}
 .pill.novo{background:rgba(58,134,255,.2); color:var(--accent-blue)}
+/* destaque temporário do card de configuração (atalho "Adicionar sessão") */
+@keyframes destaqueFlash{0%{box-shadow:0 0 0 0 rgba(58,134,255,.75)}100%{box-shadow:0 0 0 14px rgba(58,134,255,0)}}
+.destaque-flash{animation:destaqueFlash .8s ease-out 2; border-color:var(--accent-blue)!important}
+.pill.num{background:rgba(255,255,255,.1); color:var(--text-title); font-weight:700; min-width:22px; text-align:center; font-variant-numeric:tabular-nums}
 
 /* ---- resultados da busca global ---- */
 .busca-resultados{position:absolute; top:100%; left:0; right:0; margin-top:6px; z-index:60;
@@ -763,6 +826,9 @@ label.btn-slide{line-height:1.4}
 .ck-piloto:hover{background:rgba(255,255,255,.06)}
 .ck-piloto.on{background:rgba(46,196,182,.14)}
 .ck-piloto input{accent-color:var(--accent-green)}
+.ck-nome{flex:1}
+.ck-atalho{margin-left:auto; background:var(--accent-gold); color:#000; font-size:10px;
+  font-weight:700; padding:1px 6px; border-radius:4px}
 
 /* ---- voltas por atalho F1..F12 ---- */
 .lista-atalhos{display:grid; grid-template-columns:repeat(auto-fill,minmax(168px,1fr)); gap:8px}
@@ -803,6 +869,23 @@ label.btn-slide{line-height:1.4}
 .bd.vermelha{background:#e63946; color:#fff}
 .bd.fechada{background:#4a5568; color:#fff}
 
+/* ---- resumo do sistema (Admin → Sobre → Versão) ---- */
+.resumo-sistema{display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr));
+  gap:16px 22px; margin-top:16px}
+.resumo-sistema h4{margin:0 0 6px; font-size:11px; letter-spacing:.6px;
+  text-transform:uppercase; color:var(--accent-gold)}
+.resumo-sistema ul{margin:0; padding-left:17px}
+.resumo-sistema li{font-size:12px; line-height:1.45; color:var(--text-muted); margin-bottom:4px}
+.resumo-sistema b{color:var(--text-title); font-weight:600}
+
+/* ---- duração do campeonato (somente leitura, vem do CTAD/C56) ---- */
+.duracao-ctad{
+  display:flex; align-items:center; min-height:31px; padding:6px 8px;
+  border:1px dashed var(--border-card); border-radius:4px;
+  background:var(--bg-input); color:var(--text-title); font-size:11.5px;
+  line-height:1.35; white-space:normal
+}
+
 /* ---- créditos (Admin → Sobre) ---- */
 .sobre-credito{display:flex; gap:16px; align-items:center}
 .credito-foto{width:74px; height:74px; border-radius:50%; object-fit:cover;
@@ -811,18 +894,19 @@ label.btn-slide{line-height:1.4}
 .credito-cargo{color:var(--accent-blue); font-size:12px; letter-spacing:.5px;
   text-transform:uppercase; margin-bottom:8px}
 
-/* ---- menu lateral: logo full-width + status do decoder + QR Gestão Remota ---- */
+/* ---- menu lateral: logo full-width + painel de conexões + QR Gestão Remota ---- */
 .side-logo{padding:2px 4px 10px}
 .side-logo img{width:100%; height:auto; display:block}
-.side-decoder{display:flex; align-items:center; gap:9px; padding:9px 11px; margin-bottom:12px;
+.side-conexoes{display:flex; flex-direction:column; gap:6px; margin-bottom:12px}
+.side-conexao{display:flex; align-items:center; gap:9px; padding:8px 11px;
   border:1px solid var(--border-card); border-radius:8px; background:rgba(0,0,0,.28)}
-.side-decoder .led{width:11px; height:11px; border-radius:50%; background:var(--accent-red);
+.side-conexao .led{width:11px; height:11px; border-radius:50%; background:var(--accent-red);
   box-shadow:0 0 8px var(--accent-red); flex:none}
-.side-decoder .led.on{background:var(--accent-green); box-shadow:0 0 8px var(--accent-green)}
-.side-decoder-txt{min-width:0}
-.side-decoder-nome{color:var(--text-title); font-size:12.5px; font-weight:600;
+.side-conexao .led.on{background:var(--accent-green); box-shadow:0 0 8px var(--accent-green)}
+.side-conexao-txt{min-width:0; flex:1}
+.side-conexao-nome{color:var(--text-title); font-size:12.5px; font-weight:600;
   white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
-.side-decoder-sub{color:var(--text-muted); font-size:11px; white-space:nowrap;
+.side-conexao-sub{color:var(--text-muted); font-size:11px; white-space:nowrap;
   overflow:hidden; text-overflow:ellipsis}
 .side-qr{margin-top:10px; padding:10px; border:1px solid var(--border-card);
   border-radius:10px; background:rgba(0,0,0,.28); text-align:center}

@@ -7,7 +7,7 @@ separada do executável:
 
 | Sistema | Executável | Dados do usuário |
 |---|---|---|
-| Windows | `C:\Program Files\KChrono\KChrono.exe` | `%APPDATA%\KChrono` |
+| Windows | `C:\Program Files\KChrono\KChrono-<versão>.exe` | `%APPDATA%\KChrono` |
 | Linux   | `~/.local/share/KChrono` | `~/.local/share/KChrono` |
 
 ---
@@ -63,21 +63,48 @@ cd empacotamento
 build-windows.bat
 ```
 
-Resultado: `empacotamento\dist\KChrono.exe` (arquivo único, com a interface e
-as imagens embutidas). Dê duplo clique para abrir o aplicativo em **janela
+Resultado: `empacotamento\dist\KChrono-<versão>\` (**onedir** — pasta com o
+executável e a subpasta `_internal`, com a interface e as imagens embutidas).
+Dê duplo clique no `KChrono-<versão>.exe` para abrir o aplicativo em **janela
 nativa (WebView2) maximizada, com a barra de título** (minimizar/maximizar/
 fechar à mão) — sem navegador e sem barra de endereço.
+
+> O formato **onedir** (em vez de onefile) evita a auto-extração em
+> `%TEMP%\_MEIxxxx` a cada abertura, um dos principais gatilhos de falso
+> positivo de antivírus. O `upx=False` também é intencional: binário
+> comprimido com UPX parece "empacotado" para a heurística.
 
 Opções de linha de comando do app:
 
 ```bat
-KChrono.exe                 REM janela maximizada com barra de título (padrão)
-KChrono.exe --janela        REM janela normal, redimensionável (desenvolvimento)
-KChrono.exe --fullscreen    REM tela cheia real, sem barra de título (kiosk)
-KChrono.exe --porta 9000    REM porta alternativa
-KChrono.exe --telao         REM abre direto no telão
-KChrono.exe --gerente       REM abre direto no gerente (celular)
-KChrono.exe --sem-janela    REM headless (serviço)
+KChrono-<versão>.exe                 REM janela maximizada com barra de título (padrão)
+KChrono-<versão>.exe --janela        REM janela normal, redimensionável (desenvolvimento)
+KChrono-<versão>.exe --fullscreen    REM tela cheia real, sem barra de título (kiosk)
+KChrono-<versão>.exe --porta 9000    REM porta alternativa
+KChrono-<versão>.exe --telao         REM abre direto no telão
+KChrono-<versão>.exe --gerente       REM abre direto no gerente (celular)
+KChrono-<versão>.exe --sem-janela    REM headless (serviço)
+```
+
+### Assinatura de código (recomendado contra falso positivo)
+
+Assinar o `.exe` e o instalador é a forma correta e mais eficaz de evitar
+falso positivo de antivírus. A senha **nunca** fica no código: tudo vem de
+variáveis de ambiente.
+
+```bat
+set KCHRONO_SIGN_PFX=C:\certificados\kchrono.pfx
+set KCHRONO_SIGN_PASSWORD=...            :: senha do certificado
+set KCHRONO_TIMESTAMP_URL=http://timestamp.digicert.com
+python empacotamento\build.py            :: já assina o .exe ao final
+```
+
+Sem certificado configurado, a assinatura é simplesmente ignorada (no-op) e o
+build segue normal. Para assinar um arquivo já gerado:
+
+```bat
+python empacotamento\assinar.py empacotamento\KChrono-Setup-1-2-3.exe
+python empacotamento\assinar.py --verificar empacotamento\KChrono-Setup-1-2-3.exe
 ```
 
 ### Gerar o instalador (NSIS)
@@ -85,10 +112,12 @@ KChrono.exe --sem-janela    REM headless (serviço)
 1. Instale o [NSIS](https://nsis.sourceforge.io/).
 2. Abra `instalador.nsi` e compile (`makensis instalador.nsi`).
 3. Resultado: `empacotamento\KChrono-Setup-<versão>.exe` (ex.:
-   `KChrono-Setup-1-1-2.exe` — a versão entra no nome com hífens).
+   `KChrono-Setup-1-2-3.exe` — a versão entra no nome com hífens).
 
-O instalador cria atalhos no Menu Iniciar e na Área de Trabalho, registra a
-desinstalação e oferece a opção de iniciar com o Windows.
+O instalador copia a pasta **onedir** inteira, cria atalhos no Menu Iniciar e
+na Área de Trabalho, registra a desinstalação, preenche os **metadados**
+(empresa, produto, versão, copyright) e oferece a opção de iniciar com o
+Windows.
 
 ---
 
@@ -140,9 +169,11 @@ Para ativar:
 | Arquivo | Função |
 |---|---|
 | `kchrono_launcher.py` | ponto de entrada do executável (sobe o servidor e abre a janela nativa em tela cheia) |
-| `KChrono.spec` | receita do PyInstaller |
-| `build-windows.bat` | gera `KChrono.exe` |
-| `instalador.nsi` | instalador Windows (NSIS) |
+| `KChrono.spec` | receita do PyInstaller (onedir, sem UPX, com metadados de versão) |
+| `build.py` | empacota (confere versão, sincroniza NSIS e assina o .exe) |
+| `assinar.py` | assinatura de código via signtool (certificado por variável de ambiente) |
+| `build-windows.bat` | atalho para `python build.py` |
+| `instalador.nsi` | instalador Windows (NSIS, com metadados) |
 | `instalar-linux.sh` | instalação Linux por usuário |
 | `kchrono.desktop` | atalho de menu (Linux) |
 | `kchrono.service` | unidade systemd opcional |

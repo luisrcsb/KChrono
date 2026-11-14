@@ -1,10 +1,10 @@
 {
-  "versao": "1.1.2",
+  "versao": "1.2.3",
   "canal": "estavel",
   "url_base": "",
-  "notas": "Versão 1.1.2 — Live Feed Grid: empilhamento dinâmico de voltas em tempo real com slots reservados. Volta mais recente no topo.",
+  "notas": "Versão 1.2.3 — Correcao final: botao azul fixo Preparar para Largada; amarelo fixo apos clicar; transparente na corrida; botoes fora do card config; checkin oculto com sessao ativa",
   "arquivos": {
-    "windows": "KChrono-Setup-1-1-2.exe",
-    "linux": "KChrono-1.1.2-x86_64.AppImage"
+    "windows": "KChrono-Setup-1-2-3.exe",
+    "linux": "KChrono-1.2.3-x86_64.AppImage"
   }
 }

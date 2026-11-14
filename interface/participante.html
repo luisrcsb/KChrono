@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>KChrono — Tempos do Piloto</title>
+<link rel="icon" href="/imagens/KCHRONO-LOGO.png">
+<style>
+  :root { --bg:#0b0f1a; --card:#131a2a; --txt:#e6eaf2; --mut:#8492a6; --ouro:#ffb703; --verde:#2ec4b6; --verm:#ff3b3b; --borda:#1f2a44; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif; background:var(--bg); color:var(--txt); min-height:100vh; padding:16px; }
+  .wrap { max-width:480px; margin:0 auto; }
+  header { text-align:center; margin-bottom:16px; }
+  header img { width:48px; height:48px; }
+  header h1 { font-size:1.4rem; margin:8px 0 2px; }
+  header p { color:var(--mut); font-size:.9rem; margin:0; }
+  .card { background:var(--card); border:1px solid var(--borda); border-radius:12px; padding:14px; margin-bottom:12px; }
+  .card h2 { font-size:1rem; margin:0 0 10px; color:var(--ouro); }
+  select, button { width:100%; padding:12px; border-radius:8px; border:1px solid var(--borda); background:#1a2438; color:var(--txt); font-size:1rem; }
+  button.destaque { background:var(--ouro); color:#000; font-weight:700; border:none; margin-top:8px; }
+  .piloto-info { text-align:center; padding:8px 0; }
+  .piloto-info .nome { font-size:1.3rem; font-weight:700; }
+  .piloto-info .melhor { color:var(--verde); font-size:1.1rem; margin-top:4px; }
+  table { width:100%; border-collapse:collapse; font-size:.95rem; }
+  th, td { padding:8px 6px; text-align:center; border-bottom:1px solid var(--borda); }
+  th { color:var(--mut); font-size:.8rem; text-transform:uppercase; }
+  td.melhor { color:var(--verde); font-weight:700; }
+  .status { text-align:center; color:var(--mut); padding:20px; }
+  .erro { color:#ff6b6b; text-align:center; padding:12px; }
+  .principal-badge { display:inline-block; background:var(--ouro); color:#000; font-size:.75rem; padding:2px 8px; border-radius:999px; margin-left:6px; font-weight:700; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <img src="/imagens/KCHRONO-LOGO.png" alt="KChrono">
+    <h1>Tempos do Piloto</h1>
+    <p>KChrono — acompanhe suas voltas</p>
+  </header>
+
+  <div class="card">
+    <h2>Escolha seu piloto</h2>
+    <select id="piloto-select"><option value="">carregando…</option></select>
+    <button class="destaque" onclick="salvarPrincipal()">⭐ Definir como principal</button>
+    <div id="principal-info" class="status"></div>
+  </div>
+
+  <div class="card">
+    <h2 id="titulo-voltas">Voltas</h2>
+    <div id="voltas-box" class="status">Selecione um piloto para ver as voltas.</div>
+  </div>
+</div>
+
+<script>
+const PRINCIPAL_KEY = "kchrono_participante_principal";
+let pilotos = [];
+let sessaoAtual = null;
+
+async function api(path) {
+  const r = await fetch("/api" + path);
+  return r.json();
+}
+
+async function carregarPilotos() {
+  try {
+    const r = await api("/pilotos");
+    pilotos = r.pilotos || [];
+    const sel = document.getElementById("piloto-select");
+    sel.innerHTML = pilotos.map(p => `<option value="${p.id}">${p.nome}</option>`).join("") || '<option value="">nenhum piloto</option>';
+    // restaurar principal
+    const salvo = localStorage.getItem(PRINCIPAL_KEY);
+    if (salvo && pilotos.some(p => String(p.id) === String(salvo))) {
+      sel.value = salvo;
+      mostrarPrincipal();
+    }
+  } catch (e) {
+    document.getElementById("piloto-select").innerHTML = '<option value="">erro ao carregar</option>';
+  }
+}
+
+function salvarPrincipal() {
+  const id = document.getElementById("piloto-select").value;
+  if (!id) return;
+  localStorage.setItem(PRINCIPAL_KEY, id);
+  mostrarPrincipal();
+  carregarVoltas();
+}
+
+function mostrarPrincipal() {
+  const id = localStorage.getItem(PRINCIPAL_KEY);
+  const p = pilotos.find(x => String(x.id) === String(id));
+  const el = document.getElementById("principal-info");
+  if (p) el.innerHTML = `Principal: <b>${p.nome}</b> <span class="principal-badge">PRINCIPAL</span>`;
+  else el.textContent = "";
+}
+
+async function carregarVoltas() {
+  const id = document.getElementById("piloto-select").value;
+  const box = document.getElementById("voltas-box");
+  const tit = document.getElementById("titulo-voltas");
+  if (!id) { box.textContent = "Selecione um piloto."; return; }
+  const p = pilotos.find(x => String(x.id) === String(id));
+  tit.textContent = "Voltas — " + (p ? p.nome : "");
+  box.innerHTML = '<div class="status">carregando…</div>';
+  try {
+    // tenta sessão ativa
+    let voltas = [];
+    let melhorGeral = null;
+    let maxV = 0;
+    // 1) tenta /api/sessao/voltas
+    try {
+      const sv = await api("/sessao/voltas");
+      if (sv && sv.pilotos) {
+        const pp = sv.pilotos.find(x => String(x.piloto_id) === String(id));
+        if (pp) { voltas = pp.voltas || []; }
+        const todosT = sv.pilotos.flatMap(x => (x.voltas||[]).map(v=>v.tempo));
+        if (todosT.length) melhorGeral = Math.min(...todosT);
+      }
+    } catch (e) {}
+    // 2) se vazio, busca última sessão do histórico
+    if (!voltas.length) {
+      try {
+        const h = await api("/historico");
+        const sessoes = h.sessoes || [];
+        if (sessoes.length) {
+          const ultima = sessoes[0];
+          const d = await api("/historico/" + encodeURIComponent(ultima.id));
+          if (d && d.pilotos) {
+            const pp = d.pilotos.find(x => x.nome === (p ? p.nome : ""));
+            if (pp) voltas = pp.voltas || [];
+            if (d.melhor_geral != null) melhorGeral = d.melhor_geral;
+          }
+        }
+      } catch (e) {}
+    }
+    if (!voltas.length) {
+      box.innerHTML = '<div class="status">Sem voltas registradas para este piloto.</div>';
+      return;
+    }
+    const melhorPiloto = Math.min(...voltas.map(v => v.tempo));
+    let html = '<table><thead><tr><th>Volta</th><th>Tempo</th></tr></thead><tbody>';
+    voltas.forEach(v => {
+      const isMelhorPiloto = v.tempo === melhorPiloto;
+      const isMelhorGeral = melhorGeral != null && v.tempo === melhorGeral;
+      let cls = isMelhorGeral ? 'melhor' : (isMelhorPiloto ? 'melhor' : '');
+      html += `<tr><td>${v.numero}</td><td class="${cls}">${fmt(v.tempo)}${isMelhorGeral ? ' ⭐' : (isMelhorPiloto ? ' 🏆' : '')}</td></tr>`;
+    });
+    html += '</tbody></table>';
+    html += `<div class="piloto-info"><div class="melhor">Melhor volta: ${fmt(melhorPiloto)}${melhorGeral != null && melhorPiloto === melhorGeral ? ' (melhor geral)' : ''}</div></div>`;
+    box.innerHTML = html;
+  } catch (e) {
+    box.innerHTML = '<div class="erro">Erro ao carregar voltas.</div>';
+  }
+}
+
+function fmt(t) {
+  if (t == null) return "—";
+  const m = Math.floor(t / 60);
+  const s = t % 60;
+  return (m > 0 ? m + ":" : "") + (s < 10 && m > 0 ? "0" : "") + s.toFixed(3);
+}
+
+document.getElementById("piloto-select").addEventListener("change", carregarVoltas);
+carregarPilotos().then(() => { mostrarPrincipal(); carregarVoltas(); });
+</script>
+</body>
+</html>

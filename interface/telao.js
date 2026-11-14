@@ -4,6 +4,24 @@
 "use strict";
 
 let ws = null;
+let qrParticipanteData = null;   // data URI do QR de participação (cache)
+
+async function atualizarQRParticipante() {
+  const box = document.getElementById("qr-participante");
+  const img = document.getElementById("qr-part-img");
+  if (!box || !img) return;
+  // mostra apenas quando a tela de largada está visível (idle / antes da prova)
+  const telaLargada = document.getElementById("tela-largada");
+  const visivel = telaLargada && telaLargada.classList.contains("visivel");
+  if (!visivel) { box.style.display = "none"; return; }
+  box.style.display = "";
+  if (qrParticipanteData) { img.src = qrParticipanteData; return; }
+  try {
+    const r = await fetch("/api/participante/qrcode").then(x => x.json());
+    if (r && r.ok && r.qrcode) { qrParticipanteData = r.qrcode; img.src = r.qrcode; }
+    else { box.style.display = "none"; }
+  } catch (e) { box.style.display = "none"; }
+}
 let estadoAtual = "parado";
 let ultimoSessaoId = null;
 let ultimaLinhas = [];
@@ -12,6 +30,8 @@ let ultimaLinhas = [];
 // apaga o efeito antes que o piloto consiga vê-lo.
 const flashesVolta = new Map();
 const DURACAO_FLASH_VOLTA_MS = 1800;
+const flashesGhost = new Map();
+const DURACAO_FLASH_GHOST_MS = 1500;
 let tracadaAtual = null;      // traçado salvo da pista ativa (evento/snapshot)
 let sessaoSimulacao = false;  // sessão de teste (replay do simulador)
 let tracadaCache = null;      // pista estática em offscreen (evita redesenhar)
@@ -135,6 +155,42 @@ function limparDadosSessao() {
   if (tabAtual === "tv-track") desenharTrack();
 }
 
+function aplicarFundoGrace(s) {
+  const body = document.body;
+  if (!body) return;
+  body.classList.remove("grace", "finalizado");
+  if (s && s.grace) body.classList.add("grace");
+  else if (s && s.estado === "finalizado") body.classList.add("finalizado");
+}
+
+function rotuloTipoSessao(tipo, camp) {
+  const map = { treino: "TREINO", classificacao: "CLASSIFICAÇÃO", corrida: "CORRIDA",
+                campeonato: "CAMPEONATO" };
+  let base = map[String(tipo || "").toLowerCase()] || String(tipo || "SESSÃO").toUpperCase();
+  if (camp && camp.estado && camp.estado.etapa) {
+    const e = camp.estado;
+    const rotulo = (e.etapa && e.etapa.rotulo) ? e.etapa.rotulo : base;
+    const num = e.numero, tot = e.total;
+    if (num && tot) return `${String(rotulo).toUpperCase()} · ETAPA ${num} DE ${tot}`;
+    return String(rotulo).toUpperCase();
+  }
+  if (camp && camp.etapa) {
+    const rotulo = camp.etapa.rotulo || base;
+    const num = camp.numero, tot = camp.total;
+    if (num && tot) return `${String(rotulo).toUpperCase()} · ETAPA ${num} DE ${tot}`;
+    return String(rotulo).toUpperCase();
+  }
+  return base;
+}
+
+function atualizarTituloSessao(texto) {
+  if (!texto) return;
+  ["titulo-sessao", "titulo-sessao-largada"].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = texto;
+  });
+}
+
 function tratarEvento(ev) {
   if (ev.tipo === "snapshot") {
     if (ev.sessao && ev.sessao.id && ev.sessao.id !== ultimoSessaoId) {
@@ -145,7 +201,10 @@ function tratarEvento(ev) {
                                 ev.sessao.restante_s);
     if (ev.sessao && ev.sessao.parametros) ultimasVoltas.parametros = ev.sessao.parametros;
     if (ev.telao && ev.telao.colunas) aplicarColunasTelao(ev.telao.colunas);
+    aplicarFundoGrace(ev.sessao);
     renderSessao(ev.sessao);
+    if (ev.sessao && ev.sessao.tipo) atualizarTituloSessao(rotuloTipoSessao(ev.sessao.tipo, ev.campeonato));
+    atualizarQRParticipante();
     renderClassificacao(ev.classificacao || []);
     renderBandeira(ev.pista);
     if (ev.tracada !== undefined) tracadaAtual = ev.tracada || null;
@@ -164,7 +223,10 @@ function tratarEvento(ev) {
         ultimoSessaoId = ev.id;
         limparDadosSessao();
       }
+      aplicarFundoGrace(ev);
       renderSessao(ev);
+      if (ev.tipo) atualizarTituloSessao(rotuloTipoSessao(ev.tipo, ev.campeonato));
+      atualizarQRParticipante();
       if (typeof ev.tempo_s === "number" || typeof ev.restante_s === "number") {
         definirClock(ev.tempo_s, ev.pausada, ev.estado, ev.restante_s);
       } else {
@@ -184,11 +246,24 @@ function tratarEvento(ev) {
       else beepVolta();
       destacarVolta(ev.piloto_id);
       break;
+    case "ghost_lap":
+      // volta inválida detectada: pisca o nome do piloto 3x em vermelho
+      destacarGhost(ev.piloto_id, ev.nome);
+      break;
     case "voltas":
       ultimasVoltas = ev;
       if (tabAtual === "tv-ritmo") desenharRitmo();
       if (tabAtual === "tv-posicoes") desenharPosicoes();
       if (tabAtual === "tv-track") desenharTrack();
+      break;
+    case "campeonato":
+      if (ev.estado) {
+        const et = (ev.estado.etapa && ev.estado.etapa.rotulo) ? ev.estado.etapa.rotulo : null;
+        const num = ev.estado.numero, tot = ev.estado.total;
+        let txt = et ? String(et).toUpperCase() : "CAMPEONATO";
+        if (num && tot) txt = `${txt} · ETAPA ${num} DE ${tot}`;
+        atualizarTituloSessao(txt);
+      }
       break;
     case "semaforo":
       // linha do tempo da largada comandada pelo servidor (ms)
@@ -237,6 +312,7 @@ function iniciarContagem() {
   const contagem = document.getElementById("contagem");
   const subtitulo = document.getElementById("subtitulo-largada");
   contagem.classList.remove("vai");
+  contagem.classList.add("texto");
   contagem.textContent = "ATENÇÃO, PILOTOS!";
   subtitulo.textContent = "preparem-se para a largada…";
   renderSemaforo(0, "vermelho", null);
@@ -267,17 +343,21 @@ function renderSemaforo(acesas, fase, numero) {
   if (fase === "verde") {
     contagem.textContent = "";
     contagem.classList.add("vai");
+    contagem.classList.remove("texto");
     if (subtitulo) subtitulo.textContent = "";
   } else if (numero) {
     contagem.textContent = String(numero);
     contagem.classList.remove("vai");
+    contagem.classList.remove("texto");
     if (subtitulo) subtitulo.textContent = "preparem-se para a largada…";
   } else if (fase === "vermelho") {
     contagem.textContent = "ATENÇÃO, PILOTOS!";
     contagem.classList.remove("vai");
+    contagem.classList.add("texto");
   } else {
     contagem.textContent = "";
     contagem.classList.remove("vai");
+    contagem.classList.remove("texto");
   }
 }
 
@@ -381,6 +461,10 @@ function renderClassificacao(linhas) {
     if (expiraEm <= agora) flashesVolta.delete(pid);
     else aplicarFlashVolta(pid, expiraEm - agora);
   }
+  for (const [pid, info] of flashesGhost) {
+    if (info.expiraEm <= agora) flashesGhost.delete(pid);
+    else aplicarFlashGhost(info.pilotoId, info.expiraEm - agora, info.nome);
+  }
 }
 
 // Aplica o flash e guarda sua expiração. A classificação pode reconstruir o
@@ -410,6 +494,39 @@ function destacarVolta(pilotoId) {
                            DURACAO_FLASH_VOLTA_MS);
   if (!destacarVolta._timers) destacarVolta._timers = new Map();
   destacarVolta._timers.set(String(pilotoId), timer);
+}
+
+// Volta inválida (ghost lap): pisca o nome do piloto 3 vezes em vermelho.
+function destacarGhost(pilotoId, nome) {
+  const expiraEm = Date.now() + DURACAO_FLASH_GHOST_MS;
+  const chave = pilotoId != null ? String(pilotoId) : ("nome:" + (nome || ""));
+  flashesGhost.set(chave, { expiraEm, nome: nome || null, pilotoId });
+  aplicarFlashGhost(pilotoId, DURACAO_FLASH_GHOST_MS, nome);
+  clearTimeout(destacarGhost._timers?.get(chave));
+  const timer = setTimeout(() => flashesGhost.delete(chave), DURACAO_FLASH_GHOST_MS);
+  if (!destacarGhost._timers) destacarGhost._timers = new Map();
+  destacarGhost._timers.set(chave, timer);
+}
+
+function aplicarFlashGhost(pilotoId, duracaoMs, nome) {
+  let tr = null;
+  if (pilotoId != null) {
+    tr = document.querySelector(`#tabela-telao tbody tr[data-piloto="${pilotoId}"]`);
+  }
+  if (!tr && nome) {
+    // fallback: localiza a linha pelo nome do piloto
+    const linhas = document.querySelectorAll("#tabela-telao tbody tr");
+    for (const r of linhas) {
+      const cel = r.querySelector('td[data-col="piloto"]');
+      if (cel && cel.textContent.trim() === String(nome).trim()) { tr = r; break; }
+    }
+  }
+  if (!tr) return;
+  tr.classList.remove("ghost-flash");
+  void tr.offsetWidth;
+  tr.classList.add("ghost-flash");
+  clearTimeout(tr._ghostFlashTimer);
+  tr._ghostFlashTimer = setTimeout(() => tr.classList.remove("ghost-flash"), duracaoMs);
 }
 
 // ---------------------------------------------------------------- gráficos
@@ -633,3 +750,5 @@ conectarWS();
 fetch("/api/telao/colunas").then(r => r.json())
   .then(d => { if (d && d.colunas) aplicarColunasTelao(d.colunas); })
   .catch(() => {});
+
+setTimeout(() => atualizarQRParticipante(), 2000);

@@ -48,6 +48,31 @@ FRASES_TTS = {
     "recorde_pista": "Novo recorde da pista! {nome}, {tempo} segundos!",
     "ghost_lap": "Atenção: volta inválida detectada.",
     "gato": "Atenção: volta marcada como suspeita.",
+    "tempo_esgotado": "Tempo acabou! Faltam {n} segundos para concluir a volta.",
+    "piloto_finalizou": "{nome} finalizou!",
+    "todos_finalizaram": "Todos os pilotos finalizaram. Sessão encerrada.",
+    # Eventos (1) — pista/largada/corrida
+    "pista_aberta": "Pista aberta para os pilotos:",
+    "pista_aberta_treino": "Pista aberta para treino por",
+    "carros_prontos": "Carros prontos para largar",
+    "largada_liberada": "{nome}, largada liberada",
+    "stop_and_go": "{nome}: pare e siga",
+    "todos_terminaram": "Todos os pilotos terminaram. Pista fechada.",
+    "piloto_terminou": "{nome} terminou",
+    "treino_encerrado": "Treino encerrado. Os pilotos devem estar prontos para largar",
+    "para_o_fim": "para o fim",
+    "deteccao_linha": "{n}% detectado",
+    "erro_volta_minima": "erro de volta mínima {nome} {tempo}",
+    # Eventos (2) — posições/recordes/estimativa
+    "primeira_posicao": "PRIMEIRA POSIÇÃO:",
+    "melhor_volta_corrida": "MELHOR VOLTA DA CORRIDA DE: {classe}",
+    "melhor_volta_pessoal": "Melhor volta pessoal",
+    "melhor_tempo_pessoal": "Melhor tempo pessoal: {classe}",
+    "recorde_pista_evento": "{nome} RECORDE DA PISTA {classe} {tempo}",
+    "estimativa_chegada": "{nome}, estimativa de chegada: {n} voltas em {tempo}",
+    "intervalo_atras": "{nome} {tempo} atrás",
+    "estimativa_melhorada": "Estimativa de voltas melhorada",
+    "resultado_pessoal_melhorado": "Resultado pessoal melhorado",
     # Sons de passagem (bips) - não usam TTS, são bips puros
     "passagem": "",           # bip curto a cada passagem
     "lider": "",              # bip especial (alto-baixo-alto) quando líder passa
@@ -72,6 +97,31 @@ ROTULOS = [
     ("melhor_volta", "Melhor volta"),
     ("ghost_lap", "Volta inválida"),
     ("gato", "Gato (suspeita)"),
+    ("tempo_esgotado", "Tempo esgotado (início da carência)"),
+    ("piloto_finalizou", "Piloto finalizou na carência"),
+    ("todos_finalizaram", "Todos finalizaram (fim da carência)"),
+    # Eventos (1)
+    ("pista_aberta", "Pista aberta para os pilotos"),
+    ("pista_aberta_treino", "Pista aberta para treino"),
+    ("carros_prontos", "Carros prontos para largar"),
+    ("largada_liberada", "Largada liberada (piloto)"),
+    ("stop_and_go", "Stop and Go (pare e siga)"),
+    ("todos_terminaram", "Todos os pilotos terminaram / pista fechada"),
+    ("piloto_terminou", "Piloto terminou"),
+    ("treino_encerrado", "Treino encerrado"),
+    ("para_o_fim", "Para o fim (alarme)"),
+    ("deteccao_linha", "Detecção na linha de chegada"),
+    ("erro_volta_minima", "Erro de volta mínima"),
+    # Eventos (2)
+    ("primeira_posicao", "Primeira posição"),
+    ("melhor_volta_corrida", "Melhor volta da corrida"),
+    ("melhor_volta_pessoal", "Melhor volta pessoal"),
+    ("melhor_tempo_pessoal", "Melhor tempo pessoal"),
+    ("recorde_pista_evento", "Recorde da pista (evento)"),
+    ("estimativa_chegada", "Estimativa de chegada"),
+    ("intervalo_atras", "Intervalo / gap (atrás)"),
+    ("estimativa_melhorada", "Estimativa de voltas melhorada"),
+    ("resultado_pessoal_melhorado", "Resultado pessoal melhorado"),
     ("passagem", "Bip de passagem (cada piloto)"),
     ("lider", "Bip especial do líder (alto-baixo-alto)"),
 ]
@@ -99,6 +149,24 @@ OPCOES_SOM_PADRAO = {
     "som_menor_volta": True,         # 7 bipes da menor volta / recorde
     "bip_luz": True,                 # bipe a cada luz acesa na contagem
     "bip_vai": True,                 # bipe longo no verde (largada)
+    # Anúncios estendidos (C42)
+    "alarme_fim_corrida": True,      # alarme de fim de corrida
+    "falar_tempo_restante": True,    # falar o tempo restante
+    "tempo_restante_seg": 30,        # falar o tempo restante com ... s
+    "tempo_restante_repetir_seg": 30,# repetir a cada ... s
+    "posicoes_troca_lider": 3,      # posições a ler quando houver troca de líder
+    "ler_tempos_treino": False,      # ler os tempos do treino
+    "ler_estimativa_mudanca": True,  # ler a estimativa quando o valor mudar
+    "ler_estimativa_cada_voltas": 0, # ler a estimativa a cada ... voltas (0 = desligado)
+    "ler_recorde_melhor_volta_baterias": True,  # ler o recorde de melhor volta em todas as baterias/finais
+    "ler_todas_voltas_treino_livre": False,     # ler todas as voltas no treino livre
+    "ler_classificacao_cada_min": 0, # ler a classificação a cada ... min (0 = desligado)
+    "ler_classificacao_durante_corrida": True,   # leitura da classificação durante a corrida
+    "comecar_leitura_volta_n": 1,   # começar a leitura na volta número
+    "casas_decimais_volta": 3,      # casas decimais na leitura do tempo de volta
+    "ignorar_voltas_maiores_que": 0,# ignorar tempos de volta maiores que ... s (0 = desligado)
+    "omitir_minutos_ritmo": False,  # omitir os minutos na leitura do ritmo
+    "chamar_pilotos_por": "nome",   # nome | numero | dorsal
 }
 
 
@@ -323,8 +391,16 @@ class ModuloSom:
 
         threading.Thread(target=_executar, daemon=True, name="kchrono-bips-final").start()
 
+    def bip_finalizacao(self):
+        """Bip de finalização da sessão (1 longo + 5 curtos) — chamável isoladamente."""
+        try:
+            self._beep_pattern(500, 500, 1200, 100, 5)
+        except Exception as e:
+            log.warning("bips de finalização falharam: %s", e)
+
+
     def finalizada(self, tipo: str = "", grid_ordenado: Optional[List[int]] = None,
-               grid_invertido: bool = False, resultados: Optional[List[Dict]] = None):
+               grid_invertido: bool = False, resultados: Optional[List[Dict]] = None, tocar_beep: bool = True):
         """Anuncia o fim da sessão com padrão de bips + frase própria do tipo.
         
         Padrão sonoro: 1 bip longo + 5 bips curtos e altos.
@@ -339,7 +415,8 @@ class ModuloSom:
         log.info("finalizada: tipo='%s', habilitados=%s", tipo, self.habilitados)
         # padrão de bips: 1 longo + 5 curtos
         try:
-            self._beep_pattern(500, 500, 1200, 100, 5)
+            if tocar_beep:
+                self._beep_pattern(500, 500, 1200, 100, 5)
         except Exception as e:
             log.warning("bips de fim de sessão falharam: %s", e)
         # frase final
@@ -357,10 +434,9 @@ class ModuloSom:
         if tipo == "treino":
             return
         if grid_ordenado is not None:
-            try:
-                self._annunciar_grid(grid_ordenado, invertido=grid_invertido)
-            except Exception as e:
-                log.warning("anúncio de grid falhou: %s", e)
+            # anuncia apenas as posições dos pilotos (resultado), sem a listagem
+            # redundante de "1º, 2º, 3º..." do grid.
+            pass
         if resultados is not None:
             try:
                 self._annuncian_resultados(resultados)
@@ -395,7 +471,7 @@ class ModuloSom:
             self.falar(frase)
 
     def _annuncian_resultados(self, resultados: List[Dict]):
-        """Anuncia o resultado da corrida: 'O 1º lugar é de [piloto], 2º [piloto], etc.'"""
+        """Anuncia o resultado da corrida: 'Em primeiro lugar [piloto], 2º [piloto], ...'"""
         if not resultados:
             return
         partes = []
@@ -403,11 +479,10 @@ class ModuloSom:
             pos = r.get("posicao", 0)
             nome = r.get("nome", "Desconhecido")
             if pos == 1:
-                partes.append(f"O 1º lugar é de {nome}")
+                partes.append(f"Em primeiro lugar {nome}")
             else:
-                partes.append(f"{self._posicao_por_extenso(pos)} lugar é de {nome}")
+                partes.append(f"{self._posicao_por_extenso(pos)} {nome}")
         if partes:
-            # une as partes com vírgula e 'e' final
             if len(partes) == 1:
                 frase = partes[0] + "."
             else:
