@@ -917,10 +917,6 @@ function renderSessao(s) {
   sessaoPausada = !!s.pausada;
   atualizarBotaoPrincipal();
   atualizarBotaoPausa();
-  // painel de check-in ("Pilotos na pista") só faz sentido antes de uma sessão ativa:
-  // depois que a sessão inicia, o quadro de pilotos na pista é o "Ao Vivo"
-  const cardCheckin = document.getElementById("card-checkin");
-  if (cardCheckin) cardCheckin.style.display = sessaoAtiva ? "none" : "";
   // mini-semáforo acompanha o estado (a sequência de largada pilota via evento)
   if (estadoSessao === "largada") renderMiniSemaforo(0, "vermelho");
   else if (["treino", "classificacao", "correndo"].includes(estadoSessao)) renderMiniSemaforo(0, "verde");
