@@ -938,35 +938,12 @@ function renderSessao(s) {
 // "Configuração da sessão" fica recolhido e acima do botão de ação aparece
 // só um texto curto com as informações básicas escolhidas.
 function renderResumoSessao() {
+  // desabilitado: não ocultar o card de configuração/botões ao iniciar sessão
   const el = document.getElementById("sessao-resumo");
-  const txt = document.getElementById("sessao-resumo-txt");
+  if (el) el.style.display = "none";
   const cardCfg = document.getElementById("card-config-sessao");
-  if (!el || !txt) return;
-  const ativa = sessaoAtiva && !["parado", "finalizado"].includes(estadoSessao);
-  if (!ativa) {
-    el.style.display = "none";
-    if (cardCfg) cardCfg.style.display = "";
-    return;
-  }
-  // sessão ativa → recolhe o card de configuração: só o resumo curto acima do botão
-  if (cardCfg) cardCfg.style.display = "none";
-  if (el) el.style.display = "block";
-  const tipo = (document.getElementById("cfg-tipo") || {}).value || "treino";
-  const criterio = (document.getElementById("cfg-criterio") || {}).value || "Tempo";
-  const livre = String(criterio).toLowerCase().startsWith("livre");
-  const durEl = _campoDuracao(tipo);
-  let duracao = parseFloat(durEl && durEl.value);
-  if (!Number.isFinite(duracao) || duracao < 0) duracao = DURACOES_PADRAO[tipo] ?? 10;
-  if (livre) duracao = 0;
-  const unidade = String(criterio).toLowerCase().startsWith("voltas") ? "voltas" : "min";
-  const durTxt = duracao > 0 ? `${duracao} ${unidade}` : "sem limite";
-  const contador = parseInt((document.getElementById("cfg-contador") || {}).value, 10) || 10;
-  const paradas = parseInt((document.getElementById("cfg-aviso-saida") || {}).value, 10) || 0;
-  const paraTerminar = parseInt((document.getElementById("cfg-terminar") || {}).value, 10) || 0;
-  const tmin = parseInt((document.getElementById("cfg-tempo-minimo") || {}).value, 10) || 0;
-  txt.textContent =
-    `${tipo === "treino" ? "Treino" : tipo === "classificacao" ? "Classificação" : tipo === "corrida" ? "Corrida" : "Campeonato"}` +
-    ` · duração ${durTxt} · contagem ${contador}s · aviso saída ${paradas}s · tempo pra terminar ${paraTerminar}s · mín. volta ${tmin}s`;
+  if (cardCfg) cardCfg.style.display = "";
+  return;
 }
 
 // cronômetro da sessão no display "Tempo" enquanto não há líder com voltas.
