@@ -1,10 +1,10 @@
 {
-  "versao": "1.2.5",
+  "versao": "1.2.6",
   "canal": "estavel",
   "url_base": "",
-  "notas": "Versão 1.2.5 — desabilita ocultação do card de configuração/botões ao iniciar sessão",
+  "notas": "Versão 1.2.6 — reorganiza botões de volta para dentro do card de configuração (estilo 1.2.2)",
   "arquivos": {
-    "windows": "KChrono-Setup-1-2-5.exe",
-    "linux": "KChrono-1.2.5-x86_64.AppImage"
+    "windows": "KChrono-Setup-1-2-6.exe",
+    "linux": "KChrono-1.2.6-x86_64.AppImage"
   }
 }
