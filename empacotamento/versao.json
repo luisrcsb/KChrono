@@ -1,10 +1,10 @@
 {
-  "versao": "1.2.8",
+  "versao": "1.2.10",
   "canal": "estavel",
   "url_base": "",
-  "notas": "Versão 1.2.8 — restaura todos os campos de configuração de tempo e mantém botões fixos respondendo ao tipo de sessão",
+  "notas": "Versão 1.2.10 — corrige HTML duplicado, ID do botao Pausar e botoes dinamicos por tipo de sessao",
   "arquivos": {
-    "windows": "KChrono-Setup-1-2-8.exe",
-    "linux": "KChrono-1.2.8-x86_64.AppImage"
+    "windows": "KChrono-Setup-1-2-10.exe",
+    "linux": "KChrono-1.2.10-x86_64.AppImage"
   }
 }

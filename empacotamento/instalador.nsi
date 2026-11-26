@@ -3,7 +3,7 @@
 ;  Requer: ter compilado a pasta dist\KChrono-<versão>\ com build-windows.bat
 ;  Compile este arquivo no NSIS (compilador makensis).
 ;
-;  Gera: KChrono-Setup-<versão com hífens>.exe (ex.: KChrono-Setup-1-2-8.exe)
+;  Gera: KChrono-Setup-<versão com hífens>.exe (ex.: KChrono-Setup-1-2-10.exe)
 ;  App nativo com pywebview (WebView2) — NÃO abre navegador.
 ;
 ;  Metadados do instalador (VIProductVersion / VIAddVersionKey) preenchidos:
@@ -15,8 +15,8 @@
 !include "LogicLib.nsh"
 
 ; VERSAO e VERSAO_ARQ são sincronizados com versao.json por build.py
-!define VERSAO "1.2.8"
-!define VERSAO_ARQ "1-2-8"
+!define VERSAO "1.2.10"
+!define VERSAO_ARQ "1-2-10"
 !define APP "KChrono"
 !define FABRICANTE "KChrono"
 !define DESCRICAO "KChrono - Cronometragem de Kart"
@@ -66,16 +66,30 @@ Section "KChrono" SecPrincipal
   ; FECHA O KCHRONO: encerra Operador, Telão, Gerente e Serviço. Repete até não
   ; sobrar processo, porque o WebView2 mantém processos filhos por alguns
   ; instantes e o File abaixo falharia com "arquivo em uso".
+  ; ATENÇÃO: "taskkill /IM ${APP}*.exe" NÃO casa com "KChrono-1.2.8.exe" —
+  ; o sufixo ".exe" impede o curinga e o app antigo continua rodando, travando
+  ; as DLLs de _internal. Use "${APP}-1*", que também não casa com o próprio
+  ; instalador (KChrono-Setup-*).
   StrCpy $2 0
+  StrCpy $4 0
   ${Do}
-    nsExec::ExecToStack 'taskkill /IM ${APP}*.exe /T /F'
+    nsExec::ExecToStack 'taskkill /IM ${APP}-1* /T /F'
     Pop $0              ; código de saída: 128 = nenhum processo encontrado
+    Pop $1              ; texto do comando (mantém a pilha limpa)
     ${If} $0 == 128
+      StrCpy $4 1
       ${Break}
     ${EndIf}
     Sleep 500
     IntOp $2 $2 + 1
   ${LoopWhile} $2 < 12
+
+  ; Se ainda sobrar processo, aborta com mensagem clara em vez de deixar o
+  ; Windows mostrar "Erro ao abrir o arquivo pra gravação" no meio da cópia.
+  ${If} $4 != 1
+    MessageBox MB_ICONSTOP|MB_OK "Não foi possível encerrar o KChrono. Feche o programa e execute o instalador novamente."
+    Abort
+  ${EndIf}
 
   ; DESINSTALA A VERSÃO ANTERIOR: roda o desinstalador antigo em modo silencioso
   ; (/S não pergunta nada e preserva os dados do usuário em APPDATA\KChrono).
@@ -150,9 +164,10 @@ SectionEnd
 
 ; ==================== Desinstalação ====================
 Section "Uninstall"
-  ; fecha o app para poder apagar o exe
-  nsExec::ExecToStack 'taskkill /IM ${APP}*.exe /T /F'
+  ; fecha o app para poder apagar o exe (padrão ${APP}-1*: ver nota na instalação)
+  nsExec::ExecToStack 'taskkill /IM ${APP}-1* /T /F'
   Pop $0
+  Pop $1
   Sleep 500
 
   ; guarda a pasta de telemetria ANTES de apagar o registro

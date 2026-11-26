@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>KChrono — Precision Timing System</title>
-<link rel="stylesheet" href="/static/estilo.css?v=1.2.8">
+<link rel="stylesheet" href="/static/estilo.css?v=1.2.10">
 <link rel="icon" href="/imagens/KCHRONO-LOGO.png">
 <script src="/static/chart.umd.min.js"></script>
 </head>
@@ -138,14 +138,9 @@
       </div>
             </div>
             <div class="acoes" style="margin-top:12px">
-              <button class="destaque" id="btn-acao-principal" onclick="acaoPrincipal()">▶ Iniciar treino</button>
-              <button id="btn-pausa" onclick="alternarPausa()" disabled>⏸ Pausar</button>
-              <button onclick="finalizar()">⏹ Finalizar</button>
-            </div>
- style="margin-top:12px">
               <button class="destaque" id="btn-acao-principal" onclick="acaoPrincipal()" data-help="Inicia a sessão conforme o tipo selecionado (treino, classificação ou prepara a largada para corrida)">▶ Iniciar treino</button>
               <button id="btn-pausa" onclick="alternarPausa()" disabled title="Pausar o cronômetro da sessão">⏸ Pausar</button>
-              <button onclick="finalizar()">⏹ Finalizar</button>
+              <button id="btn-finalizar" onclick="finalizar()" title="Finalizar a sessão">⏹ Finalizar</button>
             </div>
             <div class="sessao-resumo" id="sessao-resumo" style="display:none; margin-top:10px">
               <span id="sessao-resumo-txt" style="font-size:13px; color:var(--text-main)"></span>
@@ -1182,7 +1177,7 @@
         <div class="grid g4">
           <div class="card sobre-versao" style="grid-column:1/-1">
             <h3>Versão</h3>
-            <div class="big" id="upd-versao">1.2.8</div>
+            <div class="big" id="upd-versao">1.2.10</div>
             <div class="sub">Resumo completo do sistema · fases 0 → 8 implementadas (fase 6 parcial)</div>
 
             <div class="resumo-sistema">
@@ -1277,8 +1272,8 @@
               <button class="btn-slide" onclick="encerrarApp()">⏹ Sair</button>
             </div>
             <p class="hint">Publique a versão nova como <b>release no GitHub</b> com tag igual à
-              versão (ex.: <code>v1.2.8</code>) — a CI anexa sozinha o instalador
-              <code>KChrono-Setup-1-2-8.exe</code>
+              versão (ex.: <code>v1.2.10</code>) — a CI anexa sozinha o instalador
+              <code>KChrono-Setup-1-2-10.exe</code>
               (Windows), o <code>KChrono-*.AppImage</code> (Linux) e a ISO da live. "Instalar agora"
               baixa, fecha o app e atualiza em silêncio — ao reabrir já é a versão nova (os dados
               ficam intactos).</p>
@@ -1302,12 +1297,12 @@
 <!-- rodapé fixo -->
 <div class="rodape-bar">
   <div class="dir">
-    <span>KChrono <span class="js-versao">v1.2.8</span> · por <b>Raphael Belowodski</b></span>
+    <span>KChrono <span class="js-versao">v1.2.10</span> · por <b>Raphael Belowodski</b></span>
   </div>
 </div>
 
-<script src="/static/tracado.js?v=1.2.8"></script>
-<script src="/static/app.js?v=1.2.8"></script>
+<script src="/static/tracado.js?v=1.2.10"></script>
+<script src="/static/app.js?v=1.2.10"></script>
 
 <!-- nova versão disponível (abre sozinho na abertura do app) -->
 <div id="modal-atualizacao" class="modal-fundo" style="display:none">

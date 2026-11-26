@@ -454,12 +454,20 @@ const finalizar = () => api("sessao/finalizar");
 // Um único botão Pausar/Retomar: o rótulo mostra a ação que ele vai executar.
 // (só faz sentido com sessão em andamento e sem sessão o botão fica desabilitado)
 function atualizarBotaoPausa() {
-  const btn = document.getElementById("btn-pausar");
+  const btn = document.getElementById("btn-pausa");
   if (!btn) return;
   btn.disabled = !sessaoAtiva || estadoSessao === "largada";
   const pausada = sessaoPausada;
-  btn.textContent = pausada ? "⏵ Retomar" : "⏸ Pausar";
-  btn.title = pausada ? "Retomar o cronômetro da sessão" : "Pausar o cronômetro da sessão";
+  const nome = tipoAtualNome();
+  btn.textContent = pausada ? `⏵ Retomar ${nome}` : `⏸ Pausar ${nome}`;
+  btn.title = `cronômetro da sessão de ${nome} — ${pausada ? "retomar" : "pausar"}`;
+}
+function atualizarBotaoFinalizar() {
+  const btn = document.getElementById("btn-finalizar");
+  if (!btn) return;
+  const nome = tipoAtualNome();
+  btn.textContent = `⏹ Finalizar ${nome}`;
+  btn.title = `Finalizar a sessão de ${nome}`;
 }
 function alternarPausa() {
   if (!sessaoAtiva) return;
@@ -611,6 +619,7 @@ function tratarEvento(ev) {
       if (typeof ev.pausada === "boolean") sessaoPausada = ev.pausada;
       atualizarBotaoPrincipal();
       atualizarBotaoPausa();
+      atualizarBotaoFinalizar();
       // atualiza a base do cronômetro DIRETO do evento (sem round-trip HTTP),
       // para o relógio do operador parar junto com o telão no fim da prova.
       renderSessao(ev);
@@ -917,6 +926,7 @@ function renderSessao(s) {
   sessaoPausada = !!s.pausada;
   atualizarBotaoPrincipal();
   atualizarBotaoPausa();
+  atualizarBotaoFinalizar();
   // mini-semáforo acompanha o estado (a sequência de largada pilota via evento)
   if (estadoSessao === "largada") renderMiniSemaforo(0, "vermelho");
   else if (["treino", "classificacao", "correndo"].includes(estadoSessao)) renderMiniSemaforo(0, "verde");
@@ -4218,6 +4228,8 @@ function tipoSessaoMudou() {
   atualizarDuracoesVisiveis();
   criterioMudou();
   atualizarBotaoPrincipal();
+  atualizarBotaoPausa();
+  atualizarBotaoFinalizar();
 }
 
 // Troca os campos entre minutos e voltas. Antes de trocar, grava o que estava
@@ -4302,12 +4314,21 @@ const ROTULO_ACAO = {
   treino: "▶ Iniciar treino",
   classificacao: "▶ Iniciar classificação",
   corrida: "▶ Preparar para a Largada",
+  campeonato: "▶ Iniciar campeonato",
 };
+const NOME_TIPO = {
+  treino: "treino", classificacao: "classificação",
+  corrida: "corrida", campeonato: "campeonato",
+};
+function tipoAtualNome() {
+  const tipo = (document.getElementById("cfg-tipo") || {}).value || "treino";
+  return NOME_TIPO[tipo] || tipo;
+}
 function atualizarBotaoPrincipal() {
   const btn = document.getElementById("btn-acao-principal");
   if (!btn) return;
   const tipo = (document.getElementById("cfg-tipo") || {}).value || "treino";
-  if (tipo === "campeonato") { btn.style.display = "none"; btn.classList.remove("btn-regressiva-piscar"); btn.classList.remove("btn-largada-amarelo"); btn.classList.remove("btn-preparar-piscar"); return; }  // tem botões próprios no plano
+  // NUNCA esconder: os botões ficam fixos no card C01 para qualquer tipo.
   btn.style.display = "";
   if (sessaoAtiva && estadoSessao === "largada") {
     // Durante a corrida (estado LARGADA/CORRENDO): botão transparente (sem interação visual)
@@ -4342,11 +4363,9 @@ function atualizarBotaoPrincipal() {
   }
 }
 function acaoPrincipal() {
-  const tipo = (document.getElementById("cfg-tipo") || {}).value || "treino";
-  if (tipo === "campeonato") return;
   if (sessaoAtiva && estadoSessao === "largada") { largada(); return; }
   if (sessaoAtiva) return;
-  iniciarSessaoConfigurada();
+  iniciarSessaoConfigurada(); // inclui campeonato (iniciarCampeonatoEscolhido)
 }
 async function carregarPlanoCampeonato() {
   const r = await api("campeonato/plano", "GET");
@@ -4954,6 +4973,7 @@ preencherDuracoesSessao(); // durações por tipo (Treino 60 · Classificação 
 tipoSessaoMudou();         // aplica a duração do tipo escolhido
 carregarPlanoCampeonato(); // durações do CTAD usadas pelo tipo Campeonato
 atualizarBotaoPausa();
+atualizarBotaoFinalizar();
 carregarAutoConectar();
 carregarVozContagem();
 configurarAutoSalvarSom();
