@@ -1556,7 +1556,8 @@ function iniciarSessaoConfigurada() {
   if (tipo === "campeonato") { iniciarCampeonatoEscolhido(); return; }
   const criterio = document.getElementById("cfg-criterio").value;
   const livre = criterio.toLowerCase().startsWith("livre");
-  const durEl = _campoDuracao(tipo);
+  // O C01 usa um único campo de duração visível; ele vale para qualquer tipo.
+  const durEl = document.getElementById("cfg-duracao");
   let duracao = parseFloat(durEl && durEl.value);
   // 0 é uma duração válida (sem limite / infinito) — não usar "|| 10".
   if (!Number.isFinite(duracao) || duracao < 0) duracao = DURACOES_PADRAO[tipo] ?? 10;
@@ -4201,6 +4202,69 @@ function atualizarDuracoesVisiveis() {
   if (camp) { carregarPlanoCampeonato(); _renderDuracaoCampeonato(); }
 }
 
+// C01: mostra só os campos que fazem sentido para o tipo/critério escolhidos.
+// Treino = só Critério · Classificação = Critério + Duração (+ Tempo para
+// terminar quando for por tempo) · Corrida = tempo/voltas com largada ·
+// Campeonato = só Tempo mínimo de volta (o resto vem de 🏆 Campeonatos).
+function atualizarCamposConfigSessao() {
+  const tipo = _tipoSessaoAtual();
+  const modo = _modoCriterio();
+  const visiveis = new Set(["criterio"]);
+
+  if (tipo === "classificacao") {
+    // "Tempo livre" esconde só os campos de configuração; o Critério fica
+    // visível para o operador poder voltar para Tempo/Voltas.
+    if (modo !== "livre") {
+      visiveis.add("duracao");
+      if (modo === "tempo") visiveis.add("terminar");
+    }
+  } else if (tipo === "corrida") {
+    ["criterio", "duracao", "contador", "terminar", "saida", "tempo-minimo"]
+      .forEach(k => visiveis.add(k));
+  } else if (tipo === "campeonato") {
+    visiveis.clear();
+    visiveis.add("tempo-minimo");
+  }
+
+  const campos = ["criterio", "duracao", "contador", "aviso-saida", "terminar",
+                  "entre-carros", "metodo", "saida", "tempo-minimo", "media-n"];
+  campos.forEach(k => {
+    const el = document.getElementById("cfg-wrap-" + k);
+    if (el) el.style.display = visiveis.has(k) ? "" : "none";
+  });
+
+  // Corrida é por tempo ou por voltas — "tempo livre" não existe aqui.
+  const livre = document.getElementById("cfg-criterio-livre");
+  if (livre) {
+    livre.hidden = tipo === "corrida" || tipo === "campeonato";
+    livre.disabled = tipo === "corrida" || tipo === "campeonato";
+  }
+
+  // O campo de duração acompanha a unidade do critério (e é inútil em livre).
+  const dur = document.getElementById("cfg-duracao");
+  const lbl = document.getElementById("cfg-lbl-duracao");
+  if (dur) {
+    if (modo === "livre") {
+      if (dur.value !== "0" && dur.value !== "") duracaoAntesLivre = dur.value;
+      dur.value = "0";
+      dur.disabled = true;
+    } else {
+      dur.disabled = false;
+      if (duracaoAntesLivre !== null) {
+        dur.value = duracaoAntesLivre;
+        duracaoAntesLivre = null;
+      } else if (dur.value === "0" || dur.value === "") {
+        dur.value = DURACOES_PADRAO[tipo] ?? 10;
+      }
+    }
+    dur.title = modo === "livre" ? "tempo livre: 0 = sem limite" : "0 = sem limite (infinito)";
+  }
+  if (lbl) lbl.textContent = modo === "livre" ? "Duração (sem limite)"
+    : `Duração (${modo === "voltas" ? "voltas" : "min"})`;
+}
+
+let duracaoAntesLivre = null;
+
 function _renderDuracaoCampeonato() {
   const el = document.getElementById("cfg-duracao-camp");
   if (!el) return;
@@ -4229,6 +4293,7 @@ function tipoSessaoMudou() {
     if (tipo !== "treino" && livre) crit.value = "Tempo";
   }
   atualizarDuracoesVisiveis();
+  atualizarCamposConfigSessao();
   criterioMudou();
   atualizarBotaoPrincipal();
   atualizarBotaoPausa();
@@ -4246,6 +4311,7 @@ function criterioMudou() {
     salvarDuracoesSessao();
   }
   _aplicarValoresDuracao();
+  atualizarCamposConfigSessao();
 }
 
 // ---------------------------------------------------------------- escolha do campeonato (painel do operador)

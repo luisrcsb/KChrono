@@ -3,7 +3,7 @@
 ;  Requer: ter compilado a pasta dist\KChrono-<versão>\ com build-windows.bat
 ;  Compile este arquivo no NSIS (compilador makensis).
 ;
-;  Gera: KChrono-Setup-<versão com hífens>.exe (ex.: KChrono-Setup-1-2-16.exe)
+;  Gera: KChrono-Setup-<versão com hífens>.exe (ex.: KChrono-Setup-1-2-17.exe)
 ;  App nativo com pywebview (WebView2) — NÃO abre navegador.
 ;
 ;  Metadados do instalador (VIProductVersion / VIAddVersionKey) preenchidos:
@@ -15,8 +15,8 @@
 !include "LogicLib.nsh"
 
 ; VERSAO e VERSAO_ARQ são sincronizados com versao.json por build.py
-!define VERSAO "1.2.16"
-!define VERSAO_ARQ "1-2-16"
+!define VERSAO "1.2.17"
+!define VERSAO_ARQ "1-2-17"
 !define APP "KChrono"
 !define FABRICANTE "KChrono"
 !define DESCRICAO "KChrono - Cronometragem de Kart"
@@ -157,9 +157,12 @@ Section "KChrono" SecPrincipal
 SectionEnd
 
 Section "Iniciar com o Windows (Serviço)" SecAuto
-  MessageBox MB_YESNO "Deseja iniciar o KChrono automaticamente com o Windows?" IDNO fim
-    WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Run" "${APP}_service" '"$INSTDIR\${APP}-${VERSAO}.exe" --sem-janela'
-  fim:
+  ; Instalação silenciosa (/S) não pode parar numa pergunta — pula a seção.
+  ${IfNot} ${Silent}
+    MessageBox MB_YESNO "Deseja iniciar o KChrono automaticamente com o Windows?" IDNO fim_auto
+      WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Run" "${APP}_service" '"$INSTDIR\${APP}-${VERSAO}.exe" --sem-janela'
+    fim_auto:
+  ${EndIf}
 SectionEnd
 
 ; ==================== Desinstalação ====================
