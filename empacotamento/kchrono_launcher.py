@@ -245,6 +245,39 @@ def _num_telas() -> int:
         return 1
 
 
+def _desativar_gpu_webview() -> None:
+    """Evita o AppHangB1 do WebView2 no Windows (dxgi.dll/directxdatabasehelper).
+
+    O servidor headless e a interface no navegador continuam respondendo; só a
+    janela nativa trava. Desligar a aceleração gráfica do WebView2 elimina esse
+    caminho sem mudar layout, botões ou dados.
+    """
+    if sys.platform != "win32":
+        return
+    try:
+        from webview.platforms import edgechromium as _ec
+    except Exception:
+        return
+    if getattr(_ec, "_kchrono_sem_gpu", False):
+        return
+    original_init = _ec.EdgeChrome.__init__
+
+    def _init_sem_gpu(self, form, window, cache_dir):
+        original_init(self, form, window, cache_dir)
+        try:
+            props = self.webview.CreationProperties
+            args = str(props.AdditionalBrowserArguments or "")
+            if "--disable-gpu" not in args:
+                args = (args + " --disable-gpu --disable-gpu-compositing").strip()
+                props.AdditionalBrowserArguments = args
+                self.webview.CreationProperties = props
+        except Exception:
+            pass
+
+    _ec.EdgeChrome.__init__ = _init_sem_gpu
+    _ec._kchrono_sem_gpu = True
+
+
 def main() -> int:
     multiprocessing.freeze_support()
     configurar_log()
@@ -450,6 +483,7 @@ def main() -> int:
     # Inicia loop da GUI (bloqueante — encerra quando fecha a janela)
     import atexit
     atexit.register(ponte.encerrar_filhos)
+    _desativar_gpu_webview()
     webview.start(func=_ao_iniciar, debug=False, private_mode=False,
                   storage_path=None)
     ponte.encerrar_filhos()

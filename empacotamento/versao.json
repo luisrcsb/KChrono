@@ -1,10 +1,10 @@
 {
-  "versao": "1.2.11",
+  "versao": "1.2.12",
   "canal": "estavel",
   "url_base": "",
-  "notas": "Versão 1.2.11 — botao de largada disponivel no estado preparado para iniciar contagem regressiva",
+  "notas": "Versão 1.2.12 — desativa GPU do WebView2 para corrigir AppHang do botao inicial",
   "arquivos": {
-    "windows": "KChrono-Setup-1-2-11.exe",
-    "linux": "KChrono-1.2.11-x86_64.AppImage"
+    "windows": "KChrono-Setup-1-2-12.exe",
+    "linux": "KChrono-1.2.12-x86_64.AppImage"
   }
 }
