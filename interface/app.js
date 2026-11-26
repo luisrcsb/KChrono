@@ -640,7 +640,9 @@ function tratarEvento(ev) {
       if (ev.msg && /desconect|offline|perd/i.test(ev.msg))
         break;
     case "semaforo":
+      largadaRodando = (ev.fase || "vermelho") === "vermelho";
       renderMiniSemaforo(ev.acesas || 0, ev.fase || "vermelho");
+      atualizarBotaoPrincipal();
       atualizarRelogioLargada(ev);
       break;
   }
@@ -924,6 +926,7 @@ function renderSessao(s) {
   estadoSessao = s.estado || "parado";
   sessaoAtiva = !!(s.id && !["parado", "finalizado"].includes(estadoSessao));
   sessaoPausada = !!s.pausada;
+  if (estadoSessao !== "largada") largadaRodando = false;
   atualizarBotaoPrincipal();
   atualizarBotaoPausa();
   atualizarBotaoFinalizar();
@@ -4310,6 +4313,9 @@ async function iniciarCampeonatoEscolhido() {
 let sessaoAtiva = false, estadoSessao = "parado";
 //: true quando o cronômetro da sessão está pausado (alimenta o botão Pausar/Retomar)
 let sessaoPausada = false;
+//: true enquanto a contagem regressiva da largada está rodando (evita clique duplo
+// e mantém o botão bloqueado até o semáforo ficar verde)
+let largadaRodando = false;
 const ROTULO_ACAO = {
   treino: "▶ Iniciar treino",
   classificacao: "▶ Iniciar classificação",
@@ -4331,13 +4337,20 @@ function atualizarBotaoPrincipal() {
   // NUNCA esconder: os botões ficam fixos no card C01 para qualquer tipo.
   btn.style.display = "";
   if (sessaoAtiva && estadoSessao === "largada") {
-    // Durante a corrida (estado LARGADA/CORRENDO): botão transparente (sem interação visual)
-    btn.disabled = true;
-    btn.textContent = "Preparar para a Largada";
-    btn.style.opacity = "0.5";
-    btn.classList.remove("btn-regressiva-piscar");
-    btn.classList.remove("btn-largada-amarelo");
-    btn.classList.remove("btn-preparar-piscar");
+    // Corrida preparada: o botão PRECISA estar disponível para disparar a contagem.
+    btn.classList.remove("btn-regressiva-piscar", "btn-preparar-piscar");
+    btn.classList.add("btn-largada-amarelo");
+    if (largadaRodando) {
+      btn.disabled = true;
+      btn.textContent = "⏱ Contagem em andamento";
+      btn.title = "A contagem regressiva já está rodando";
+      btn.style.opacity = "0.8";
+    } else {
+      btn.disabled = false;
+      btn.textContent = "▶ Iniciar contagem regressiva";
+      btn.title = "Inicia a contagem regressiva e dispara a largada";
+      btn.style.opacity = "1";
+    }
   } else if (sessaoAtiva) {
     // Sessão em andamento (treino/classificação/correndo): botão desabilitado visível
     btn.disabled = true;
@@ -4363,7 +4376,22 @@ function atualizarBotaoPrincipal() {
   }
 }
 function acaoPrincipal() {
-  if (sessaoAtiva && estadoSessao === "largada") { largada(); return; }
+  if (sessaoAtiva && estadoSessao === "largada") {
+    if (largadaRodando) return;
+    largadaRodando = true; // bloqueia clique duplo antes do evento do servidor
+    atualizarBotaoPrincipal();
+    largada().then(r => {
+      if (r && r.ok === false) {
+        largadaRodando = false;
+        atualizarBotaoPrincipal();
+        logMsg(`largada: ${r.erro || "não iniciada"}`, "l-erro", "log-operador");
+      }
+    }).catch(() => {
+      largadaRodando = false;
+      atualizarBotaoPrincipal();
+    });
+    return;
+  }
   if (sessaoAtiva) return;
   iniciarSessaoConfigurada(); // inclui campeonato (iniciarCampeonatoEscolhido)
 }
