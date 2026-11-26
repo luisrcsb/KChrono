@@ -3,7 +3,7 @@
 ;  Requer: ter compilado a pasta dist\KChrono-<versão>\ com build-windows.bat
 ;  Compile este arquivo no NSIS (compilador makensis).
 ;
-;  Gera: KChrono-Setup-<versão com hífens>.exe (ex.: KChrono-Setup-1-2-13.exe)
+;  Gera: KChrono-Setup-<versão com hífens>.exe (ex.: KChrono-Setup-1-2-14.exe)
 ;  App nativo com pywebview (WebView2) — NÃO abre navegador.
 ;
 ;  Metadados do instalador (VIProductVersion / VIAddVersionKey) preenchidos:
@@ -15,8 +15,8 @@
 !include "LogicLib.nsh"
 
 ; VERSAO e VERSAO_ARQ são sincronizados com versao.json por build.py
-!define VERSAO "1.2.13"
-!define VERSAO_ARQ "1-2-13"
+!define VERSAO "1.2.14"
+!define VERSAO_ARQ "1-2-14"
 !define APP "KChrono"
 !define FABRICANTE "KChrono"
 !define DESCRICAO "KChrono - Cronometragem de Kart"

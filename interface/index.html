@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>KChrono — Precision Timing System</title>
-<link rel="stylesheet" href="/static/estilo.css?v=1.2.13">
+<link rel="stylesheet" href="/static/estilo.css?v=1.2.14">
 <link rel="icon" href="/imagens/KCHRONO-LOGO.png">
 <script src="/static/chart.umd.min.js"></script>
 </head>
@@ -137,6 +137,28 @@
           <input id="cfg-media-n" value="3" title="Melhor média de N voltas consecutivas (coluna 'Média N' do telão)"></div>
       </div>
             </div>
+
+            <!-- Campeonato: selecionar/editar/criar sem sair do C01 -->
+            <div id="cfg-camp-escolha" style="display:none; margin-top:14px">
+              <h4 class="cfg-grupo-tit">Campeonato</h4>
+              <div class="form-sessao centro">
+                <div><label>Escolher campeonato</label>
+                  <select id="cfg-camp-select" style="min-width:260px"
+                          onchange="atualizarEscolhaCampeonato()"></select></div>
+                <div><label>&nbsp;</label>
+                  <button class="btn-slide" onclick="menuCriarCampeonato()"
+                          title="Abre 🏆 Campeonatos no menu lateral para criar um campeonato">➕ Criar campeonato</button></div>
+                <div><label>&nbsp;</label>
+                  <button class="btn-slide" id="cfg-camp-editar"
+                          onclick="menuEditarCampeonato()" disabled
+                          title="Abre 🏆 Campeonatos com o campeonato escolhido">✏️ Editar campeonato</button></div>
+              </div>
+              <p class="hint" id="cfg-camp-aviso" style="display:none; margin-top:10px">
+                Nenhum campeonato cadastrado ainda — clique em <b>Criar campeonato</b> para montar o primeiro.</p>
+              <p class="hint" style="margin-top:6px">Criar e editar abrem o menu <b>🏆 Campeonatos</b> na lateral,
+                onde ficam as regras, inscritos, chaves, durações e a sequência de etapas.</p>
+            </div>
+
             <div class="acoes" style="margin-top:12px">
               <button class="destaque" id="btn-acao-principal" onclick="acaoPrincipal()" data-help="Inicia a sessão conforme o tipo selecionado (treino, classificação ou prepara a largada para corrida)">▶ Iniciar treino</button>
               <button id="btn-pausa" onclick="alternarPausa()" disabled title="Pausar o cronômetro da sessão">⏸ Pausar</button>
@@ -1177,7 +1199,7 @@
         <div class="grid g4">
           <div class="card sobre-versao" style="grid-column:1/-1">
             <h3>Versão</h3>
-            <div class="big" id="upd-versao">1.2.13</div>
+            <div class="big" id="upd-versao">1.2.14</div>
             <div class="sub">Resumo completo do sistema · fases 0 → 8 implementadas (fase 6 parcial)</div>
 
             <div class="resumo-sistema">
@@ -1272,8 +1294,8 @@
               <button class="btn-slide" onclick="encerrarApp()">⏹ Sair</button>
             </div>
             <p class="hint">Publique a versão nova como <b>release no GitHub</b> com tag igual à
-              versão (ex.: <code>v1.2.13</code>) — a CI anexa sozinha o instalador
-              <code>KChrono-Setup-1-2-13.exe</code>
+              versão (ex.: <code>v1.2.14</code>) — a CI anexa sozinha o instalador
+              <code>KChrono-Setup-1-2-14.exe</code>
               (Windows), o <code>KChrono-*.AppImage</code> (Linux) e a ISO da live. "Instalar agora"
               baixa, fecha o app e atualiza em silêncio — ao reabrir já é a versão nova (os dados
               ficam intactos).</p>
@@ -1297,12 +1319,12 @@
 <!-- rodapé fixo -->
 <div class="rodape-bar">
   <div class="dir">
-    <span>KChrono <span class="js-versao">v1.2.13</span> · por <b>Raphael Belowodski</b></span>
+    <span>KChrono <span class="js-versao">v1.2.14</span> · por <b>Raphael Belowodski</b></span>
   </div>
 </div>
 
-<script src="/static/tracado.js?v=1.2.13"></script>
-<script src="/static/app.js?v=1.2.13"></script>
+<script src="/static/tracado.js?v=1.2.14"></script>
+<script src="/static/app.js?v=1.2.14"></script>
 
 <!-- nova versão disponível (abre sozinho na abertura do app) -->
 <div id="modal-atualizacao" class="modal-fundo" style="display:none">

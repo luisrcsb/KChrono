@@ -1,10 +1,10 @@
 {
-  "versao": "1.2.13",
+  "versao": "1.2.14",
   "canal": "estavel",
   "url_base": "",
-  "notas": "Versão 1.2.13 — desativa GPU do WebView2 na criacao do ambiente (AppHang)",
+  "notas": "Versão 1.2.14 — C01 mostra selecao, criacao e edicao de campeonato acima dos botoes",
   "arquivos": {
-    "windows": "KChrono-Setup-1-2-13.exe",
-    "linux": "KChrono-1.2.13-x86_64.AppImage"
+    "windows": "KChrono-Setup-1-2-14.exe",
+    "linux": "KChrono-1.2.14-x86_64.AppImage"
   }
 }
