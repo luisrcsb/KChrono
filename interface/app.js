@@ -1553,10 +1553,12 @@ function selecionarLinha(tr) {
 
 function iniciarSessaoConfigurada() {
   const tipo = document.getElementById("cfg-tipo").value;
+  salvarCamposConfigSessao();
   if (tipo === "campeonato") { iniciarCampeonatoEscolhido(); return; }
+  salvarDuracoesSessao();
   const criterio = document.getElementById("cfg-criterio").value;
   const livre = criterio.toLowerCase().startsWith("livre");
-  // O C01 usa um único campo de duração visível; ele vale para qualquer tipo.
+  // O valor da duração é o guardado para este tipo/critério.
   const durEl = document.getElementById("cfg-duracao");
   let duracao = parseFloat(durEl && durEl.value);
   // 0 é uma duração válida (sem limite / infinito) — não usar "|| 10".
@@ -4138,53 +4140,105 @@ function _modoCriterio() {
   return "tempo";
 }
 
-// Preenche os campos com os valores do modo atual (tempo, voltas ou livre).
-// Tempo ↔ Voltas troca unidade, valor, rótulo e o armazenamento usado.
+// O C01 tem UM campo de duração visível, mas o valor é por tipo E por critério:
+// Treino, Classificação e Corrida guardam seus próprios minutos/voltas.
+// Campeonato não entra nesse mapa — ele usa as regras de 🏆 Campeonatos (C56).
+// Preenche o campo com o valor salvo para o tipo atual no modo atual.
+// "Tempo livre" mostra 0 sem apagar o valor guardado para quando voltar a Tempo.
 function _aplicarValoresDuracao() {
   const modo = _modoCriterio();
+  const tipo = _tipoSessaoAtual();
   modoDuracaoAplicado = modo;
+  const el = document.getElementById("cfg-duracao");
+  if (!el) return;
+  const lbl = document.getElementById("cfg-lbl-duracao");
+  if (modo === "livre") {
+    el.value = "0";
+    el.disabled = true;
+    el.title = "tempo livre: 0 = sem limite (infinito)";
+    if (lbl) lbl.textContent = "Duração (sem limite)";
+    return;
+  }
   const vals = modo === "voltas" ? carregarVoltasSessao() : carregarDuracoesSessao();
-  const unidade = modo === "voltas" ? "voltas" : "min";
-  TIPOS_DURACAO.forEach(t => {
-    const el = _campoDuracao(t);
-    if (!el) return;
-    const lbl = document.getElementById("lbl-duracao-" + t);
-    if (modo === "livre") {
-      el.value = 0;
-      el.disabled = true;
-      el.title = "tempo livre: 0 = sem limite (infinito)";
-      if (lbl) lbl.textContent = `Duração ${ROTULOS_DURACAO[t]} (sem limite)`;
-    } else {
-      el.value = vals[t];
-      el.disabled = false;
-      el.title = "0 = sem limite (infinito)";
-      if (lbl) lbl.textContent = `Duração ${ROTULOS_DURACAO[t]} (${unidade})`;
-    }
-  });
+  const padrao = modo === "voltas" ? VOLTAS_PADRAO[tipo] ?? 20 : DURACOES_PADRAO[tipo] ?? 10;
+  el.value = Number.isFinite(vals[tipo]) ? vals[tipo] : padrao;
+  el.disabled = false;
+  el.title = "0 = sem limite (infinito)";
+  if (lbl) lbl.textContent = `Duração (${modo === "voltas" ? "voltas" : "min"})`;
 }
 
 function preencherDuracoesSessao() {
   _aplicarValoresDuracao();
 }
 
-// Grava os campos no armazenamento do modo exibido (tempo ou voltas).
-// No tempo livre nada é gravado: os valores originais ficam preservados.
-function salvarDuracoesSessao() {
+// Grava o valor digitado no tipo informado, no modo exibido (tempo/voltas).
+// O tipo pode ser passado explicitamente: no onchange do <select> o valor já
+// mudou, então é preciso guardar o tipo anterior antes de carregar o novo.
+function salvarDuracoesSessao(tipo = _tipoSessaoAtual()) {
   if (modoDuracaoAplicado !== "tempo" && modoDuracaoAplicado !== "voltas") return;
+  if (!TIPOS_DURACAO.includes(tipo)) return; // campeonato tem duração própria
+  const el = document.getElementById("cfg-duracao");
+  if (!el || el.disabled) return;
   const voltas = modoDuracaoAplicado === "voltas";
+  const padrao = (voltas ? VOLTAS_PADRAO : DURACOES_PADRAO)[tipo] ?? 10;
+  let n = parseFloat(el.value);
+  if (!Number.isFinite(n) || n < 0) n = padrao;
+  n = voltas ? Math.round(n) : Math.round(n * 100) / 100;
+  el.value = n;
   const d = voltas ? carregarVoltasSessao() : carregarDuracoesSessao();
-  const padrao = voltas ? VOLTAS_PADRAO : DURACOES_PADRAO;
-  TIPOS_DURACAO.forEach(t => {
-    const el = _campoDuracao(t);
-    if (!el || el.disabled) return;
-    let n = parseFloat(el.value);
-    if (!Number.isFinite(n) || n < 0) n = padrao[t];
-    n = voltas ? Math.round(n) : Math.round(n * 100) / 100;
-    el.value = n;
-    d[t] = n;
-  });
+  d[tipo] = n;
   _salvarMapa(voltas ? VOLTAS_KEY : DURACOES_KEY, d);
 }
+
+// ------------------------------------------- demais campos do C01, por tipo
+// Toda configuração ajustada no C01 volta como foi deixada na próxima vez que
+// o operador selecionar aquele tipo (inclusive após fechar/reabrir o app).
+const CFG_SESSAO_KEY = "kchrono_cfg_sessao_campos";
+const CAMPOS_CFG_SESSAO = ["criterio", "contador", "aviso-saida", "terminar",
+                           "entre-carros", "metodo", "saida", "tempo-minimo", "media-n"];
+const CFG_SESSAO_PADRAO = {
+  criterio: "Tempo", contador: "10", "aviso-saida": "30", terminar: "30",
+  "entre-carros": "2", metodo: "Melhor tempo", saida: "1ª passagem pela meta",
+  "tempo-minimo": "3", "media-n": "3",
+};
+
+function _carregarMapaCamposC01() {
+  let salvo = {};
+  try { salvo = JSON.parse(localStorage.getItem(CFG_SESSAO_KEY)) || {}; } catch (e) {}
+  return (salvo && typeof salvo === "object") ? salvo : {};
+}
+
+function salvarCamposConfigSessao(tipo = _tipoSessaoAtual()) {
+  const salvo = _carregarMapaCamposC01();
+  const atual = Object.assign({}, salvo[tipo] || {});
+  CAMPOS_CFG_SESSAO.forEach(k => {
+    const el = document.getElementById("cfg-" + k);
+    if (el) atual[k] = el.value;
+  });
+  salvo[tipo] = atual;
+  try { localStorage.setItem(CFG_SESSAO_KEY, JSON.stringify(salvo)); } catch (e) {}
+}
+
+function carregarCamposConfigSessao(tipo) {
+  const salvo = _carregarMapaCamposC01();
+  const cfg = salvo[tipo] || {};
+  CAMPOS_CFG_SESSAO.forEach(k => {
+    const el = document.getElementById("cfg-" + k);
+    if (!el) return;
+    let v = cfg[k];
+    if (v === undefined || v === null || v === "") {
+      v = CFG_SESSAO_PADRAO[k];
+      // Na primeira vez, treino abre em tempo livre como sempre aconteceu.
+      if (k === "criterio" && tipo === "treino" && salvo[tipo] === undefined) v = "livre";
+    }
+    el.value = v;
+  });
+}
+
+// Evita que o fluxo de inicialização/troca de tipo sobrescreva o que estava salvo.
+let cfgSessaoInicializando = false;
+let trocandoTipoC01 = false;
+let tipoC01Anterior = "treino";
 
 function _tipoSessaoAtual() {
   return (document.getElementById("cfg-tipo") || {}).value || "treino";
@@ -4239,31 +4293,8 @@ function atualizarCamposConfigSessao() {
     livre.hidden = tipo === "corrida" || tipo === "campeonato";
     livre.disabled = tipo === "corrida" || tipo === "campeonato";
   }
-
-  // O campo de duração acompanha a unidade do critério (e é inútil em livre).
-  const dur = document.getElementById("cfg-duracao");
-  const lbl = document.getElementById("cfg-lbl-duracao");
-  if (dur) {
-    if (modo === "livre") {
-      if (dur.value !== "0" && dur.value !== "") duracaoAntesLivre = dur.value;
-      dur.value = "0";
-      dur.disabled = true;
-    } else {
-      dur.disabled = false;
-      if (duracaoAntesLivre !== null) {
-        dur.value = duracaoAntesLivre;
-        duracaoAntesLivre = null;
-      } else if (dur.value === "0" || dur.value === "") {
-        dur.value = DURACOES_PADRAO[tipo] ?? 10;
-      }
-    }
-    dur.title = modo === "livre" ? "tempo livre: 0 = sem limite" : "0 = sem limite (infinito)";
-  }
-  if (lbl) lbl.textContent = modo === "livre" ? "Duração (sem limite)"
-    : `Duração (${modo === "voltas" ? "voltas" : "min"})`;
+  // Valor/rótulo da duração são aplicados por _aplicarValoresDuracao().
 }
-
-let duracaoAntesLivre = null;
 
 function _renderDuracaoCampeonato() {
   const el = document.getElementById("cfg-duracao-camp");
@@ -4277,6 +4308,13 @@ function _renderDuracaoCampeonato() {
 }
 
 function tipoSessaoMudou() {
+  // Guarda o tipo que ESTAVA ativo antes de trocar (duração + campos).
+  // No onchange do <select> o valor já é o novo, por isso usamos o anterior.
+  const anterior = tipoC01Anterior;
+  if (!cfgSessaoInicializando) {
+    salvarDuracoesSessao(anterior);
+    salvarCamposConfigSessao(anterior);
+  }
   const escolha = document.getElementById("cfg-camp-escolha");
   const tipo = _tipoSessaoAtual();
   const camp = tipo === "campeonato";
@@ -4285,34 +4323,48 @@ function tipoSessaoMudou() {
   const cardCamp = document.getElementById("card-camp-ativo");
   if (cardCamp) cardCamp.style.display = camp ? "block" : "none";
   if (camp) carregarCampeonatosOperador();
-  // Treino tem duração própria (60 min por padrão) e pode ser posto em tempo livre.
-  // Nos demais tipos, "tempo livre" volta para "Tempo" (evita sessão sem limite por engano).
-  const crit = document.getElementById("cfg-criterio");
-  if (crit && !camp) {
-    const livre = crit.value.toLowerCase().startsWith("livre");
-    if (tipo !== "treino" && livre) crit.value = "Tempo";
-  }
+  // Critério e demais campos voltam com o valor em que foram deixados para
+  // este tipo. A duração é carregada por criterioMudou()/_aplicarValoresDuracao().
+  carregarCamposConfigSessao(tipo);
   atualizarDuracoesVisiveis();
-  atualizarCamposConfigSessao();
+  trocandoTipoC01 = true;
   criterioMudou();
+  trocandoTipoC01 = false;
   atualizarBotaoPrincipal();
   atualizarBotaoPausa();
   atualizarBotaoFinalizar();
+  tipoC01Anterior = tipo;
 }
 
 // Troca os campos entre minutos e voltas. Antes de trocar, grava o que estava
-// sendo editado no modo antigo; depois carrega os valores do novo modo.
+// sendo editado no modo antigo; depois carrega o valor salvo do novo modo.
 // Tempo livre = 0 (sem limite) e não grava nada.
 function criterioMudou() {
   if (!document.getElementById("cfg-criterio")) return;
   const novoModo = _modoCriterio();
-  if (novoModo !== modoDuracaoAplicado &&
+  if (!cfgSessaoInicializando && !trocandoTipoC01 && novoModo !== modoDuracaoAplicado &&
       (modoDuracaoAplicado === "tempo" || modoDuracaoAplicado === "voltas")) {
     salvarDuracoesSessao();
   }
   _aplicarValoresDuracao();
   atualizarCamposConfigSessao();
 }
+
+// Salva enquanto o operador digita, sem depender de trocar de tipo ou critério.
+(function observarCamposC01() {
+  const card = document.getElementById("card-config-sessao");
+  if (!card) return;
+  const salvar = (ev) => {
+    if (cfgSessaoInicializando || !ev.target || !ev.target.id) return;
+    // O tipo é tratado por tipoSessaoMudou(): o event.input dispara antes do
+    // change, quando o <select> já mudou mas os campos ainda são do tipo antigo.
+    if (ev.target.id === "cfg-tipo") return;
+    if (ev.target.id === "cfg-duracao") salvarDuracoesSessao();
+    else if (ev.target.id.indexOf("cfg-") === 0) salvarCamposConfigSessao();
+  };
+  card.addEventListener("input", salvar);
+  card.addEventListener("change", salvar);
+})();
 
 // ---------------------------------------------------------------- escolha do campeonato (painel do operador)
 // O painel do operador apenas PERGUNTA qual campeonato rodar. Criar/editar levam
@@ -5072,8 +5124,12 @@ previewNome();
 aplicarAparencia();
 carregarIdioma();
 atualizarBotaoPrincipal();
-preencherDuracoesSessao(); // durações por tipo (Treino 60 · Classificação 10 · Corrida 4)
-tipoSessaoMudou();         // aplica a duração do tipo escolhido
+// Restaura o que foi deixado no C01 (por tipo) antes de aplicar a duração.
+cfgSessaoInicializando = true;
+carregarCamposConfigSessao(_tipoSessaoAtual());
+preencherDuracoesSessao();
+tipoSessaoMudou();
+cfgSessaoInicializando = false;
 carregarPlanoCampeonato(); // durações do CTAD usadas pelo tipo Campeonato
 atualizarBotaoPausa();
 atualizarBotaoFinalizar();

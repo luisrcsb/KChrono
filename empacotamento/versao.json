@@ -1,10 +1,10 @@
 {
-  "versao": "1.2.17",
+  "versao": "1.2.18",
   "canal": "estavel",
   "url_base": "",
-  "notas": "Versão 1.2.17 — C01 mostra so os campos relevantes para tipo e criterio da sessao",
+  "notas": "Versão 1.2.18 — C01 salva duracao e campos por tipo de sessao",
   "arquivos": {
-    "windows": "KChrono-Setup-1-2-17.exe",
-    "linux": "KChrono-1.2.17-x86_64.AppImage"
+    "windows": "KChrono-Setup-1-2-18.exe",
+    "linux": "KChrono-1.2.18-x86_64.AppImage"
   }
 }

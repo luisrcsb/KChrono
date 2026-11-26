@@ -103,8 +103,8 @@ Sem certificado configurado, a assinatura é simplesmente ignorada (no-op) e o
 build segue normal. Para assinar um arquivo já gerado:
 
 ```bat
-python empacotamento\assinar.py empacotamento\KChrono-Setup-1-2-17.exe
-python empacotamento\assinar.py --verificar empacotamento\KChrono-Setup-1-2-17.exe
+python empacotamento\assinar.py empacotamento\KChrono-Setup-1-2-18.exe
+python empacotamento\assinar.py --verificar empacotamento\KChrono-Setup-1-2-18.exe
 ```
 
 ### Gerar o instalador (NSIS)
@@ -112,7 +112,7 @@ python empacotamento\assinar.py --verificar empacotamento\KChrono-Setup-1-2-17.e
 1. Instale o [NSIS](https://nsis.sourceforge.io/).
 2. Abra `instalador.nsi` e compile (`makensis instalador.nsi`).
 3. Resultado: `empacotamento\KChrono-Setup-<versão>.exe` (ex.:
-   `KChrono-Setup-1-2-17.exe` — a versão entra no nome com hífens).
+   `KChrono-Setup-1-2-18.exe` — a versão entra no nome com hífens).
 
 O instalador copia a pasta **onedir** inteira, cria atalhos no Menu Iniciar e
 na Área de Trabalho, registra a desinstalação, preenche os **metadados**
