@@ -250,7 +250,8 @@ def _desativar_gpu_webview() -> None:
 
     O servidor headless e a interface no navegador continuam respondendo; só a
     janela nativa trava. Desligar a aceleração gráfica do WebView2 elimina esse
-    caminho sem mudar layout, botões ou dados.
+    caminho sem mudar layout, botões ou dados. A flag precisa entrar nas
+    CreationProperties ANTES do EnsureCoreWebView2Async do pywebview.
     """
     if sys.platform != "win32":
         return
@@ -260,21 +261,23 @@ def _desativar_gpu_webview() -> None:
         return
     if getattr(_ec, "_kchrono_sem_gpu", False):
         return
-    original_init = _ec.EdgeChrome.__init__
 
-    def _init_sem_gpu(self, form, window, cache_dir):
-        original_init(self, form, window, cache_dir)
-        try:
-            props = self.webview.CreationProperties
-            args = str(props.AdditionalBrowserArguments or "")
+    props_cls = _ec.CoreWebView2CreationProperties
+    propriedade = props_cls.AdditionalBrowserArguments
+
+    class _PropsSemGpu(props_cls):
+        @property
+        def AdditionalBrowserArguments(self):
+            return propriedade.__get__(self, props_cls)
+
+        @AdditionalBrowserArguments.setter
+        def AdditionalBrowserArguments(self, valor):
+            args = str(valor or "")
             if "--disable-gpu" not in args:
                 args = (args + " --disable-gpu --disable-gpu-compositing").strip()
-                props.AdditionalBrowserArguments = args
-                self.webview.CreationProperties = props
-        except Exception:
-            pass
+            propriedade.__set__(self, args)
 
-    _ec.EdgeChrome.__init__ = _init_sem_gpu
+    _ec.CoreWebView2CreationProperties = _PropsSemGpu
     _ec._kchrono_sem_gpu = True
 
 
