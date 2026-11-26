@@ -1,10 +1,10 @@
 {
-  "versao": "1.2.7",
+  "versao": "1.2.8",
   "canal": "estavel",
   "url_base": "",
-  "notas": "Versão 1.2.7 — redesenha botões da Configuração da sessão (estilo 1.2.2, dentro do card)",
+  "notas": "Versão 1.2.8 — restaura todos os campos de configuração de tempo e mantém botões fixos respondendo ao tipo de sessão",
   "arquivos": {
-    "windows": "KChrono-Setup-1-2-7.exe",
-    "linux": "KChrono-1.2.7-x86_64.AppImage"
+    "windows": "KChrono-Setup-1-2-8.exe",
+    "linux": "KChrono-1.2.8-x86_64.AppImage"
   }
 }

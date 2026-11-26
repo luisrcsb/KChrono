@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>KChrono — Precision Timing System</title>
-<link rel="stylesheet" href="/static/estilo.css?v=1.2.7">
+<link rel="stylesheet" href="/static/estilo.css?v=1.2.8">
 <link rel="icon" href="/imagens/KCHRONO-LOGO.png">
 <script src="/static/chart.umd.min.js"></script>
 </head>
@@ -110,22 +110,39 @@
             <div class="cfg-grupo">
               <h4 class="cfg-grupo-tit">Pré-corrida</h4>
               <div class="form-sessao centro">
-                <div><label>Tipo</label>
-                  <select id="cfg-tipo" onchange="tipoSessaoMudou()">
-                    <option value="treino">Treino</option>
-                    <option value="classificacao">Classificação</option>
-                    <option value="corrida">Corrida</option>
-                    <option value="campeonato">Campeonato</option>
-                  </select></div>
-                <div><label>Critério</label>
-                  <select id="cfg-criterio" onchange="criterioMudou()">
-                    <option value="tempo">Tempo</option>
-                    <option value="voltas">Voltas</option>
-                    <option value="livre">Tempo livre (sem limite)</option>
-                  </select></div>
-              </div>
+        <div><label>Tipo</label>
+          <select id="cfg-tipo" onchange="tipoSessaoMudou()">
+            <option value="treino">Treino</option>
+            <option value="classificacao">Classificação</option>
+            <option value="corrida">Corrida</option>
+            <option value="campeonato">Campeonato</option>
+          </select></div>
+        <div><label>Critério</label>
+          <select id="cfg-criterio" onchange="criterioMudou()">
+            <option value="Tempo">Tempo</option>
+            <option value="Voltas">Voltas</option>
+            <option value="livre">Tempo livre (sem limite)</option>
+          </select></div>
+        <div><label>Duração (min/voltas)</label><input id="cfg-duracao" value="10"></div>
+        <div><label>Contador regressivo (s)</label><input id="cfg-contador" value="10"></div>
+        <div><label>Aviso de saída (s)</label><input id="cfg-aviso-saida" value="30"></div>
+        <div><label>Tempo para terminar (s)</label><input id="cfg-terminar" value="30"></div>
+        <div><label>Tempo entre carros (s)</label><input id="cfg-entre-carros" value="2"></div>
+        <div><label>Método</label>
+          <select id="cfg-metodo"><option>Melhor tempo</option><option>Consecutivas</option></select></div>
+        <div><label>Saída</label>
+          <select id="cfg-saida"><option>1ª passagem pela meta</option><option>1ª detecção</option></select></div>
+        <div><label>Tempo mínimo de volta (s)</label><input id="cfg-tempo-minimo" value="3"></div>
+        <div><label>Média de N voltas</label>
+          <input id="cfg-media-n" value="3" title="Melhor média de N voltas consecutivas (coluna 'Média N' do telão)"></div>
+      </div>
             </div>
             <div class="acoes" style="margin-top:12px">
+              <button class="destaque" id="btn-acao-principal" onclick="acaoPrincipal()">▶ Iniciar treino</button>
+              <button id="btn-pausa" onclick="alternarPausa()" disabled>⏸ Pausar</button>
+              <button onclick="finalizar()">⏹ Finalizar</button>
+            </div>
+ style="margin-top:12px">
               <button class="destaque" id="btn-acao-principal" onclick="acaoPrincipal()" data-help="Inicia a sessão conforme o tipo selecionado (treino, classificação ou prepara a largada para corrida)">▶ Iniciar treino</button>
               <button id="btn-pausa" onclick="alternarPausa()" disabled title="Pausar o cronômetro da sessão">⏸ Pausar</button>
               <button onclick="finalizar()">⏹ Finalizar</button>
@@ -1165,7 +1182,7 @@
         <div class="grid g4">
           <div class="card sobre-versao" style="grid-column:1/-1">
             <h3>Versão</h3>
-            <div class="big" id="upd-versao">1.2.7</div>
+            <div class="big" id="upd-versao">1.2.8</div>
             <div class="sub">Resumo completo do sistema · fases 0 → 8 implementadas (fase 6 parcial)</div>
 
             <div class="resumo-sistema">
@@ -1260,8 +1277,8 @@
               <button class="btn-slide" onclick="encerrarApp()">⏹ Sair</button>
             </div>
             <p class="hint">Publique a versão nova como <b>release no GitHub</b> com tag igual à
-              versão (ex.: <code>v1.2.7</code>) — a CI anexa sozinha o instalador
-              <code>KChrono-Setup-1-2-7.exe</code>
+              versão (ex.: <code>v1.2.8</code>) — a CI anexa sozinha o instalador
+              <code>KChrono-Setup-1-2-8.exe</code>
               (Windows), o <code>KChrono-*.AppImage</code> (Linux) e a ISO da live. "Instalar agora"
               baixa, fecha o app e atualiza em silêncio — ao reabrir já é a versão nova (os dados
               ficam intactos).</p>
@@ -1285,12 +1302,12 @@
 <!-- rodapé fixo -->
 <div class="rodape-bar">
   <div class="dir">
-    <span>KChrono <span class="js-versao">v1.2.7</span> · por <b>Raphael Belowodski</b></span>
+    <span>KChrono <span class="js-versao">v1.2.8</span> · por <b>Raphael Belowodski</b></span>
   </div>
 </div>
 
-<script src="/static/tracado.js?v=1.2.7"></script>
-<script src="/static/app.js?v=1.2.7"></script>
+<script src="/static/tracado.js?v=1.2.8"></script>
+<script src="/static/app.js?v=1.2.8"></script>
 
 <!-- nova versão disponível (abre sozinho na abertura do app) -->
 <div id="modal-atualizacao" class="modal-fundo" style="display:none">
