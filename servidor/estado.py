@@ -2158,7 +2158,18 @@ class EstadoApp:
                    anunciar_posicoes_corrida_depois=None,
                    som_passagem=None, som_lider=None,
                    som_menor_volta=None, bip_luz=None, bip_vai=None,
-                   habilitados: Optional[Dict] = None) -> Dict:
+                   alarme_fim_corrida=None, falar_tempo_restante=None,
+                   tempo_restante_seg=None, tempo_restante_repetir_seg=None,
+                   posicoes_troca_lider=None, ler_tempos_treino=None,
+                   ler_estimativa_mudanca=None, ler_estimativa_cada_voltas=None,
+                   ler_recorde_melhor_volta_baterias=None,
+                   ler_todas_voltas_treino_livre=None,
+                   ler_classificacao_cada_min=None,
+                   ler_classificacao_durante_corrida=None,
+                   comecar_leitura_volta_n=None, casas_decimais_volta=None,
+                   ignorar_voltas_maiores_que=None, omitir_minutos_ritmo=None,
+                   chamar_pilotos_por=None,
+                   habilitados: Optional[Dict] = None, **extras) -> Dict:
         # os checkboxes dedicados de bip também ligam/desligam a chave do ModuloSom
         if any(v is not None for v in (som_passagem, som_lider,
                                        som_menor_volta, bip_luz, bip_vai)):
@@ -2229,6 +2240,49 @@ class EstadoApp:
             som_cfg["bip_luz"] = bool(bip_luz)
         if bip_vai is not None:
             som_cfg["bip_vai"] = bool(bip_vai)
+        # anúncios estendidos (C39/C42) — a interface envia todas as opções
+        if alarme_fim_corrida is not None:
+            som_cfg["alarme_fim_corrida"] = bool(alarme_fim_corrida)
+        if falar_tempo_restante is not None:
+            som_cfg["falar_tempo_restante"] = bool(falar_tempo_restante)
+        if tempo_restante_seg is not None:
+            som_cfg["tempo_restante_seg"] = max(0, int(tempo_restante_seg))
+        if tempo_restante_repetir_seg is not None:
+            som_cfg["tempo_restante_repetir_seg"] = \
+                max(0, int(tempo_restante_repetir_seg))
+        if posicoes_troca_lider is not None:
+            som_cfg["posicoes_troca_lider"] = max(0, int(posicoes_troca_lider))
+        if ler_tempos_treino is not None:
+            som_cfg["ler_tempos_treino"] = bool(ler_tempos_treino)
+        if ler_estimativa_mudanca is not None:
+            som_cfg["ler_estimativa_mudanca"] = bool(ler_estimativa_mudanca)
+        if ler_estimativa_cada_voltas is not None:
+            som_cfg["ler_estimativa_cada_voltas"] = \
+                max(0, int(ler_estimativa_cada_voltas))
+        if ler_recorde_melhor_volta_baterias is not None:
+            som_cfg["ler_recorde_melhor_volta_baterias"] = \
+                bool(ler_recorde_melhor_volta_baterias)
+        if ler_todas_voltas_treino_livre is not None:
+            som_cfg["ler_todas_voltas_treino_livre"] = \
+                bool(ler_todas_voltas_treino_livre)
+        if ler_classificacao_cada_min is not None:
+            som_cfg["ler_classificacao_cada_min"] = \
+                max(0, int(ler_classificacao_cada_min))
+        if ler_classificacao_durante_corrida is not None:
+            som_cfg["ler_classificacao_durante_corrida"] = \
+                bool(ler_classificacao_durante_corrida)
+        if comecar_leitura_volta_n is not None:
+            som_cfg["comecar_leitura_volta_n"] = max(1, int(comecar_leitura_volta_n))
+        if casas_decimais_volta is not None:
+            som_cfg["casas_decimais_volta"] = min(3, max(0, int(casas_decimais_volta)))
+        if ignorar_voltas_maiores_que is not None:
+            som_cfg["ignorar_voltas_maiores_que"] = \
+                max(0, int(ignorar_voltas_maiores_que))
+        if omitir_minutos_ritmo is not None:
+            som_cfg["omitir_minutos_ritmo"] = bool(omitir_minutos_ritmo)
+        if chamar_pilotos_por is not None and str(chamar_pilotos_por) in (
+                "nome", "numero", "dorsal"):
+            som_cfg["chamar_pilotos_por"] = str(chamar_pilotos_por)
         cfg["som"] = som_cfg
         salvar_config(cfg)
         self.config = cfg

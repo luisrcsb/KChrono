@@ -2376,6 +2376,9 @@ async function carregarSom() {
     op.anunciar_posicoes_classificacao_durante !== false;
   document.getElementById("som-pos-class-depois").checked =
     op.anunciar_posicoes_classificacao_depois === true;
+  const posCorridaDurante = document.getElementById("som-pos-corrida-durante");
+  if (posCorridaDurante) posCorridaDurante.checked =
+    op.anunciar_posicoes_corrida_durante !== false;
   document.getElementById("som-pos-corrida-depois").checked =
     op.anunciar_posicoes_corrida_depois === true;
   // Anúncios estendidos
@@ -2532,6 +2535,7 @@ async function salvarSom(silencioso) {
   document.querySelectorAll("#som-frases .frase-hab").forEach(cb => {
     habilitados[cb.getAttribute("data-chave")] = cb.checked;
   });
+  const posCorridaDurante = document.getElementById("som-pos-corrida-durante");
   const opcoes = {
     intervalo_posicoes: parseInt(document.getElementById("som-intervalo").value, 10) || 0,
     anunciar_a_cada_voltas: parseInt(document.getElementById("som-a-cada-voltas").value, 10) || 0,
@@ -2549,7 +2553,7 @@ async function salvarSom(silencioso) {
     anunciar_posicoes_classificacao_depois:
       document.getElementById("som-pos-class-depois").checked,
     anunciar_posicoes_corrida_durante:
-      !!(document.getElementById("som-ler-class-durante-corrida") || {}).checked,
+      posCorridaDurante ? posCorridaDurante.checked : true,
     anunciar_posicoes_corrida_depois:
       document.getElementById("som-pos-corrida-depois").checked,
   chamar_pilotos_por: (document.getElementById("som-chamar-pilotos") || {}).value || "nome",
@@ -3467,6 +3471,9 @@ async function carregarSom() {
     op.anunciar_posicoes_classificacao_durante !== false;
   document.getElementById("som-pos-class-depois").checked =
     op.anunciar_posicoes_classificacao_depois === true;
+  const posCorridaDurante = document.getElementById("som-pos-corrida-durante");
+  if (posCorridaDurante) posCorridaDurante.checked =
+    op.anunciar_posicoes_corrida_durante !== false;
   document.getElementById("som-pos-corrida-depois").checked =
     op.anunciar_posicoes_corrida_depois === true;
   // Anúncios estendidos
@@ -3623,6 +3630,7 @@ async function salvarSom(silencioso) {
   document.querySelectorAll("#som-frases .frase-hab").forEach(cb => {
     habilitados[cb.getAttribute("data-chave")] = cb.checked;
   });
+  const posCorridaDurante = document.getElementById("som-pos-corrida-durante");
   const opcoes = {
     intervalo_posicoes: parseInt(document.getElementById("som-intervalo").value, 10) || 0,
     anunciar_a_cada_voltas: parseInt(document.getElementById("som-a-cada-voltas").value, 10) || 0,
@@ -3640,7 +3648,7 @@ async function salvarSom(silencioso) {
     anunciar_posicoes_classificacao_depois:
       document.getElementById("som-pos-class-depois").checked,
     anunciar_posicoes_corrida_durante:
-      !!(document.getElementById("som-ler-class-durante-corrida") || {}).checked,
+      posCorridaDurante ? posCorridaDurante.checked : true,
     anunciar_posicoes_corrida_depois:
       document.getElementById("som-pos-corrida-depois").checked,
   chamar_pilotos_por: (document.getElementById("som-chamar-pilotos") || {}).value || "nome",
