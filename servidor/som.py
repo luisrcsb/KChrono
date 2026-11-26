@@ -36,7 +36,7 @@ FRASES_TTS = {
     "vai": "Vai!",
     "treino_iniciado": "Treino iniciado. Boa prática a todos!",
     "treino_finalizado": "Treino finalizado.",
-    "classificacao_iniciada": "Classificação iniciada. Cada piloto tem seu tempo.",
+    "classificacao_iniciada": "Classificação iniciada. Pista livre para todos os pilotos. Boa sorte!",
     "classificacao_finalizada": "Classificação finalizada.",
     "pausada": "Sessão pausada.",
     "retomada": "Sessão retomada.",

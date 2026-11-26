@@ -1,10 +1,10 @@
 {
-  "versao": "1.2.14",
+  "versao": "1.2.15",
   "canal": "estavel",
   "url_base": "",
-  "notas": "Versão 1.2.14 — C01 mostra selecao, criacao e edicao de campeonato acima dos botoes",
+  "notas": "Versão 1.2.15 — encurta anuncio de classificacao iniciada",
   "arquivos": {
-    "windows": "KChrono-Setup-1-2-14.exe",
-    "linux": "KChrono-1.2.14-x86_64.AppImage"
+    "windows": "KChrono-Setup-1-2-15.exe",
+    "linux": "KChrono-1.2.15-x86_64.AppImage"
   }
 }
