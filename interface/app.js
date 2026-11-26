@@ -4521,8 +4521,10 @@ function renderEstadoCampeonato(est) {
   const cards = document.querySelectorAll("#camp-plano-lista .plano-etapa");
   if (!el) return;
   const etapaEl = document.getElementById("camp-etapa-atual");
+  const topo = document.getElementById("camp-topo-info");
   if (!est || !est.ativo) {
     el.innerHTML = '<span class="hint">nenhum campeonato em andamento</span>';
+    if (topo) topo.hidden = true;
     if (etapaEl) etapaEl.textContent = "—";
     cards.forEach(c => c.classList.remove("atual"));
     const prox = document.getElementById("camp-proxima");
@@ -4534,6 +4536,13 @@ function renderEstadoCampeonato(est) {
   const e = est.etapa;
   const nome = e ? e.rotulo : "—";
   const tipo = e ? e.etapa : "";
+  if (topo) {
+    topo.hidden = false;
+    const topoEtapa = document.getElementById("camp-topo-etapa");
+    const topoTipo = document.getElementById("camp-topo-tipo");
+    if (topoEtapa) topoEtapa.textContent = `Etapa ${est.numero} de ${est.total}`;
+    if (topoTipo) topoTipo.textContent = nome;
+  }
   if (etapaEl) etapaEl.textContent = `Etapa ${est.numero} de ${est.total} — ${nome}`;
   cards.forEach((c, i) => c.classList.toggle("atual", i === est.indice));
   el.innerHTML = `

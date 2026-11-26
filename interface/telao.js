@@ -163,24 +163,22 @@ function aplicarFundoGrace(s) {
   else if (s && s.estado === "finalizado") body.classList.add("finalizado");
 }
 
+// Etapa do campeonato no topo do telão, no mesmo formato do painel do operador:
+// "ETAPA 1 DE 5 · TREINO".
+function rotuloEtapaCampeonato(camp) {
+  const e = (camp && camp.estado && camp.estado.etapa) ? camp.estado
+          : (camp && camp.etapa) ? camp : null;
+  if (!e || !e.etapa) return null;
+  const rotulo = String((e.etapa && e.etapa.rotulo) || "CAMPEONATO").toUpperCase();
+  const num = e.numero, tot = e.total;
+  return num && tot ? `ETAPA ${num} DE ${tot} · ${rotulo}` : rotulo;
+}
+
 function rotuloTipoSessao(tipo, camp) {
   const map = { treino: "TREINO", classificacao: "CLASSIFICAÇÃO", corrida: "CORRIDA",
                 campeonato: "CAMPEONATO" };
-  let base = map[String(tipo || "").toLowerCase()] || String(tipo || "SESSÃO").toUpperCase();
-  if (camp && camp.estado && camp.estado.etapa) {
-    const e = camp.estado;
-    const rotulo = (e.etapa && e.etapa.rotulo) ? e.etapa.rotulo : base;
-    const num = e.numero, tot = e.total;
-    if (num && tot) return `${String(rotulo).toUpperCase()} · ETAPA ${num} DE ${tot}`;
-    return String(rotulo).toUpperCase();
-  }
-  if (camp && camp.etapa) {
-    const rotulo = camp.etapa.rotulo || base;
-    const num = camp.numero, tot = camp.total;
-    if (num && tot) return `${String(rotulo).toUpperCase()} · ETAPA ${num} DE ${tot}`;
-    return String(rotulo).toUpperCase();
-  }
-  return base;
+  const base = map[String(tipo || "").toLowerCase()] || String(tipo || "SESSÃO").toUpperCase();
+  return rotuloEtapaCampeonato(camp) || base;
 }
 
 function atualizarTituloSessao(texto) {
@@ -258,10 +256,8 @@ function tratarEvento(ev) {
       break;
     case "campeonato":
       if (ev.estado) {
-        const et = (ev.estado.etapa && ev.estado.etapa.rotulo) ? ev.estado.etapa.rotulo : null;
-        const num = ev.estado.numero, tot = ev.estado.total;
-        let txt = et ? String(et).toUpperCase() : "CAMPEONATO";
-        if (num && tot) txt = `${txt} · ETAPA ${num} DE ${tot}`;
+        const txt = ev.estado.ativo === false ? "CAMPEONATO"
+                  : (rotuloEtapaCampeonato({ estado: ev.estado }) || "CAMPEONATO");
         atualizarTituloSessao(txt);
       }
       break;

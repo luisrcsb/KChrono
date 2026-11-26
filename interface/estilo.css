@@ -698,6 +698,13 @@ label.btn-slide{line-height:1.4}
 .camp-etapa-atual b{color:#fff; font-size:16px}
 .camp-etapa-num{color:var(--accent-gold); font-size:11.5px; font-weight:700;
   text-transform:uppercase; letter-spacing:.5px}
+/* C02 no topo do painel: etapa/tipo do campeonato sem empurrar o layout */
+.camp-topo-info{display:inline-flex; flex-direction:column; gap:2px; margin:6px 0 2px;
+  padding:6px 14px; border:1px solid rgba(255,183,3,.55); border-radius:10px;
+  background:rgba(255,183,3,.12); line-height:1.15}
+.camp-topo-info[hidden]{display:none}
+.camp-topo-info .etapa{color:var(--accent-gold); font-size:17px; font-weight:800; letter-spacing:.3px}
+.camp-topo-info .tipo{color:var(--text-main); font-size:12px; font-weight:600}
 .frase-input{display:flex; align-items:center; gap:10px; margin:8px 0; font-size:13px}
 .frase-input .rot{min-width:150px; color:var(--text-muted); font-size:11.5px}
 .frase-input input{flex:1; padding:8px 11px; border-radius:6px; border:1px solid var(--border-card);

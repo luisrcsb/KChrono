@@ -1,10 +1,10 @@
 {
-  "versao": "1.2.15",
+  "versao": "1.2.16",
   "canal": "estavel",
   "url_base": "",
-  "notas": "Versão 1.2.15 — encurta anuncio de classificacao iniciada",
+  "notas": "Versão 1.2.16 — mostra etapa do campeonato no topo do operador e do telao",
   "arquivos": {
-    "windows": "KChrono-Setup-1-2-15.exe",
-    "linux": "KChrono-1.2.15-x86_64.AppImage"
+    "windows": "KChrono-Setup-1-2-16.exe",
+    "linux": "KChrono-1.2.16-x86_64.AppImage"
   }
 }
